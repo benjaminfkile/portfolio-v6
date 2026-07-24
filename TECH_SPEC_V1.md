@@ -1,4 +1,4 @@
-# Portfolio v6 — Technical Specification
+# Portfolio v6 — v1 Technical Specification
 
 **Status:** Draft
 **Author:** Ben Kile
@@ -11,6 +11,12 @@
 Portfolio v6 replaces the v5 portfolio site with a content-managed system. The public
 site renders a page assembled from data rather than hardcoded JSX, plus a blog; an
 authenticated admin site is the only place that data can be created or changed.
+
+This is the **v1** spec. Its deliverable is a fully functional system. The public site
+ships a deliberately plain UI — semantic HTML, minimal CSS, no component library —
+contained so a later restyle is cheap (§14). The admin is the opposite: built once,
+fully, on MUI with complete theming (§14.4), because nobody should build an internal
+tool twice.
 
 The defining constraint: **the admin application must never be delivered to public
 visitors** — not as a guarded route, not as a lazily-loaded chunk. This is enforced
@@ -57,6 +63,7 @@ repository.
                     │    GET  /api/content        public, snapshot      │
                     │    GET  /api/posts[/:slug]  public, blog          │
                     │    GET  /api/status         public, live ~30s     │
+                    │    GET  /api/now-playing    public, live ~30s     │
                     │    ---- requireAdmin() ----                       │
                     │    CRUD /api/admin/sections, /api/admin/posts     │
                     │    POST /api/admin/media/upload-url               │
@@ -224,14 +231,15 @@ The public site holds a registry:
 
 ```ts
 const SECTION_REGISTRY = {
-  hero:      HeroSection,
-  about:     AboutSection,
-  timeline:  TimelineSection,
-  skills:    SkillsSection,
-  portfolio: PortfolioSection,
-  status:    StatusSection,     // live — §3.5
-  blog:      BlogSection,       // live — §3.5
-  contact:   ContactSection,
+  hero:        HeroSection,
+  about:       AboutSection,
+  timeline:    TimelineSection,
+  skills:      SkillsSection,
+  portfolio:   PortfolioSection,
+  status:      StatusSection,      // live — §3.5
+  blog:        BlogSection,        // live — §3.5
+  now_playing: NowPlayingSection,  // live — §3.5
+  contact:     ContactSection,
 } satisfies Record<SectionType, ComponentType<any>>;
 ```
 
@@ -248,6 +256,7 @@ doesn't recognize degrades rather than crashes.
 | `portfolio` | yes | `{ title, intro, description, media_id, playback_rate?, transform_value?, tech_icons[], links: Link[] }` |
 | `status` | no | — (live; config only) |
 | `blog` | no | — (live; config only) |
+| `now_playing` | no | — (live; config only) |
 | `contact` | no | — |
 
 #### The `Link` type
@@ -287,8 +296,8 @@ under small headings ("Repositories", "Live", "Docs"). No cap on count.
 
 ### 3.5 Live sections
 
-`status` and `blog` are **live sections**: their *configuration* is published into the
-snapshot, but their *data* is fetched at runtime by the component.
+`status`, `blog`, and `now_playing` are **live sections**: their *configuration* is
+published into the snapshot, but their *data* is fetched at runtime by the component.
 
 This exists because `/api/content` is an immutable document served with `ETag: W/"v42"`
 (§3.3) — the entire caching model depends on it not changing between publishes. Service
@@ -299,6 +308,7 @@ neither can live inside the snapshot without breaking that guarantee.
 |---|---|---|
 | `status` | which services to show, whether to show response times | `GET /api/status` |
 | `blog` | how many posts, tag filter | `GET /api/posts` |
+| `now_playing` | idle behavior (`hide` \| `message`), whether to show album art | `GET /api/now-playing` |
 
 Live-section components must render a loading state and must **degrade rather than
 error** — a failed `/api/status` fetch renders the section as unavailable, never a
@@ -327,6 +337,32 @@ Renders the N most recent published posts as teaser cards linking to `/blog/:slu
 Fetching the listing at runtime rather than embedding it in the snapshot is what keeps
 post publishing decoupled from page publishing — writing a post does not require
 republishing the page.
+
+#### `now_playing`
+
+Shows what the owner is currently listening to on Spotify: track title, artists,
+album, album art, and a link to the track. Data comes from `GET /api/now-playing`,
+which proxies Spotify server-side — the browser never talks to Spotify and never sees
+a Spotify credential (§4.6).
+
+- **Idle state is config, not accident.** When nothing is playing the section either
+  hides entirely or renders a short "not listening right now" message, per the
+  `idle` setting. Both are legitimate; which reads better is a design call.
+- **The component refetches on an interval** (~60s) while mounted, and pauses when
+  `document.hidden` — a backgrounded tab should not poll. This is the one live section
+  whose data changes *while the visitor is on the page*, which is exactly why it must
+  not be in the snapshot.
+- **Album art is hotlinked from Spotify's CDN** (`i.scdn.co`), not ingested into the
+  media pipeline. It is ephemeral, licensed content that Spotify serves and requires
+  linking back to; storing it in `bk-portfolio-v6-*` would be both a terms problem and
+  pointless duplication. This is the one place the public site renders an image that
+  is not on `media.benkile.com`.
+- Standard live-section rules apply: loading state, and **degrade rather than error** —
+  a failed fetch renders as idle, never a broken section.
+
+A "recently played" fallback (showing the last track when idle) is a deliberate
+non-goal for v1 — it needs a second Spotify scope and endpoint. The response shape
+leaves room for it (§4.6) if it's ever wanted.
 
 ### 3.6 The blog
 
@@ -420,8 +456,8 @@ changes.
 **v5's animated header does not carry over.** `HeaderBackgroundLogic.js` and its jQuery
 dependency are dropped, not ported — which removes jQuery from the project entirely.
 The `hero` section type is retained as a **static** section (title, tagline, optional
-background media) and no canvas or animation code is written for it. If the design
-direction (§14.1) ends up with no hero at all, deleting the type is one component and
+background media) and no canvas or animation code is written for it. If a future
+restyle (§14) ends up with no hero at all, deleting the type is one component and
 one registry line.
 
 ### 3.9 Validation
@@ -452,6 +488,7 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/health` | Returns 200 immediately. No DB call. |
 | `GET` | `/api/content` | Latest `page_versions.document`, media refs resolved to CDN URLs. `ETag` + `Cache-Control`. |
 | `GET` | `/api/status` | Curated service health for the `status` section (§3.5). Cached ~30s. |
+| `GET` | `/api/now-playing` | Current Spotify track for the `now_playing` section (§3.5, §4.6). Cached ~30s. |
 | `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
 | `GET` | `/api/posts/:slug` | One published post, `published_body` only. `ETag`. |
 
@@ -479,7 +516,15 @@ Responds `304` on a matching `If-None-Match`. If no version has ever been publis
 returns `200` with an empty `sections` array rather than a 404 — the public site should
 render an empty page, not an error.
 
-### 4.2 Admin endpoints — `requireAdmin()` on every route
+### 4.2 Admin endpoints — `requireAdmin()` on every route (two exceptions, marked †)
+
+Every route below sits behind `requireAdmin()` (§5.3), with one deliberate exception:
+the two preview-serialization routes marked **†** are guarded by a
+`requireAdminOrPreviewToken()` middleware that accepts *either* a bearer admin token
+*or* a valid preview token (§7). They must, because they are called by the public site
+inside the preview iframe — and the public bundle has no Cognito SDK by design (§2.1),
+so `requireAdmin()` alone would be unsatisfiable there. The preview token grants
+read-only access to exactly those two routes and nothing else.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -504,11 +549,12 @@ render an empty page, not an error.
 | `DELETE` | `/api/admin/posts/:id` | Delete a post |
 | `POST` | `/api/admin/posts/:id/publish` | Validate + `published_body := draft_body` |
 | `POST` | `/api/admin/posts/:id/unpublish` | Null `published_at`, retain `published_body` |
-| `GET` | `/api/admin/preview` | Serialize the **draft** page in `/api/content` shape |
-| `GET` | `/api/admin/preview/posts/:id` | Serialize a post's **draft** body |
+| `POST` | `/api/admin/preview-token` | Mint an opaque 15-min read-only preview token (§7) |
+| `GET` | `/api/admin/preview` † | Serialize the **draft** page in `/api/content` shape |
+| `GET` | `/api/admin/preview/posts/:id` † | Serialize a post's **draft** body |
 | `POST` | `/api/admin/publish` | Validate + snapshot → new version |
 | `GET` | `/api/admin/versions` | Version history |
-| `POST` | `/api/admin/versions/:v/restore` | Re-publish an old document |
+| `POST` | `/api/admin/versions/:v/restore` | Restore an old version — new snapshot **and** working-set reset (see below) |
 
 Reorder takes a full ordered array rather than per-item position patches. It's one
 transaction, it's idempotent, and it makes drag-and-drop trivial to implement correctly.
@@ -517,6 +563,17 @@ Post block bodies are written wholesale via `PATCH .../posts/:id` with a complet
 `draft_body` array — blocks are not individually addressable endpoints. The editor holds
 the array in memory and saves it as a unit, which keeps ordering, insertion, and
 deletion as plain array operations rather than nine more routes.
+
+**Restore rewrites the working set.** `POST /api/admin/versions/:v/restore` does two
+things in one transaction: it re-publishes version *v*'s document as a new version (the
+live site changes immediately), and it **replaces the entire working set** — `sections`
+and `section_items` are deleted and rebuilt from the restored document. The second half
+is not optional: without it, the admin would still hold the newer draft after a
+restore, and the next publish would silently undo it. The consequence is that
+**unpublished edits are lost on restore**, so the admin UI must state this and confirm
+before invoking it. Media referenced only by the discarded draft is not deleted by the
+restore itself — it simply becomes unreferenced, and the normal GC pass (§6.9) gives it
+the standard 30-day grace period, during which re-referencing rescues it.
 
 ### 4.3 Response envelope
 
@@ -532,6 +589,81 @@ Match the `file-manager-api` convention already in use:
 Do **not** carry over v5's `res.render("error", …)` handler — no view engine is
 configured, so it throws instead of returning a clean 500. Use file-manager-api's JSON
 error handler.
+
+### 4.5 Concurrency
+
+Wholesale writes — a complete `draft_body` array, a full `data` blob — mean two open
+admin tabs (or one stale tab left open overnight) can silently overwrite each other's
+work. Every `PATCH` on sections, items, and posts therefore carries an optimistic
+concurrency precondition: the client sends `expected_updated_at`, the row's
+`updated_at` as it last read it, and the API compares before writing.
+
+- **Match** → the write proceeds and the response returns the new `updated_at`.
+- **Mismatch** → **409**, no write. The client refetches, and the admin UI surfaces
+  "this changed since you loaded it" rather than silently losing either copy.
+- `expected_updated_at` is **required** on these routes, not optional — an
+  unconditional overwrite should be impossible to express, not merely discouraged.
+
+The reorder routes (`PUT .../order`) are exempt: they are idempotent full-array
+replacements, and losing a race there costs a re-drag, not data. `POST
+/api/admin/publish` needs no precondition either — it snapshots whatever the working
+set is at that moment, and preview exists precisely to check that state first.
+
+This is deliberately lighter than per-field merging or real-time collaboration, which
+a single-admin system does not need. It is a seatbelt for the two-tab case, priced
+accordingly: one timestamp comparison per write.
+
+### 4.6 Spotify integration — `/api/now-playing`
+
+The `now_playing` section (§3.5) needs Spotify's *Get Currently Playing Track*
+endpoint, which requires a user-authorized token with the
+`user-read-currently-playing` scope — client-credentials auth cannot read a user's
+playback. The API proxies it for the same reasons `/api/status` proxies the gateway:
+the credential stays server-side, the exposed shape is a deliberate choice, and a
+server-side cache means visitor traffic never multiplies upstream calls.
+
+**One-time bootstrap.** Create a Spotify app in the developer dashboard (redirect URI
+`http://127.0.0.1:8888/callback`), then run `scripts/spotify-auth.ts` locally: it
+walks the authorization-code flow in a browser, exchanges the code, and prints the
+**refresh token**. Store client id, client secret, and refresh token in Secrets
+Manager (§9.3). Spotify refresh tokens do not expire; if one is ever revoked, the
+symptom is a 400 `invalid_grant` on refresh, and the fix is re-running the bootstrap.
+One Spotify app and one refresh token serve both environments — prod and dev are
+reading the same person's playback.
+
+**Runtime flow.** The API holds the current access token in memory, exchanging the
+refresh token for a new one on startup and whenever a request 401s or the ~1-hour
+expiry passes. `GET /api/now-playing` then:
+
+1. Serves from a ~30-second in-memory cache when fresh. Whatever the visitor count,
+   Spotify sees at most ~2 requests/minute — this is what protects the app's rate
+   limit, and it makes the endpoint safe to poll from the client (§3.5).
+2. On a cache miss, calls `GET /v1/me/player/currently-playing`. Spotify returns
+   **204 when nothing is playing** — that is a normal response, not an error.
+3. Returns a curated shape, never Spotify's raw payload:
+
+```jsonc
+{ "playing": true,
+  "track": {
+    "title":       "…",
+    "artists":     ["…"],
+    "album":       "…",
+    "art_url":     "https://i.scdn.co/image/…",
+    "url":         "https://open.spotify.com/track/…",
+    "progress_ms": 83000,
+    "duration_ms": 214000
+  } }
+// or
+{ "playing": false }
+```
+
+On any Spotify failure — timeout, 5xx, auth breakage — the endpoint returns
+`{ "playing": false }` and logs. It never surfaces an upstream error to the public
+site; a broken Spotify integration renders as "not listening," which is the §3.5
+degrade rule applied.
+
+No Spotify token, in any form, is ever included in a response. The browser's only
+contact with Spotify is the hotlinked album art and the outbound track link (§3.5).
 
 ---
 
@@ -959,6 +1091,13 @@ The preview token is minted by `POST /api/admin/preview-token` (behind `requireA
 is opaque and single-purpose, and expires in 15 minutes. It grants read-only access to
 draft content and nothing else, so it is safe to place in a URL.
 
+The token is what makes the flow possible at all: the public site has no Cognito SDK
+and no bearer token by design (§2.1), so the two preview-serialization endpoints are
+the only admin routes **not** guarded by `requireAdmin()` alone — they accept either an
+admin bearer token or a valid preview token, via `requireAdminOrPreviewToken()` (§4.2).
+The token authorizes exactly those two `GET`s; every mutating route still requires a
+real admin token.
+
 The public site must send `X-Robots-Tag: noindex` (or a `<meta>` equivalent) when in
 preview mode.
 
@@ -1020,7 +1159,10 @@ It also means the preview iframe targets a path, not just a query string (§7).
 
 ### 8.3 `portfolio-v6-admin`
 
-Vite + React + TypeScript + MUI (consistent with `FileManager`).
+Vite + React + TypeScript + **MUI** (consistent with `FileManager`). The admin is
+exempt from §14's plain-HTML constraint, which applies to the public site only: it is
+fully themed — light and dark palettes, system theme detection, persisted manual
+override — and **fully built out in phase 1**. See §14.4.
 
 ```
 └── src/
@@ -1124,7 +1266,10 @@ Shape (following the v5 `IAPISecrets` convention):
   "cdn_domain": "media.benkile.com",          // media-dev.benkile.com in the dev secret
   "cognito_user_pool_id": "us-east-1_…",
   "cognito_client_id": "…",
-  "aws_region": "us-east-1"
+  "aws_region": "us-east-1",
+  "spotify_client_id": "…",          // §4.6 — same values in prod and dev secrets
+  "spotify_client_secret": "…",
+  "spotify_refresh_token": "…"
 }
 ```
 
@@ -1361,15 +1506,17 @@ serving during the ~7 minute refresh.
    instance refresh. Confirm `api.benkile.com/portfolio-v6-api/api/health` answers.
 4. **Migrations + schema** — six tables, Zod schemas for sections, items, and blocks,
    `/api/schema`.
-5. **Admin auth** — port `cognitoClient.ts` and the interceptors, `requireAdmin()`,
-   login page. Prove end-to-end auth before building any CRUD.
+5. **Admin auth + shell** — port `cognitoClient.ts` and the interceptors,
+   `requireAdmin()`, login page, and the MUI app shell with the theme module (system
+   detection, mode toggle — §14.4). Prove end-to-end auth before building any CRUD.
 6. **Admin CRUD** — sections, items, reordering, and the `Link[]` editor.
 7. **Media** — presigned upload + confirm, tagging, CDN URL resolution, bucket lifecycle
    rules, admin media library. Verify a CloudFront URL renders and that video Range/seek
    works at the edge before building the library UI on top of it.
 8. **Publish** — validation, snapshot, `/api/content`, version history, and the
    post-publish GC pass (§6.9).
-9. **Public site** — router, section components, registry, fetch and render.
+9. **Public site** — router, section components, registry, fetch and render. Styled
+   per §14: plain semantic HTML, CSS Modules, tokens file.
 10. **Preview** — preview token, `?preview=` handling in the public site, admin iframe.
 11. **Blog** — `posts` CRUD, the block editor, `/api/posts`, the public `/blog` and
     `/blog/:slug` routes, code-block rendering with highlighting and copy, post preview,
@@ -1378,8 +1525,9 @@ serving during the ~7 minute refresh.
     project and it reuses the media picker (7), the publish validation pattern (8), the
     renderer registry (9), and preview (10). Building it earlier means building those
     four things twice.
-12. **Status section** — `/api/status`, the live-section fetch pattern, degraded-state
-    rendering.
+12. **Live sections** — `/api/status` and `/api/now-playing` (Spotify app + one-time
+    auth bootstrap — §4.6), the live-section fetch pattern, degraded-state rendering,
+    and the `now_playing` poll-while-visible behavior.
 13. **Content migration** — move v5's about/portfolio/skills/timeline rows and S3
     objects into the new model. Project links migrate mechanically:
     `url` → `{ type: 'prod', label: 'Live site' }`, `repo` → `{ type: 'repo', label: <repo name> }`.
@@ -1424,26 +1572,108 @@ event and nothing in v6 blocks on one.
 | `Link[]` replaces `url`/`repo` scalars | A project can span five repos plus dev and prod deployments. Required `label` is what makes five `repo` links distinguishable. |
 | Posts use draft/published columns, not snapshots | A post is a single row — already atomic, already a one-query read. Snapshotting would add a table and a second publishing mechanism for rollback alone. |
 | Post bodies are typed block arrays, not markdown or HTML | Code blocks are first-class objects with a `language` field. Storing HTML would put sanitization in the render path. |
-| Live sections (`status`, `blog`) fetch at runtime | Their data is time-varying and cannot sit in an immutable ETag-cached snapshot. |
+| Live sections (`status`, `blog`, `now_playing`) fetch at runtime | Their data is time-varying and cannot sit in an immutable ETag-cached snapshot. |
+| `now_playing` proxies Spotify server-side, never from the browser | The refresh token stays in Secrets Manager; the ~30s cache caps Spotify at ~2 req/min regardless of traffic; the exposed shape is a deliberate choice (§4.6). |
+| Album art hotlinked from Spotify's CDN | Ephemeral licensed content stays out of the media pipeline; Spotify serves it and its terms require linking back. The only non-`media.benkile.com` image on the site. |
 | Post block bodies saved wholesale | Ordering, insertion, and deletion stay array operations instead of nine more endpoints. |
 | Client-side syntax highlighting | Keeps the API free of rendering concerns and `code` raw; avoids republishing every post on a theme change. |
 | Routing Middleware for post metadata, not prerendering | Keeps publishing instant and the API→Vercel coupling absent. Works on a static Vite build; no framework adoption. |
+| Restore resets the working set, discarding unpublished edits | Live site and draft must agree after a restore; otherwise the next publish silently reverts it. The admin UI warns before invoking (§4.2). |
+| Preview-serialization routes accept the preview token | The public site renders previews and has no Cognito SDK by design; `requireAdmin()` alone would be unsatisfiable there (§4.2, §7). |
+| Optimistic concurrency via required `expected_updated_at` | Wholesale writes from two tabs would silently clobber each other; 409 + refetch is the cheapest correct answer for a single-admin system (§4.5). |
+| Public-site v1 UI is plain semantic HTML + minimal CSS, no component library | Owner decision. The v1 deliverable there is a functional UI, not polish; the future restyle lands on the public site (§14). |
+| Public-site styling contained to CSS Modules + one tokens file | Makes the future restyle a mechanical leaf-file swap — markup replaced, `*.module.css` deleted, tokens mapped (§14.3). |
+| Admin is MUI, fully themed, fully built in v1 | Owner decision. Audience of one and no restyle planned — an interim plain admin would mean building it twice (§8.3, §14.4). |
+| Admin reorder is drag-and-drop | The full-array `PUT` (§4.2) was designed for it; the admin is built once, so no up/down-button interim (§14.4). |
 
 ---
 
-## 14. Open questions
+## 14. Design & styling — v1
 
-1. **Design/theming — undecided, non-blocking.** Whether v6 is a visual redesign or a
-   re-platform of the v5 look is still open. It does not block any structural work: the
-   section registry (§3.4) fixes the *shape* of content, and styling is confined to the
-   renderer components in `portfolio-v6`. Steps 1–8 of §12 — infrastructure, API, auth,
-   admin CRUD, media, publish — can be built to completion without answering it. It only
-   gates §12 step 9, and it does change that step's size substantially.
+**The two frontends get opposite treatments, deliberately.**
 
-   Direction so far: an operations-console aesthetic, with the `status` section (§3.5) as
-   one element among many rather than the organising metaphor for the whole site.
+- **The public site ships plain semantic HTML with minimal CSS.** No component
+  library, no CSS framework, no CSS-in-JS. Its v1 deliverable is a *functional* UI —
+  every feature works and is usable, none of it is polished. The "operations-console
+  aesthetic" previously floated is a future restyle, not part of v1, and nothing in v1
+  should anticipate it. What matters is not how it looks but how cheaply its styling
+  can be replaced; §14.1–14.3 exist so the restyle is a mechanical swap, not an
+  excavation.
+- **The admin is built once, fully, on MUI** — themed, complete, and *not* part of any
+  future restyle (§14.4). It has an audience of one and no design direction pending,
+  so shipping an interim plain version would mean building it twice.
 
-Design is now the only open question in this spec.
+The containment rules below apply to the **public site only**.
+
+### 14.1 Containment rules (public site)
+
+1. **Markup is semantic HTML.** `<button>`, `<nav>`, `<form>`, `<label>` — native
+   elements throughout. A future library replaces these element-for-component;
+   nothing needs untangling first.
+2. **All appearance lives in co-located CSS Modules** — `HeroSection.tsx` sits next to
+   `HeroSection.module.css`. CSS Modules are built into Vite (zero new dependencies),
+   and the scoping is the point: deleting any component's stylesheet can never break
+   another component. Removing v1's look *is* deleting the `*.module.css` files.
+3. **One global stylesheet**, `src/styles/global.css`: a reset plus design tokens as
+   CSS custom properties (`--color-*`, `--space-*`, `--font-*`). Component styles
+   reference tokens, never literal values, so what little theming v1 has lives in one
+   file.
+4. **No inline styles** except genuinely dynamic values (a computed transform, a
+   progress width). No styling logic in TSX — components emit class names only.
+5. **Do not grow a bespoke design system.** No `ui/` directory of styled wrappers —
+   that is building the thing the future library replaces. If a pattern genuinely
+   repeats (a confirm dialog, a form row), a trivial shared component is fine and
+   becomes a natural swap point later; its job is markup reuse, not visual ambition.
+
+### 14.2 What "functional" means (public site)
+
+- A readable centered column: `max-width`, system font stack, sensible whitespace from
+  the tokens file. Essentially the no-stylesheet look, tidied.
+- Fluid media (`max-width: 100%`) and single-column flow are the entire responsive
+  strategy. No breakpoint system.
+- No animations, no transitions, no dark mode, no custom fonts. (All of this applies
+  to the public site only — the admin *is* themed, including dark mode; §14.4.)
+- The accessibility floor comes free with the rules above: native controls, real
+  labels, `alt` text (already modelled — `media_assets.alt`), browser-default focus
+  states left intact.
+- Two things that look like polish but are **not** cut, because they are content
+  rendering and correctness rather than chrome: code-block highlighting with the copy
+  control (§3.7), and live-section loading/degraded states (§3.5).
+
+### 14.3 The later swap (public site)
+
+Restyling the public site touches exactly three kinds of file: leaf component markup
+(`sections/`, `blocks/`, `pages/`), the `*.module.css` files (deleted), and the tokens
+file (mapped onto whatever replaces it — a component library's theme or a real design
+system). The registries (§3.4, §3.7) already fence rendering into leaf components, and
+nothing outside those leaves encodes appearance — documents store content (§3.2),
+media URLs resolve at read time (§6.8), and the API has no rendering concerns at all.
+The swap is wide but shallow, which is the tolerable kind. The admin is untouched by
+it.
+
+### 14.4 The admin: MUI, themed, final
+
+The admin uses **MUI** (consistent with `FileManager`) and is **fully built out in
+phase 1** — the section editors, block editor, media library, and version history ship
+as complete MUI implementations, not placeholders awaiting a restyle. There is no
+sense building that part twice.
+
+- **One theme module.** Light and dark palettes defined together. Mode follows the
+  system by default (`prefers-color-scheme` detection), with a manual
+  light / dark / system toggle persisted in `localStorage`; `CssBaseline` applies it
+  globally.
+- **Styling goes through the theme.** Palette, spacing, and typography come from the
+  theme object; per-component tweaks use `sx`. No parallel CSS files in the admin —
+  MUI is the styling system there, which is its own form of containment.
+- **Reorder is drag-and-drop.** The full-array `PUT` (§4.2) was designed for exactly
+  this, and with the admin built once there is no reason to ship an up/down-button
+  interim.
+
+---
+
+## 15. Open questions
+
+None. Design was the last one; resolved in §14.
 
 ### Resolved
 
@@ -1455,3 +1685,4 @@ Design is now the only open question in this spec.
 | — | Version retention | **50.** As specified in §3.3. |
 | — | Cutover strategy | **Owner-managed.** v6 ships to `v6.benkile.com`; apex swapped in Vercel when v5 is retired (§12). |
 | — | Dev container needed? | **Yes.** `portfolio-v6-api-dev` on 4002 is permanent, along with the dev pool, database, bucket, distribution, and secret. |
+| — | Design/theming | **Split by frontend (§14).** Public site: plain HTML + minimal CSS under containment rules; restyle later. Admin: fully themed MUI (system theme detection, dark mode), built out completely in v1 (§14.4). |
