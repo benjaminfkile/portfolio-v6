@@ -1,0 +1,15 @@
+.block {
+  margin-block: var(--space-lg);
+}
+
+.media {
+  width: 100%;
+  border-radius: var(--radius);
+}
+
+.caption {
+  margin-top: var(--space-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}

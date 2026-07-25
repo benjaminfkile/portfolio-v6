@@ -1,0 +1,16 @@
+.list {
+  margin-block: var(--space-md);
+  padding-inline-start: var(--space-lg);
+}
+
+.list li {
+  margin-block: var(--space-2xs);
+}
+
+.list code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background-color: var(--color-surface);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius);
+}

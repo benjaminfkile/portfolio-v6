@@ -1,0 +1,55 @@
+.block {
+  margin-block: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-2xs) var(--space-sm);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.filename {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* When there is no filename the copy button sits alone at the right. */
+.header:not(:has(.filename)) {
+  justify-content: flex-end;
+}
+
+.copy {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  padding: var(--space-3xs) var(--space-xs);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.copy:hover {
+  background-color: var(--color-surface);
+}
+
+.pre {
+  margin: 0;
+  padding: var(--space-md);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.line {
+  display: inline;
+  white-space: pre;
+}

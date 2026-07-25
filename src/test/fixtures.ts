@@ -1,4 +1,4 @@
-import type { ContentDocument } from '../types/content';
+import type { ContentDocument, Post, PostSummary } from '../types/content';
 
 /**
  * A realistic published document exercising every static section type (hero,
@@ -140,3 +140,78 @@ export const fixtureDocument: ContentDocument = {
     },
   ],
 };
+
+/**
+ * A post whose body exercises every one of the eight block types (spec §3.7),
+ * plus a trailing unknown block that must degrade to nothing. Its media map
+ * resolves the one `media` block's id. Used to drive the block-pipeline tests.
+ */
+export const fixturePost: Post = {
+  slug: 'hello-blocks',
+  title: 'Every block, once',
+  excerpt: 'A post that renders one of each block type.',
+  cover: {
+    url: 'https://media.benkile.com/media/posts/cover.jpg',
+    alt: 'Post cover',
+  },
+  tags: ['engineering', 'react'],
+  published_at: '2026-07-20T09:00:00Z',
+  media: {
+    'media-inline': {
+      url: 'https://media.benkile.com/media/posts/diagram.png',
+      alt: 'An architecture diagram',
+    },
+  },
+  body: [
+    { type: 'heading', level: 2, text: 'A heading' },
+    {
+      type: 'paragraph',
+      text: 'Some **bold**, some *italic*, some `code`, and a [link](https://example.com).',
+    },
+    {
+      type: 'code',
+      language: 'typescript',
+      code: 'const answer: number = 42;\nconsole.log(answer);',
+      filename: 'src/answer.ts',
+    },
+    { type: 'media', media_id: 'media-inline', caption: 'The diagram' },
+    { type: 'list', ordered: false, items: ['First item', 'Second **item**'] },
+    { type: 'quote', text: 'A quotable line.', attribution: 'Someone' },
+    {
+      type: 'links',
+      links: [
+        {
+          type: 'repo',
+          label: 'Source',
+          url: 'https://github.com/example/repo',
+        },
+      ],
+    },
+    { type: 'divider' },
+    // Unknown block — must render nothing rather than crash (§3.7).
+    { type: 'mystery' } as unknown as Post['body'][number],
+  ],
+};
+
+/** A page of post summaries with a following cursor, for pagination tests. */
+export const fixturePostSummaries: PostSummary[] = [
+  {
+    slug: 'first-post',
+    title: 'First post',
+    excerpt: 'The very first one.',
+    cover: {
+      url: 'https://media.benkile.com/media/posts/first.jpg',
+      alt: 'First cover',
+    },
+    tags: ['engineering'],
+    published_at: '2026-07-24T10:00:00Z',
+  },
+  {
+    slug: 'second-post',
+    title: 'Second post',
+    excerpt: 'Another one.',
+    cover: null,
+    tags: ['react'],
+    published_at: '2026-07-18T10:00:00Z',
+  },
+];
