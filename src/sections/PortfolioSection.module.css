@@ -1,0 +1,55 @@
+.portfolio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl) 0;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.project {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.media {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.projectTitle {
+  font-size: var(--font-size-lg);
+}
+
+.intro {
+  color: var(--color-text-muted);
+}
+
+.techIcons {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.techIcon {
+  width: var(--space-lg);
+  height: var(--space-lg);
+}
+
+.description {
+  color: var(--color-text);
+}

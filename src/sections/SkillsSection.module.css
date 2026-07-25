@@ -1,0 +1,47 @@
+.skills {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xl) 0;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.skill {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.icon {
+  width: var(--space-lg);
+  height: var(--space-lg);
+}
+
+.skillTitle {
+  font-size: var(--font-size-lg);
+}
+
+.description {
+  color: var(--color-text-muted);
+}
+
+.meter {
+  width: 100%;
+}

@@ -1,0 +1,54 @@
+.row {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.groupHeading {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.link {
+  font-weight: var(--font-weight-medium);
+}
+
+/* A small type indicator (spec §3.4: "type drives the icon"). Decorative — the
+ * link's label carries the accessible name, so the glyph is hidden from the
+ * accessibility tree via the pseudo-element. */
+.link::before {
+  content: '\2192\00a0';
+  color: var(--color-text-muted);
+}
+
+.link[data-link-type='repo']::before {
+  content: '{ }\00a0';
+}
+
+.link[data-link-type='docs']::before {
+  content: '\00b6\00a0';
+}
+
+.link[data-link-type='demo']::before {
+  content: '\25b6\00a0';
+}
+
+.link[data-link-type='package']::before {
+  content: '\2b21\00a0';
+}
