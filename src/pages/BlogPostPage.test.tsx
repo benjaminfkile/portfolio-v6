@@ -17,9 +17,9 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
   } as unknown as Response;
 }
 
-function renderAt(slug: string) {
+function renderAt(entry: string) {
   return render(
-    <MemoryRouter initialEntries={[`/blog/${slug}`]}>
+    <MemoryRouter initialEntries={[entry.startsWith('/') ? entry : `/blog/${entry}`]}>
       <Routes>
         <Route path="/blog/:slug" element={<BlogPostPage />} />
       </Routes>
@@ -90,5 +90,47 @@ describe('BlogPostPage (spec §3.7, §4.1)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /could not be loaded/i,
     );
+  });
+
+  describe('preview mode (§7)', () => {
+    it('fetches /api/admin/preview/posts/:id verbatim (by id, with token) and injects noindex', async () => {
+      const draft = { ...fixturePost, title: 'Draft post' };
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(draft));
+      vi.stubGlobal('fetch', fetchMock);
+
+      renderAt('/blog/whatever-slug?preview=tok9&postId=42');
+
+      await screen.findByRole('heading', { name: 'Draft post', level: 1 });
+
+      // The draft is addressed by id on the preview route, carrying the token.
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(url).toContain('/api/admin/preview/posts/42');
+      expect(url).toContain('tok9');
+      // The public single-post endpoint is never hit in preview mode.
+      expect(
+        fetchMock.mock.calls.some((c) =>
+          String(c[0]).startsWith('/api/posts/whatever-slug'),
+        ),
+      ).toBe(false);
+
+      // noindex meta injected + the preview indicator shown (§7).
+      const meta = document.head.querySelector('meta[name="robots"]');
+      expect(meta).toHaveAttribute('content', 'noindex');
+      expect(screen.getByText(/preview/i)).toBeInTheDocument();
+    });
+
+    it('shows a plain failure message for an invalid / expired token', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({}, { ok: false, status: 401 }));
+      vi.stubGlobal('fetch', fetchMock);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      renderAt('/blog/whatever-slug?preview=expired&postId=42');
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /invalid or has expired/i,
+      );
+    });
   });
 });

@@ -96,3 +96,101 @@ export function getPosts(
 export function getPost(slug: string, init?: RequestInit): Promise<Post> {
   return apiFetch<Post>(`/api/posts/${encodeURIComponent(slug)}`, init);
 }
+
+/* ---- Live section: status (spec §3.5) ------------------------------------- */
+
+/**
+ * One curated service in the `status` section's response. The gateway's raw
+ * `/api/health` is never exposed; `/api/status` returns a deliberate shape
+ * (spec §3.5): a name, whether it is up, and an optional response time the
+ * section renders only when its `show_response_times` config is on.
+ */
+export interface ServiceStatus {
+  name: string;
+  ok: boolean;
+  response_time_ms?: number;
+}
+
+/**
+ * `GET /api/status` — curated service health for the `status` section (spec
+ * §3.5). The endpoint returns 200 with `degraded: true` when the upstream
+ * gateway reports an outage (the gateway's own 503 translated into an honest,
+ * cached, deliberately-shaped body); the section shows that as degraded rather
+ * than as a failure.
+ */
+export interface StatusResponse {
+  degraded: boolean;
+  services: ServiceStatus[];
+}
+
+/** `GET /api/status` — see {@link StatusResponse}. */
+export function getStatus(init?: RequestInit): Promise<StatusResponse> {
+  return apiFetch<StatusResponse>('/api/status', init);
+}
+
+/* ---- Live section: now-playing (spec §3.5, §4.6) -------------------------- */
+
+/** The curated track shape returned by `/api/now-playing` (spec §4.6). */
+export interface NowPlayingTrack {
+  title: string;
+  artists: string[];
+  album: string;
+  /** Hotlinked from Spotify's CDN (`i.scdn.co`), never ingested (spec §3.5). */
+  art_url: string;
+  /** Outbound `open.spotify.com` track link. */
+  url: string;
+  progress_ms?: number;
+  duration_ms?: number;
+}
+
+/**
+ * `GET /api/now-playing` — the owner's current Spotify track (spec §4.6). The
+ * API proxies Spotify server-side and returns `{ playing: false }` both when
+ * nothing is playing and on any upstream failure, so the browser never sees a
+ * Spotify error — a broken integration simply reads as "not listening" (§3.5).
+ */
+export type NowPlayingResponse =
+  | { playing: true; track: NowPlayingTrack }
+  | { playing: false };
+
+/** `GET /api/now-playing` — see {@link NowPlayingResponse}. */
+export function getNowPlaying(init?: RequestInit): Promise<NowPlayingResponse> {
+  return apiFetch<NowPlayingResponse>('/api/now-playing', init);
+}
+
+/* ---- Preview (spec §7) ---------------------------------------------------- */
+
+/**
+ * `GET /api/admin/preview` — serialize the **draft** page in `/api/content`
+ * shape (spec §7). Called by the public site (not the admin) when the URL
+ * carries `?preview=<token>`; the opaque, 15-minute token is forwarded as
+ * `?token=` and authorizes this read-only GET via `requireAdminOrPreviewToken`
+ * (§4.2). An invalid or expired token yields a non-2xx {@link ApiError} the
+ * caller renders as a plain failure message.
+ */
+export function getPreviewContent(
+  token: string,
+  init?: RequestInit,
+): Promise<ContentDocument> {
+  return apiFetch<ContentDocument>(
+    `/api/admin/preview?token=${encodeURIComponent(token)}`,
+    init,
+  );
+}
+
+/**
+ * `GET /api/admin/preview/posts/:id` — serialize a post's **draft** body in
+ * `/api/posts/:slug` shape (spec §7). Reached on a blog route carrying
+ * `?preview=<token>&postId=<id>`; the post is addressed by `id`, not slug,
+ * because a draft may not have a stable slug yet.
+ */
+export function getPreviewPost(
+  postId: string,
+  token: string,
+  init?: RequestInit,
+): Promise<Post> {
+  return apiFetch<Post>(
+    `/api/admin/preview/posts/${encodeURIComponent(postId)}?token=${encodeURIComponent(token)}`,
+    init,
+  );
+}

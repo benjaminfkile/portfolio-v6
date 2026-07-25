@@ -1,0 +1,14 @@
+.indicator {
+  position: fixed;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  z-index: 1000;
+  background-color: var(--color-accent);
+  color: #ffffff;
+  border-radius: var(--radius);
+  padding: var(--space-3xs) var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
