@@ -1,0 +1,14 @@
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-xl) 0;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+.paragraph {
+  color: var(--color-text);
+}

@@ -123,6 +123,12 @@ export interface ContentDocument {
   version: number;
   published_at: string | null;
   sections: Section[];
+  /**
+   * `media_id` → resolved CDN reference for every asset referenced by the
+   * document (§6.8). Optional so an older API payload without it degrades to
+   * "no media" rather than crashing; the public site defaults it to `{}`.
+   */
+  media?: MediaMap;
 }
 
 /* ---- Blog block model (spec §3.7) ----------------------------------------- */
@@ -160,6 +166,14 @@ export interface MediaRef {
   url: string;
   alt: string | null;
 }
+
+/**
+ * The published document's media lookup map: `media_id` → resolved reference
+ * (§6.8). `media_assets` stores `s3_key` only; the content endpoint resolves
+ * keys to absolute CDN URLs at read time, so sections reference media by id and
+ * the public site looks the id up here to get a ready-to-render URL + `alt`.
+ */
+export type MediaMap = Record<string, MediaRef>;
 
 /**
  * `GET /api/posts` returns summaries only — never bodies (§4.1).

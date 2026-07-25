@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
+import type { ComponentType } from 'react';
 import { getContent } from '../lib/api';
 import type { ContentDocument } from '../types/content';
+import { SECTION_REGISTRY } from '../registry';
+import type { SectionProps } from '../sections/types';
 import styles from './HomePage.module.css';
+
+/**
+ * The registry indexed by an arbitrary string: `section.type` is a `SectionType`
+ * at the type level, but the published document can carry a type this build
+ * doesn't know yet — so the lookup must be allowed to miss (spec §3.4).
+ */
+const REGISTRY = SECTION_REGISTRY as Record<
+  string,
+  ComponentType<SectionProps> | undefined
+>;
 
 type LoadState =
   | { status: 'loading' }
@@ -9,9 +22,11 @@ type LoadState =
   | { status: 'ready'; document: ContentDocument };
 
 /**
- * The home page. Fetches `GET /api/content`, holds `{ version, sections }`, and
- * for now renders a placeholder list of section types — the section registry
- * and real components land in a later task (spec §3.4).
+ * The home page. Fetches `GET /api/content`, then maps the published document's
+ * sections through `SECTION_REGISTRY` (spec §3.4), passing each section its
+ * `data`/`items` and the document-level media map (§6.8). An unknown `type`
+ * renders nothing and logs a warning, so a section published ahead of a public
+ * deploy degrades rather than crashes.
  *
  * When `sections` is empty the page renders cleanly with no error, per spec
  * §4.1: an unpublished site is an empty page, not a failure. Loading and error
@@ -51,16 +66,20 @@ export default function HomePage() {
   }
 
   const { sections } = state.document;
+  const media = state.document.media ?? {};
 
   return (
     <main className={styles.page}>
-      {sections.length > 0 && (
-        <ul className={styles.sectionList}>
-          {sections.map((section) => (
-            <li key={section.id}>{section.type}</li>
-          ))}
-        </ul>
-      )}
+      {sections.map((section) => {
+        const Component = REGISTRY[section.type];
+        if (!Component) {
+          console.warn(
+            `Unknown section type "${section.type}" — rendering nothing (spec §3.4).`,
+          );
+          return null;
+        }
+        return <Component key={section.id} section={section} media={media} />;
+      })}
     </main>
   );
 }

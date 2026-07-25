@@ -1,0 +1,28 @@
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-2xl) 0;
+}
+
+.background {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.title {
+  font-size: var(--font-size-2xl);
+}
+
+.tagline {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-muted);
+}
