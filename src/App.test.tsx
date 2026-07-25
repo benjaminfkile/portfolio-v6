@@ -4,10 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import type { ContentDocument } from '../types/content';
 
-function jsonResponse(body: unknown) {
+function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
-    ok: true,
-    status: 200,
+    ok: init.ok ?? true,
+    status: init.status ?? 200,
     json: () => Promise.resolve(body),
   } as unknown as Response;
 }
@@ -37,6 +37,11 @@ describe('App routing', () => {
   });
 
   it('resolves "/blog" to the blog index', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ posts: [], next_cursor: null })),
+    );
+
     renderAt('/blog');
 
     expect(
@@ -44,12 +49,26 @@ describe('App routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('resolves "/blog/:slug" to the blog post page and exposes the slug', () => {
+  it('resolves "/blog/:slug" to the blog post page for the given slug', async () => {
+    const post = {
+      slug: 'hello-world',
+      title: 'Hello World',
+      excerpt: '',
+      cover: null,
+      tags: [],
+      published_at: '2026-07-20T09:00:00Z',
+      body: [],
+      media: {},
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(post));
+    vi.stubGlobal('fetch', fetchMock);
+
     renderAt('/blog/hello-world');
 
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Post' }),
+      await screen.findByRole('heading', { level: 1, name: 'Hello World' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('hello-world')).toBeInTheDocument();
+    // The slug drove the fetch of the matching post.
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/posts/hello-world');
   });
 });

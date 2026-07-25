@@ -194,4 +194,12 @@ export interface PostSummary {
  */
 export interface Post extends PostSummary {
   body: Block[];
+  /**
+   * `media_id` → resolved CDN reference for every asset referenced by this
+   * post's body (§6.8) — the per-post analogue of {@link ContentDocument.media}.
+   * A `media` block (§3.7) looks its `media_id` up here to get a ready-to-render
+   * URL + `alt`. Optional so an older payload without it degrades to "no media"
+   * rather than crashing; the public site defaults it to `{}`.
+   */
+  media?: MediaMap;
 }
