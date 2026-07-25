@@ -1,0 +1,133 @@
+/*
+ * Global stylesheet — the ONLY global CSS on the public site (spec §14.1 rule 3).
+ *
+ * Two responsibilities and nothing else:
+ *   1. A minimal reset, so the browser default box model and spacing are sane.
+ *   2. Design tokens as CSS custom properties (--color-*, --space-*, --font-*).
+ *
+ * Component appearance lives in co-located *.module.css files that reference
+ * these tokens and never literal values (§14.1 rule 3). The v1 look is
+ * deliberately plain: a readable centered column, system fonts, no animations,
+ * no dark mode, no custom fonts (§14.2). Restyling later maps this one file
+ * onto whatever replaces it (§14.3).
+ */
+
+/* ---- Design tokens -------------------------------------------------------- */
+
+:root {
+  /* Color — a plain light palette. No dark mode in v1 (§14.2). */
+  --color-bg: #ffffff;
+  --color-surface: #f6f6f6;
+  --color-text: #1a1a1a;
+  --color-text-muted: #555555;
+  --color-border: #e0e0e0;
+  --color-link: #0b5fff;
+  --color-link-hover: #0847c4;
+  --color-accent: #0b5fff;
+  --color-error: #b00020;
+
+  /* Spacing — a simple modular scale. */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* Typography — system font stack, no custom fonts (§14.2). */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+  --font-size-2xl: 2.25rem;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  --line-height-base: 1.6;
+  --line-height-heading: 1.2;
+
+  /* Layout — the readable centered column (§14.2). */
+  --content-max-width: 44rem;
+  --radius: 6px;
+}
+
+/* ---- Minimal reset -------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Fluid media is the entire responsive strategy alongside single-column
+ * flow (§14.2). */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--color-link);
+}
+
+a:hover {
+  color: var(--color-link-hover);
+}
+
+/* The readable centered column: max-width content wrapper (§14.2). Applied to
+ * the app root so every page inherits the same measure. */
+#root {
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  padding: var(--space-xl) var(--space-md);
+}
