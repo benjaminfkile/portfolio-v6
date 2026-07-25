@@ -32,8 +32,8 @@ import DividerBlock from './blocks/DividerBlock';
  * `satisfies Record<SectionType, …>` makes the table exhaustive at compile time:
  * adding a `SectionType` without a component here is a build error.
  *
- * `status`, `blog`, and `now_playing` are live sections (§3.5) whose components
- * are registered as placeholders for now — the next task fills them in.
+ * `status`, `blog`, and `now_playing` are live sections (§3.5): their config is
+ * in the snapshot but their data is fetched at runtime by the component.
  */
 export const SECTION_REGISTRY = {
   hero: HeroSection,

@@ -2,9 +2,9 @@ import type { ContentDocument, Post, PostSummary } from '../types/content';
 
 /**
  * A realistic published document exercising every static section type (hero,
- * about, timeline, skills, portfolio, contact) plus the live placeholders and
- * a media map resolved to CDN URLs (spec §6.8). Used to render the full section
- * pipeline in tests.
+ * about, timeline, skills, portfolio, contact) plus the three live sections'
+ * config (status, blog, now_playing) and a media map resolved to CDN URLs (spec
+ * §6.8). Used to render the full section pipeline in tests.
  */
 export const fixtureDocument: ContentDocument = {
   version: 42,
@@ -124,10 +124,20 @@ export const fixtureDocument: ContentDocument = {
         },
       ],
     },
-    // Live sections — registered placeholders that render nothing for now (§3.5).
-    { id: 'sec-status', type: 'status', data: {}, items: [] },
-    { id: 'sec-blog', type: 'blog', data: {}, items: [] },
-    { id: 'sec-now', type: 'now_playing', data: {}, items: [] },
+    // Live sections — config in the snapshot; data fetched at runtime (§3.5).
+    {
+      id: 'sec-status',
+      type: 'status',
+      data: { services: ['Gateway', 'API', 'Database'], show_response_times: true },
+      items: [],
+    },
+    { id: 'sec-blog', type: 'blog', data: { limit: 3 }, items: [] },
+    {
+      id: 'sec-now',
+      type: 'now_playing',
+      data: { idle: 'hide', show_album_art: true },
+      items: [],
+    },
     {
       id: 'sec-contact',
       type: 'contact',

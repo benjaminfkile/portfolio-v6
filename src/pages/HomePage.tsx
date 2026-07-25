@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { ComponentType } from 'react';
-import { getContent } from '../lib/api';
+import { getContent, getPreviewContent } from '../lib/api';
 import type { ContentDocument } from '../types/content';
 import { SECTION_REGISTRY } from '../registry';
 import type { SectionProps } from '../sections/types';
+import { usePreviewParams, useNoindexMeta } from '../lib/preview';
+import PreviewIndicator from '../components/PreviewIndicator';
 import styles from './HomePage.module.css';
 
 /**
@@ -31,14 +33,28 @@ type LoadState =
  * When `sections` is empty the page renders cleanly with no error, per spec
  * §4.1: an unpublished site is an empty page, not a failure. Loading and error
  * states are plain semantic markup (spec §14).
+ *
+ * In **preview mode** (§7) — the URL carries `?preview=<token>` — it fetches the
+ * draft page from `GET /api/admin/preview` with that token instead of the public
+ * endpoint, marks the page `noindex`, and shows a small preview indicator. An
+ * invalid or expired token renders a plain failure message.
  */
 export default function HomePage() {
+  const { token } = usePreviewParams();
+  const preview = token != null;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+
+  useNoindexMeta(preview);
 
   useEffect(() => {
     const controller = new AbortController();
 
-    getContent({ signal: controller.signal })
+    const request =
+      preview && token
+        ? getPreviewContent(token, { signal: controller.signal })
+        : getContent({ signal: controller.signal });
+
+    request
       .then((document) => setState({ status: 'ready', document }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -47,11 +63,12 @@ export default function HomePage() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [preview, token]);
 
   if (state.status === 'loading') {
     return (
       <main className={styles.page}>
+        {preview && <PreviewIndicator />}
         <p>Loading…</p>
       </main>
     );
@@ -60,7 +77,12 @@ export default function HomePage() {
   if (state.status === 'error') {
     return (
       <main className={styles.page}>
-        <p role="alert">Sorry — the page could not be loaded right now.</p>
+        {preview && <PreviewIndicator />}
+        <p role="alert">
+          {preview
+            ? 'This preview link is invalid or has expired.'
+            : 'Sorry — the page could not be loaded right now.'}
+        </p>
       </main>
     );
   }
@@ -70,6 +92,7 @@ export default function HomePage() {
 
   return (
     <main className={styles.page}>
+      {preview && <PreviewIndicator />}
       {sections.map((section) => {
         const Component = REGISTRY[section.type];
         if (!Component) {

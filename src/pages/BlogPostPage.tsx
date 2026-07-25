@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { getPost, ApiError } from '../lib/api';
+import { getPost, getPreviewPost, ApiError } from '../lib/api';
 import type { Post } from '../types/content';
 import BlockRenderer from '../blocks/BlockRenderer';
+import { usePreviewParams, useNoindexMeta } from '../lib/preview';
+import PreviewIndicator from '../components/PreviewIndicator';
 import styles from './BlogPostPage.module.css';
 
 /**
@@ -13,6 +15,12 @@ import styles from './BlogPostPage.module.css';
  * A `404` — a slug that is only a draft, or does not exist — renders a clean
  * not-found state, not an error (§4.1). Loading and error states are plain
  * semantic markup (spec §14).
+ *
+ * In **preview mode** (§7) — the URL carries `?preview=<token>&postId=<id>` —
+ * it fetches the draft body from `GET /api/admin/preview/posts/<id>` (addressed
+ * by id, since a draft may have no stable slug yet) instead of the public
+ * endpoint, marks the page `noindex`, and shows a small preview indicator. An
+ * invalid or expired token renders a plain failure message.
  */
 
 type LoadState =
@@ -33,15 +41,37 @@ function formatDate(iso: string): string {
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { token, postId } = usePreviewParams();
+  const preview = token != null;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
 
+  useNoindexMeta(preview);
+
   useEffect(() => {
-    if (!slug) {
-      setState({ status: 'notfound' });
-      return;
-    }
     const controller = new AbortController();
     setState({ status: 'loading' });
+
+    // Preview addresses the draft by id (§7); a preview link without a postId is
+    // malformed, so it degrades to the same plain failure as a bad token.
+    if (preview) {
+      if (!token || !postId) {
+        setState({ status: 'error' });
+        return () => controller.abort();
+      }
+      getPreviewPost(postId, token, { signal: controller.signal })
+        .then((post) => setState({ status: 'ready', post }))
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          setState({ status: 'error' });
+          console.error('Failed to load preview post', error);
+        });
+      return () => controller.abort();
+    }
+
+    if (!slug) {
+      setState({ status: 'notfound' });
+      return () => controller.abort();
+    }
 
     getPost(slug, { signal: controller.signal })
       .then((post) => setState({ status: 'ready', post }))
@@ -56,11 +86,12 @@ export default function BlogPostPage() {
       });
 
     return () => controller.abort();
-  }, [slug]);
+  }, [slug, preview, token, postId]);
 
   if (state.status === 'loading') {
     return (
       <main className={styles.page}>
+        {preview && <PreviewIndicator />}
         <p>Loading…</p>
       </main>
     );
@@ -80,7 +111,12 @@ export default function BlogPostPage() {
   if (state.status === 'error') {
     return (
       <main className={styles.page}>
-        <p role="alert">Sorry — this post could not be loaded right now.</p>
+        {preview && <PreviewIndicator />}
+        <p role="alert">
+          {preview
+            ? 'This preview link is invalid or has expired.'
+            : 'Sorry — this post could not be loaded right now.'}
+        </p>
       </main>
     );
   }
@@ -89,6 +125,7 @@ export default function BlogPostPage() {
 
   return (
     <main className={styles.page}>
+      {preview && <PreviewIndicator />}
       <article>
         <header className={styles.header}>
           <h1 className={styles.title}>{post.title}</h1>
