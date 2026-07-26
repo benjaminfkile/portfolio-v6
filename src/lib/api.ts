@@ -135,8 +135,11 @@ export interface NowPlayingTrack {
   title: string;
   artists: string[];
   album: string;
-  /** Hotlinked from Spotify's CDN (`i.scdn.co`), never ingested (spec §3.5). */
-  art_url: string;
+  /**
+   * Hotlinked from Spotify's CDN (`i.scdn.co`), never ingested (spec §3.5).
+   * `null` when Spotify reports a track with no album image — render without art.
+   */
+  art_url: string | null;
   /** Outbound `open.spotify.com` track link. */
   url: string;
   progress_ms?: number;

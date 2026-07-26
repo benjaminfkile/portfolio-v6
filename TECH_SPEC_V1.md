@@ -575,14 +575,27 @@ before invoking it. Media referenced only by the discarded draft is not deleted 
 restore itself — it simply becomes unreferenced, and the normal GC pass (§6.9) gives it
 the standard 30-day grace period, during which re-referencing rescues it.
 
-### 4.3 Response envelope
+### 4.3 Response envelope — admin routes only
 
-Match the `file-manager-api` convention already in use:
+Admin route responses match the `file-manager-api` convention already in use:
 
 ```jsonc
 { "status": "ok",    "error": false, "data": { … } }
 { "status": "error", "error": true,  "errorMsg": "…" }
 ```
+
+**Scope (clarified after implementation):** the success envelope applies to
+**admin routes only**. Public read endpoints (`/api/content`, `/api/posts`,
+`/api/posts/:slug`, `/api/status`, `/api/now-playing`) return their resource
+**raw**, exactly as the `/api/content` example in §4.1 shows — the public site
+parses these bodies directly and never unwraps an envelope. The two
+preview-serialization endpoints (§4.2 †) are consumed by the public site's
+renderer, so they are raw too, in the same shapes as `/api/content` and
+`/api/posts/:slug`. Error responses use the error envelope everywhere; public
+clients treat any non-2xx as a failure without parsing the body.
+
+The preview token (§7) travels to those endpoints as the `?token=` query param
+(also accepted: `?preview=` and the `X-Preview-Token` header).
 
 ### 4.4 Error handling
 
