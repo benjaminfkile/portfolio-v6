@@ -843,6 +843,14 @@ Direct S3 URLs stay unreachable from the internet. CloudFront is the only reader
 Both buckets carry the lifecycle rules defined in §6.9 (`expire-pending-uploads`,
 `expire-orphaned-media`, and abort-incomplete-multipart).
 
+Both buckets also carry a **CORS policy for the browser-direct upload path**
+(§6.7): `PUT` allowed from the admin origins (`https://admin.benkile.com`,
+`https://*.vercel.app` previews, `http://localhost:5174` for local dev), all
+headers allowed (the presigned signature pins the ones that matter), `ETag`
+exposed. Without this the browser preflight fails and no upload can succeed —
+it is part of bucket provisioning, not an afterthought (added after
+implementation surfaced it).
+
 ### 6.3 Distributions
 
 | Distribution | Origin | Alias | Environment |
