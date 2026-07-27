@@ -465,12 +465,18 @@ one registry line.
 Every section type, item type, and block type has a **Zod schema** in the API. These are
 canonical and do triple duty:
 
-1. Server-side validation on every admin write. JSONB accepts arbitrary garbage
-   otherwise, and a malformed `data` blob would only surface as a public-site crash.
+1. Server-side validation on every admin write — **draft-lenient** (clarified after
+   implementation): every *provided* field must be well-typed and unknown keys are
+   rejected (JSONB accepts arbitrary garbage otherwise), but required fields may be
+   absent, because the admin's create-empty-then-edit flow means a fresh draft is
+   incomplete by construction. Concretely: writes validate `.partial()` variants of
+   the canonical schemas (block drafts keep `type` required so every block stays
+   renderable).
 2. Form generation in the admin, so adding a section or block type doesn't require
    hand-writing a bespoke form.
 3. Publish-time validation — `POST /api/admin/publish` re-validates the entire working
-   set, and `POST /api/admin/posts/:id/publish` re-validates the post body. Both refuse
+   set, and `POST /api/admin/posts/:id/publish` re-validates the post body, both against
+   the **full canonical schemas** — this is where completeness is enforced. Both refuse
    to publish if anything fails. Invalid content can reach a draft; it can never reach
    production.
 
