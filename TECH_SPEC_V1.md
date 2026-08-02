@@ -3,6 +3,9 @@
 **Status:** Draft
 **Author:** Ben Kile
 **Date:** 2026-07-24
+**Amended:** 2026-08-01 — v1.1 pages model (§3.10): the site becomes a set of
+admin-composed pages; `sections` gain a `page_id`, the published document and
+`/api/content` become pages-shaped, and the public site routes dynamically.
 
 ---
 
@@ -122,26 +125,42 @@ is explicitly out of scope.
 
 ### 3.2 Schema
 
-Six tables across three concerns:
+Seven tables across three concerns:
 
-- **The page** — `sections` + `section_items` are the editable working set (always
-  draft); `page_versions` holds immutable published snapshots (§3.3).
+- **The site** — `pages` (v1.1, §3.10) are the admin-composed pages; `sections` +
+  `section_items` are the editable working set (always draft), each section belonging
+  to a page; `page_versions` holds immutable published snapshots of the whole site
+  (§3.3).
 - **The blog** — `posts` holds one row per post, each independently publishable (§3.6).
 - **Media** — `media_assets` tracks uploads, referenced by both (§6).
 
 ```sql
 -- Editable working set -------------------------------------------------
 
+-- v1.1 (§3.10): admin-composed pages. One row per public page.
+CREATE TABLE pages (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          text        NOT NULL UNIQUE,  -- URL segment; 'home' renders at '/'
+  title         text        NOT NULL,         -- document <title> / page heading
+  nav_label     text,                         -- null = not shown in the nav
+  nav_position  integer     NOT NULL DEFAULT 0,
+  is_hidden     boolean     NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_pages_nav ON pages (nav_position);
+
 CREATE TABLE sections (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  page_id     uuid        NOT NULL REFERENCES pages(id) ON DELETE CASCADE, -- v1.1
   type        text        NOT NULL,   -- 'hero' | 'about' | 'timeline' | ...
-  position    integer     NOT NULL,
+  position    integer     NOT NULL,   -- ordering WITHIN the page (v1.1)
   is_hidden   boolean     NOT NULL DEFAULT false,
   data        jsonb       NOT NULL DEFAULT '{}'::jsonb,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_sections_position ON sections (position);
+CREATE INDEX idx_sections_position ON sections (page_id, position);
 
 -- Repeatable children: projects, skills, timeline entries.
 -- Sections without repeatable content (hero, about, contact) have zero rows here.
@@ -480,6 +499,66 @@ canonical and do triple duty:
    to publish if anything fails. Invalid content can reach a draft; it can never reach
    production.
 
+### 3.10 Pages (v1.1)
+
+The v1 model was one implicit page: a flat ordered list of sections rendered at `/`.
+v1.1 makes pages first-class content: **the admin composes any number of pages from the
+section-type palette (§3.4), and the public site renders whatever pages the published
+document contains.** Adding, removing, or reorganizing pages is a content operation,
+not a deploy.
+
+Model rules:
+
+- **Slugs** are URL segments: lowercase `[a-z0-9-]+`, unique, validated server-side.
+  The slug `home` is special — it renders at `/`; every other page renders at
+  `/<slug>`. **Reserved slugs** (rejected on create/rename): `blog`, `api`, `admin` —
+  `blog` because `/blog` and `/blog/:slug` are real routes owned by the blog (§3.6),
+  the others defensively.
+- **Navigation is derived from pages**: a page appears in the public nav iff
+  `nav_label` is non-null and the page is not hidden, ordered by `nav_position`. A
+  page with `nav_label = null` is still served at its slug (reachable by direct link)
+  — useful for one-off pages you link from elsewhere.
+- **Hidden pages** (`is_hidden`) are excluded from the published document entirely —
+  same semantics as hidden sections (§3.9): validated at publish, never serialized.
+- **Sections belong to exactly one page** (`page_id`, cascade on page delete);
+  `position` orders sections within their page. Any section type may appear on any
+  page, any number of times, including types that also appear on other pages. The
+  same registry (§3.4) is the palette everywhere; live sections (§3.5) are page-
+  agnostic by construction since they fetch their own data.
+- **Deleting a page deletes its sections** (and their items, transitively). The admin
+  UI must state this and confirm. Media referenced only by the deleted page's draft
+  becomes unreferenced and follows normal GC (§6.9).
+- **Publish validation** (§3.9) extends one level up: every page must have a valid
+  slug/title, and at publish time at least one non-hidden page must exist and one page
+  must be `home` — a site with no home page cannot be published.
+
+**Published document shape (v1.1).** `page_versions.document` becomes pages-shaped:
+
+```jsonc
+{
+  "version": 43,
+  "published_at": "2026-08-01T18:00:00Z",
+  "pages": [
+    {
+      "id": "…", "slug": "home", "title": "Ben Kile",
+      "nav_label": "Home", "nav_position": 0,
+      "sections": [ { "id": "…", "type": "hero", "data": { … }, "items": [] } ]
+    },
+    { "id": "…", "slug": "projects", "title": "Projects",
+      "nav_label": "Projects", "nav_position": 1, "sections": [ … ] }
+  ],
+  "media": { "<media_id>": "media/<uuid>/<filename>" }
+}
+```
+
+**Back-compat:** documents published before v1.1 have a top-level `sections` array
+instead of `pages`. `POST /api/admin/versions/:v/restore` of such a version wraps the
+flat sections into a single `home` page (slug `home`, title from the site, nav_label
+"Home") during the working-set rebuild, and the re-published document is emitted in
+the v1.1 shape. `/api/content` never serves the legacy shape after the first v1.1
+publish; the migration backfills the working set (a `home` page adopting all existing
+sections), so the first publish after deploying v1.1 flips the shape atomically.
+
 ---
 
 ## 4. API
@@ -505,21 +584,29 @@ never transits the API — see §6.
 `published_at` — never bodies. `GET /api/posts/:slug` returns `404` for a slug that
 exists but has never been published; drafts are invisible to the public API.
 
-`GET /api/content` returns:
+`GET /api/content` returns the published document (v1.1 pages shape, §3.10) with the
+`media` map resolved to absolute CDN URLs (§6.8):
 
 ```jsonc
 {
-  "version": 42,
-  "published_at": "2026-07-24T18:00:00Z",
-  "sections": [
-    { "id": "…", "type": "hero", "data": { … }, "items": [] },
-    { "id": "…", "type": "portfolio", "data": { … }, "items": [ … ] }
-  ]
+  "version": 43,
+  "published_at": "2026-08-01T18:00:00Z",
+  "pages": [
+    {
+      "id": "…", "slug": "home", "title": "Ben Kile",
+      "nav_label": "Home", "nav_position": 0,
+      "sections": [
+        { "id": "…", "type": "hero", "data": { … }, "items": [] },
+        { "id": "…", "type": "portfolio", "data": { … }, "items": [ … ] }
+      ]
+    }
+  ],
+  "media": { "<media_id>": { "url": "https://media.benkile.com/…", "alt": "…" } }
 }
 ```
 
 Responds `304` on a matching `If-None-Match`. If no version has ever been published,
-returns `200` with an empty `sections` array rather than a 404 — the public site should
+returns `200` with an empty `pages` array rather than a 404 — the public site should
 render an empty page, not an error.
 
 ### 4.2 Admin endpoints — `requireAdmin()` on every route (two exceptions, marked †)
@@ -534,11 +621,16 @@ read-only access to exactly those two routes and nothing else.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/admin/sections` | Full working set, drafts included |
-| `POST` | `/api/admin/sections` | Create a section |
-| `PATCH` | `/api/admin/sections/:id` | Update `data` / `is_hidden` |
+| `GET` | `/api/admin/pages` | All pages (v1.1, §3.10), nav order |
+| `POST` | `/api/admin/pages` | Create a page (slug validated, reserved list) |
+| `PATCH` | `/api/admin/pages/:id` | Update slug/title/nav_label/nav_position/is_hidden |
+| `DELETE` | `/api/admin/pages/:id` | Delete page + its sections (admin confirms) |
+| `PUT` | `/api/admin/pages/order` | Reorder nav — full ordered id array |
+| `GET` | `/api/admin/sections` | Full working set, drafts included; each section carries `page_id`. Optional `?page_id=` filter |
+| `POST` | `/api/admin/sections` | Create a section — `page_id` required (v1.1) |
+| `PATCH` | `/api/admin/sections/:id` | Update `data` / `is_hidden` / `page_id` (move between pages) |
 | `DELETE` | `/api/admin/sections/:id` | Delete (cascades to items) |
-| `PUT` | `/api/admin/sections/order` | Reorder — accepts a full ordered id array |
+| `PUT` | `/api/admin/sections/order` | Reorder within a page — body carries `page_id` + that page's full ordered id array (v1.1) |
 | `POST` | `/api/admin/sections/:id/items` | Create an item |
 | `PATCH` | `/api/admin/items/:id` | Update an item |
 | `DELETE` | `/api/admin/items/:id` | Delete an item |
@@ -613,8 +705,8 @@ error handler.
 
 Wholesale writes — a complete `draft_body` array, a full `data` blob — mean two open
 admin tabs (or one stale tab left open overnight) can silently overwrite each other's
-work. Every `PATCH` on sections, items, and posts therefore carries an optimistic
-concurrency precondition: the client sends `expected_updated_at`, the row's
+work. Every `PATCH` on pages (v1.1), sections, items, and posts therefore carries an
+optimistic concurrency precondition: the client sends `expected_updated_at`, the row's
 `updated_at` as it last read it, and the API compares before writing.
 
 - **Match** → the write proceeds and the response returns the new `updated_at`.
@@ -1094,9 +1186,15 @@ public site's renderers.
 **Solution: the admin embeds the real public site in an iframe.**
 
 ```
-admin.benkile.com/preview            → <iframe src="…/?preview=<token>">
+admin.benkile.com/preview            → <iframe src="…/<page slug>?preview=<token>">
 admin.benkile.com/posts/:id/preview  → <iframe src="…/blog/:slug?preview=<token>">
 ```
+
+With pages (v1.1, §3.10) the admin preview screen carries a page selector; the iframe
+targets the selected page's public path (`/` for `home`, `/<slug>` otherwise). The
+draft serialization from `GET /api/admin/preview` is the full pages-shaped document,
+and the public site in preview mode routes within it exactly as it routes the
+published document — including pages that exist only in the draft.
 
 The public site, seeing `?preview=`, fetches `/api/admin/preview` (or
 `/api/admin/preview/posts/:id` on a blog route) with that token instead of the public
@@ -1168,9 +1266,12 @@ Vite + React + TypeScript + React Router. No auth dependency. No Cognito SDK.
 ├── vercel.json                 SPA rewrite — §9.6
 └── src/
     ├── main.tsx
-    ├── App.tsx                 routes
+    ├── App.tsx                 routes — content pages are DYNAMIC (v1.1, §3.10):
+    │                           '/' renders the 'home' page, '/:slug' any other
+    │                           published page (404 for unknown slugs); nav is
+    │                           generated from the document's nav fields
     ├── pages/
-    │   ├── HomePage.tsx        fetch /api/content → map sections → registry
+    │   ├── ContentPage.tsx     fetch /api/content → select page by slug → registry
     │   ├── BlogIndexPage.tsx   /blog
     │   └── BlogPostPage.tsx    /blog/:slug
     ├── sections/               one component per section type
