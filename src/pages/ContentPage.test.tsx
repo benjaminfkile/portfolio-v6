@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import HomePage from './HomePage';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import ContentPage from './ContentPage';
 import type { ContentDocument } from '../types/content';
 import type { NowPlayingResponse, StatusResponse } from '../lib/api';
 import { fixtureDocument, fixturePostSummaries } from '../test/fixtures';
@@ -35,9 +35,9 @@ const nowPlaying: NowPlayingResponse = {
 };
 
 /**
- * A URL-aware fetch mock. The home page's live sections (status, blog,
- * now_playing) each fetch their own endpoint at runtime (§3.5), so the mock
- * must answer per path, not with one blanket body.
+ * A URL-aware fetch mock. A content page's live sections (status, blog,
+ * now_playing) each fetch their own endpoint at runtime (§3.5), so the mock must
+ * answer per path, not with one blanket body.
  */
 function stubApi(opts: {
   content?: (path: string) => Response;
@@ -67,10 +67,14 @@ function stubApi(opts: {
   return fetchMock;
 }
 
-function renderHome(path = '/') {
+/** Render `ContentPage` under the same `/` + `/:slug` routes the app declares. */
+function renderPage(path = '/') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <HomePage />
+      <Routes>
+        <Route path="/" element={<ContentPage />} />
+        <Route path="/:slug" element={<ContentPage />} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -80,14 +84,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('HomePage', () => {
-  it('renders a clean empty page (no error) when sections is empty', async () => {
+describe('ContentPage', () => {
+  it('renders a clean empty page (no error) when pages is empty at "/"', async () => {
     stubApi({
-      content: () =>
-        jsonResponse({ version: 0, published_at: null, sections: [] }),
+      content: () => jsonResponse({ version: 0, published_at: null, pages: [] }),
     });
 
-    renderHome();
+    renderPage('/');
 
     await waitFor(() =>
       expect(screen.queryByText('Loading…')).not.toBeInTheDocument(),
@@ -95,12 +98,16 @@ describe('HomePage', () => {
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
+    // Never-published "/" is an empty page, not a 404 (§4.1).
+    expect(
+      screen.queryByRole('heading', { name: 'Page not found' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('renders every static section from a realistic fixture document', async () => {
+  it('renders the "home" page\'s static sections from a realistic document', async () => {
     stubApi();
 
-    renderHome();
+    renderPage('/');
 
     // hero — the page's <h1>, plus its background from the media map.
     const hero = await screen.findByRole('heading', { level: 1, name: 'Ben Kile' });
@@ -148,7 +155,7 @@ describe('HomePage', () => {
   it('renders the three live sections from their own runtime fetches (§3.5)', async () => {
     stubApi();
 
-    renderHome();
+    renderPage('/');
 
     // status — a curated service with a response time (config: show times on).
     expect(await screen.findByText('Gateway')).toBeInTheDocument();
@@ -165,6 +172,62 @@ describe('HomePage', () => {
     );
   });
 
+  it('selects the page matching "/:slug" and renders its sections', async () => {
+    stubApi();
+
+    renderPage('/projects');
+
+    // The "projects" page's own hero — not the home page's.
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Projects' }),
+    ).toBeInTheDocument();
+    // A section unique to the home page is absent.
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'About me' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('serves a page whose nav_label is null by direct slug (§3.10)', async () => {
+    stubApi();
+
+    renderPage('/secret');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Secret page' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a 404 for a slug that matches no page', async () => {
+    stubApi();
+
+    renderPage('/does-not-exist');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Page not found' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /home page/i }),
+    ).toHaveAttribute('href', '/');
+  });
+
+  it('sets the document title to the page title plus the site suffix', async () => {
+    stubApi();
+
+    renderPage('/projects');
+
+    await screen.findByRole('heading', { level: 1, name: 'Projects' });
+    expect(document.title).toBe('Projects · Ben Kile');
+  });
+
+  it('leaves the home title un-suffixed (it is already the site name)', async () => {
+    stubApi();
+
+    renderPage('/');
+
+    await screen.findByRole('heading', { level: 1, name: 'Ben Kile' });
+    expect(document.title).toBe('Ben Kile');
+  });
+
   it('degrades silently and logs when a section type is unknown', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     stubApi({
@@ -172,15 +235,24 @@ describe('HomePage', () => {
         jsonResponse({
           version: 1,
           published_at: '2026-07-24T18:00:00Z',
-          sections: [
-            { id: 'a', type: 'hero', data: { title: 'Ben Kile' }, items: [] },
-            // A type this build does not recognise.
-            { id: 'b', type: 'testimonials' as never, data: {}, items: [] },
+          pages: [
+            {
+              id: 'p',
+              slug: 'home',
+              title: 'Ben Kile',
+              nav_label: 'Home',
+              nav_position: 0,
+              sections: [
+                { id: 'a', type: 'hero', data: { title: 'Ben Kile' }, items: [] },
+                // A type this build does not recognise.
+                { id: 'b', type: 'testimonials', data: {}, items: [] },
+              ],
+            },
           ],
         }),
     });
 
-    renderHome();
+    renderPage('/');
 
     // The known section still renders...
     await screen.findByRole('heading', { level: 1, name: 'Ben Kile' });
@@ -193,7 +265,7 @@ describe('HomePage', () => {
     stubApi({ content: () => jsonResponse({}, { ok: false, status: 500 }) });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    renderHome();
+    renderPage('/');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
@@ -203,8 +275,17 @@ describe('HomePage', () => {
       const previewDoc: ContentDocument = {
         version: 99,
         published_at: null,
-        sections: [
-          { id: 'h', type: 'hero', data: { title: 'Draft Ben' }, items: [] },
+        pages: [
+          {
+            id: 'ph',
+            slug: 'home',
+            title: 'Draft Ben',
+            nav_label: 'Home',
+            nav_position: 0,
+            sections: [
+              { id: 'h', type: 'hero', data: { title: 'Draft Ben' }, items: [] },
+            ],
+          },
         ],
       };
       const fetchMock = stubApi({
@@ -214,7 +295,7 @@ describe('HomePage', () => {
             : jsonResponse({}, { ok: false, status: 500 }),
       });
 
-      renderHome('/?preview=tok123');
+      renderPage('/?preview=tok123');
 
       // The draft renders through the normal component tree.
       await screen.findByRole('heading', { level: 1, name: 'Draft Ben' });
@@ -239,13 +320,44 @@ describe('HomePage', () => {
       expect(screen.getByText(/preview/i)).toBeInTheDocument();
     });
 
+    it('selects a page that exists only in the draft document (§7)', async () => {
+      const previewDoc: ContentDocument = {
+        version: 99,
+        published_at: null,
+        pages: [
+          {
+            id: 'pd',
+            slug: 'draft-only',
+            title: 'Draft Only',
+            nav_label: null,
+            nav_position: 0,
+            sections: [
+              { id: 'd', type: 'hero', data: { title: 'Draft-only page' }, items: [] },
+            ],
+          },
+        ],
+      };
+      stubApi({
+        content: (path) =>
+          path.startsWith('/api/admin/preview')
+            ? jsonResponse(previewDoc)
+            : jsonResponse({}, { ok: false, status: 500 }),
+      });
+
+      renderPage('/draft-only?preview=tok123');
+
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Draft-only page' }),
+      ).toBeInTheDocument();
+    });
+
     it('shows a plain failure message for an invalid / expired token', async () => {
       stubApi({
         content: () => jsonResponse({}, { ok: false, status: 401 }),
       });
       vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      renderHome('/?preview=expired');
+      renderPage('/?preview=expired');
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
         /invalid or has expired/i,

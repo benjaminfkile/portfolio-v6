@@ -11,7 +11,7 @@
  * (`/api/admin/preview`, `/api/admin/preview/posts/:id`) instead of the public
  * ones, and must mark itself `noindex` so a leaked preview URL is never indexed.
  * This module holds the two tiny pieces that behaviour needs; the endpoint
- * switch itself lives in the pages (`HomePage`, `BlogPostPage`).
+ * switch itself lives in the pages (`ContentPage`, `BlogPostPage`).
  */
 
 import { useEffect } from 'react';

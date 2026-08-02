@@ -1,29 +1,12 @@
 import type { ContentDocument, Post, PostSummary } from '../types/content';
 
 /**
- * A realistic published document exercising every static section type (hero,
- * about, timeline, skills, portfolio, contact) plus the three live sections'
- * config (status, blog, now_playing) and a media map resolved to CDN URLs (spec
- * §6.8). Used to render the full section pipeline in tests.
+ * The sections of the fixture document's `home` page — every static section type
+ * (hero, about, timeline, skills, portfolio, contact) plus the three live
+ * sections' config (status, blog, now_playing). Referenced by the media map
+ * below via `media_id` (spec §6.8).
  */
-export const fixtureDocument: ContentDocument = {
-  version: 42,
-  published_at: '2026-07-24T18:00:00Z',
-  media: {
-    'media-hero': {
-      url: 'https://media.benkile.com/media/hero/backdrop.jpg',
-      alt: 'A wide mountain skyline',
-    },
-    'media-timeline': {
-      url: 'https://media.benkile.com/media/tl/acme.png',
-      alt: 'Acme Corp logo',
-    },
-    'media-project': {
-      url: 'https://media.benkile.com/media/proj/portfolio.png',
-      alt: 'Portfolio v6 screenshot',
-    },
-  },
-  sections: [
+const homeSections: ContentDocument['pages'][number]['sections'] = [
     {
       id: 'sec-hero',
       type: 'hero',
@@ -147,6 +130,72 @@ export const fixtureDocument: ContentDocument = {
         email: 'hello@benkile.com',
       },
       items: [],
+    },
+  ];
+
+/**
+ * A realistic published document (v1.1 pages shape, spec §3.10). The `home` page
+ * (rendered at `/`) carries every section type; a second `projects` page (with a
+ * nav label and a later `nav_position`) exercises `/:slug` routing and nav order;
+ * a third `secret` page has a null `nav_label` so it is reachable by slug but
+ * omitted from the nav. The media map is resolved to CDN URLs (§6.8). Used to
+ * render the full section pipeline and the dynamic routing in tests.
+ */
+export const fixtureDocument: ContentDocument = {
+  version: 42,
+  published_at: '2026-07-24T18:00:00Z',
+  media: {
+    'media-hero': {
+      url: 'https://media.benkile.com/media/hero/backdrop.jpg',
+      alt: 'A wide mountain skyline',
+    },
+    'media-timeline': {
+      url: 'https://media.benkile.com/media/tl/acme.png',
+      alt: 'Acme Corp logo',
+    },
+    'media-project': {
+      url: 'https://media.benkile.com/media/proj/portfolio.png',
+      alt: 'Portfolio v6 screenshot',
+    },
+  },
+  pages: [
+    {
+      id: 'page-home',
+      slug: 'home',
+      title: 'Ben Kile',
+      nav_label: 'Home',
+      nav_position: 0,
+      sections: homeSections,
+    },
+    {
+      id: 'page-projects',
+      slug: 'projects',
+      title: 'Projects',
+      nav_label: 'Projects',
+      nav_position: 1,
+      sections: [
+        {
+          id: 'sec-projects-hero',
+          type: 'hero',
+          data: { title: 'Projects' },
+          items: [],
+        },
+      ],
+    },
+    {
+      id: 'page-secret',
+      slug: 'secret',
+      title: 'Secret',
+      nav_label: null,
+      nav_position: 2,
+      sections: [
+        {
+          id: 'sec-secret-hero',
+          type: 'hero',
+          data: { title: 'Secret page' },
+          items: [],
+        },
+      ],
     },
   ],
 };

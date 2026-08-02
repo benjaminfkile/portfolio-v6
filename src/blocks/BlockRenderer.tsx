@@ -15,7 +15,7 @@ const REGISTRY = BLOCK_REGISTRY as Record<
 
 /**
  * Renders a post body — an ordered `Block[]` — by mapping each block through
- * `BLOCK_REGISTRY` (spec §3.7), exactly as `HomePage` maps sections one level up.
+ * `BLOCK_REGISTRY` (spec §3.7), exactly as `ContentPage` maps sections one level up.
  * An unknown block type renders nothing and logs a warning, so a post authored
  * against a newer block type degrades rather than crashing.
  */
