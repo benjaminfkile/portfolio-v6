@@ -1,0 +1,27 @@
+.nav {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: 0;
+  padding: var(--space-md) 0;
+  list-style: none;
+}
+
+.link {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+}
+
+.link:hover {
+  color: var(--color-link-hover);
+}
+
+.active {
+  color: var(--color-text);
+  text-decoration: underline;
+}

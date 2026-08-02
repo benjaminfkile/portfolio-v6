@@ -24,8 +24,8 @@ import DividerBlock from './blocks/DividerBlock';
 
 /**
  * The section registry (spec §3.4): every `sections.type` maps to the component
- * that renders it. `HomePage` maps the published document's sections through
- * this table; an unknown `type` renders nothing and logs (see `HomePage`), so
+ * that renders it. `ContentPage` maps the published document's sections through
+ * this table; an unknown `type` renders nothing and logs (see `ContentPage`), so
  * publishing a section type that a not-yet-deployed public site doesn't
  * recognise degrades rather than crashes.
  *

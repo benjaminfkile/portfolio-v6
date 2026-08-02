@@ -112,17 +112,39 @@ export interface Section {
   items: SectionItem[];
 }
 
-/* ---- The published document (spec §4.1) ----------------------------------- */
+/* ---- Pages & the published document (spec §3.10, §4.1) -------------------- */
 
 /**
- * Shape of `GET /api/content`. If no version has ever been published the API
- * returns 200 with an empty `sections` array (never a 404) — the public site
- * renders an empty page, not an error (§4.1).
+ * A first-class page in the published document (v1.1, spec §3.10). The admin
+ * composes any number of pages from the section palette; the public site renders
+ * whichever pages the document carries.
+ *
+ * `slug` is the URL segment (lowercase `[a-z0-9-]+`, unique). The slug `home`
+ * renders at `/`; every other page renders at `/<slug>`. `title` drives the page
+ * heading / document `<title>`. `nav_label` is the label shown in the site nav —
+ * `null` means the page is reachable by direct link but not listed in the nav.
+ * `nav_position` orders the nav. Hidden pages are validated at publish and never
+ * serialized, so every page here is a public page. `sections` are the page's
+ * sections in display order (each mapped through `SECTION_REGISTRY`, §3.4).
+ */
+export interface PageDocumentPage {
+  id: string;
+  slug: string;
+  title: string;
+  nav_label: string | null;
+  nav_position: number;
+  sections: Section[];
+}
+
+/**
+ * Shape of `GET /api/content` (v1.1 pages shape, spec §3.10, §4.1). If no version
+ * has ever been published the API returns 200 with an empty `pages` array (never
+ * a 404) — the public site renders an empty page, not an error (§4.1).
  */
 export interface ContentDocument {
   version: number;
   published_at: string | null;
-  sections: Section[];
+  pages: PageDocumentPage[];
   /**
    * `media_id` → resolved CDN reference for every asset referenced by the
    * document (§6.8). Optional so an older API payload without it degrades to
