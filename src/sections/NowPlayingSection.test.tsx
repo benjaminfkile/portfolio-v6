@@ -70,6 +70,24 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(art).toHaveAttribute('src', 'https://i.scdn.co/image/abc123');
   });
 
+  it('renders a live progress meter and an aria-live readout (DESIGN.md §5, §7)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(playing)));
+
+    const { container } = renderNowPlaying({ idle: 'message', show_album_art: true });
+
+    await screen.findByRole('link', { name: 'Windowlicker' });
+
+    // Progress bar reflects progress_ms → duration_ms (1000 / 6000 ≈ 17%).
+    const meter = screen.getByRole('meter');
+    expect(meter).toHaveAttribute('aria-valuenow', '17');
+
+    // The readout is announced politely so a track change is spoken (§7).
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live).not.toBeNull();
+    expect(live).toHaveTextContent('Windowlicker');
+    expect(live).toHaveTextContent('Aphex Twin');
+  });
+
   it('honors idle = "message" when nothing is playing', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ playing: false })));
 
@@ -100,7 +118,7 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('polls ~60s only while the tab is visible, pausing when hidden', async () => {
+  it('polls ~30s only while the tab is visible, pausing when hidden', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -118,9 +136,9 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     });
     expect(npCalls()).toBe(1);
 
-    // Visible: a 60s tick refetches.
+    // Visible: a 30s tick refetches.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(npCalls()).toBe(2);
 
@@ -139,7 +157,7 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(npCalls()).toBe(3);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(npCalls()).toBe(4);
   });

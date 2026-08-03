@@ -1,27 +1,58 @@
+/* Blog post — SectionShell-style header, mono metadata, and a tokenised block
+   body constrained to a comfortable reading measure (DESIGN.md §5). Tokens only. */
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-4);
+}
+
+.article {
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
-  margin-bottom: var(--space-md);
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--amber);
 }
 
 .title {
-  font-size: var(--font-size-2xl);
+  margin: 0;
 }
 
 .date {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
 }
 
 .cover {
   width: 100%;
-  border-radius: var(--radius);
-  margin-bottom: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  margin-bottom: var(--space-6);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* The prose column: a comfortable measure so long-form body reads well (§2.3). */
+.body {
+  max-width: 68ch;
 }

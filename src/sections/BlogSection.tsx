@@ -3,14 +3,17 @@ import { Link as RouterLink } from 'react-router-dom';
 import type { SectionProps } from './types';
 import { getPosts } from '../lib/api';
 import type { PostSummary } from '../types/content';
+import SectionShell from '../components/ui/SectionShell';
+import Panel from '../components/ui/Panel';
 import styles from './BlogSection.module.css';
 
 /**
- * The live `blog` section (spec §3.5) — the N most recent published posts as
- * teaser cards linking to `/blog/:slug`. Config (how many posts, an optional
- * tag filter) is published in the snapshot; the listing is fetched at runtime
- * from `GET /api/posts` so post publishing stays decoupled from page
- * publishing.
+ * The live `blog` section teaser (spec §3.5, DESIGN.md §5) — the N most recent
+ * published posts as a list of post `Panel`s: a mono date, the title, and the
+ * excerpt, the whole card clickable through to `/blog/:slug`. Config (how many
+ * posts, an optional tag filter) is published in the snapshot; the listing is
+ * fetched at runtime from `GET /api/posts` so post publishing stays decoupled
+ * from page publishing.
  *
  * Standard live-section rules apply (§3.5): a loading state, and **degrade
  * rather than error** — a failed fetch, or simply no posts to show, renders the
@@ -19,6 +22,9 @@ import styles from './BlogSection.module.css';
 interface BlogData {
   limit?: number;
   tag?: string;
+  title?: string;
+  eyebrow?: string;
+  intro?: string;
 }
 
 type LoadState =
@@ -39,22 +45,17 @@ function formatDate(iso: string): string {
 function TeaserCard({ post }: { post: PostSummary }) {
   return (
     <li>
-      <article className={styles.card}>
+      <Panel as="article" className={styles.card}>
+        {/* The whole card is one link (DESIGN.md §5); the date/excerpt live
+            inside it so a tap anywhere opens the post. */}
         <RouterLink className={styles.cardLink} to={`/blog/${post.slug}`}>
-          {post.cover && (
-            <img
-              className={styles.cover}
-              src={post.cover.url}
-              alt={post.cover.alt ?? ''}
-            />
-          )}
+          <time className={styles.date} dateTime={post.published_at}>
+            {formatDate(post.published_at)}
+          </time>
           <h3 className={styles.cardTitle}>{post.title}</h3>
+          {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
         </RouterLink>
-        <time className={styles.date} dateTime={post.published_at}>
-          {formatDate(post.published_at)}
-        </time>
-        {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
-      </article>
+      </Panel>
     </li>
   );
 }
@@ -82,10 +83,14 @@ export default function BlogSection({ section }: SectionProps) {
 
   if (state.status === 'loading') {
     return (
-      <section className={styles.blog} aria-label="From the blog">
-        <h2 className={styles.title}>From the blog</h2>
+      <SectionShell
+        title={config.title ?? 'From the blog'}
+        eyebrow={config.eyebrow ?? '// recent posts'}
+        intro={config.intro}
+        className={styles.blog}
+      >
         <p className={styles.muted}>Loading…</p>
-      </section>
+      </SectionShell>
     );
   }
 
@@ -96,8 +101,12 @@ export default function BlogSection({ section }: SectionProps) {
   }
 
   return (
-    <section className={styles.blog} aria-label="From the blog">
-      <h2 className={styles.title}>From the blog</h2>
+    <SectionShell
+      title={config.title ?? 'From the blog'}
+      eyebrow={config.eyebrow ?? '// recent posts'}
+      intro={config.intro}
+      className={styles.blog}
+    >
       <ul className={styles.list}>
         {state.posts.map((post) => (
           <TeaserCard key={post.slug} post={post} />
@@ -106,6 +115,6 @@ export default function BlogSection({ section }: SectionProps) {
       <RouterLink className={styles.more} to="/blog">
         Read the blog
       </RouterLink>
-    </section>
+    </SectionShell>
   );
 }

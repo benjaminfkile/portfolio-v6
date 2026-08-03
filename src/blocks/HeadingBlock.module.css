@@ -1,4 +1,7 @@
+/* Heading block — h2–h4 within a post body; base type comes from global.css,
+   this only sets the surrounding rhythm (DESIGN.md §2.3). Tokens only. */
+
 .heading {
-  margin-top: var(--space-xl);
-  margin-bottom: var(--space-xs);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-2);
 }

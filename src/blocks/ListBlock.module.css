@@ -1,16 +1,21 @@
+/* List block — ordered/unordered body lists with inline-code chips
+   (DESIGN.md §2.3). Tokens only. */
+
 .list {
-  margin-block: var(--space-md);
-  padding-inline-start: var(--space-lg);
+  margin-block: var(--space-4);
+  padding-inline-start: var(--space-5);
+  line-height: var(--lh-prose);
 }
 
 .list li {
-  margin-block: var(--space-2xs);
+  margin-block: var(--space-1);
 }
 
 .list code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background-color: var(--color-surface);
+  background: var(--panel-2);
+  color: var(--text-bright);
   padding: 0.1em 0.3em;
-  border-radius: var(--radius);
+  border-radius: var(--r-s);
 }
