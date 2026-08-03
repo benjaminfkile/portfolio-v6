@@ -1,0 +1,45 @@
+/* SectionShell — section header rhythm + body; tokens only (DESIGN.md §4). */
+
+.shell {
+  display: block;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  color: var(--text-bright);
+  text-wrap: balance;
+}
+
+.intro {
+  margin: 0;
+  max-width: 62ch;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--text);
+}
+
+.body {
+  display: block;
+}
