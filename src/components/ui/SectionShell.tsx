@@ -44,7 +44,12 @@ export default function SectionShell({
       className={[styles.shell, className].filter(Boolean).join(' ')}
       aria-labelledby={headingId}
     >
-      <header className={styles.header}>
+      {/*
+        A plain <div>, not <header>: a section's intro block is not a page
+        landmark, and emitting a <header> here would add a stray "banner" to the
+        page's landmark list (§7 wants exactly header/main/footer).
+      */}
+      <div className={styles.header}>
         {eyebrow != null && eyebrow !== '' && (
           <p className={styles.eyebrow}>{eyebrow}</p>
         )}
@@ -54,7 +59,7 @@ export default function SectionShell({
         {intro != null && intro !== '' && (
           <p className={styles.intro}>{intro}</p>
         )}
-      </header>
+      </div>
       {children != null && children !== '' && (
         <div className={styles.body}>{children}</div>
       )}

@@ -1,0 +1,113 @@
+import { useEffect, useState } from 'react';
+import Instrument from '../components/ui/Instrument';
+import StatusDot from '../components/ui/StatusDot';
+import type { StatusVariant } from '../components/ui/StatusDot';
+import { getNowPlaying, getStatus } from '../lib/api';
+import type { NowPlayingResponse, StatusResponse } from '../lib/api';
+import styles from './HeroInstrumentStrip.module.css';
+
+/**
+ * The hero **instrument strip** (DESIGN.md §5): three `Instrument` readouts —
+ * NOW PLAYING, API, and SITE vN — sitting below the hero header. The first two
+ * are fed by the live endpoints (`GET /api/now-playing`, `GET /api/status`); the
+ * third is the published document's version, threaded in via props from the
+ * already-fetched document (no extra request).
+ *
+ * Each live instrument **degrades independently and silently** (§3.5 spirit): a
+ * loading tick shows "…", any failure shows a dim "—", and neither ever throws
+ * or blocks the hero. A single fetch on mount is enough for this compact strip —
+ * the full `now_playing` / `status` sections own their own polling (§3.5).
+ */
+export interface HeroInstrumentStripProps {
+  /** Published document version → the SITE vN readout. Omitted renders no SITE. */
+  siteVersion?: number;
+}
+
+/** A live readout is loading, failed (degrade), or has data. */
+type Live<T> =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ready'; data: T };
+
+const PLACEHOLDER_LOADING = '…';
+const PLACEHOLDER_DEGRADED = '—';
+
+function nowPlayingValue(state: Live<NowPlayingResponse>): string {
+  if (state.status === 'loading') return PLACEHOLDER_LOADING;
+  if (state.status === 'error') return PLACEHOLDER_DEGRADED;
+  if (!state.data.playing) return 'Not playing';
+  const { track } = state.data;
+  const artists = track.artists.join(', ');
+  return artists ? `${track.title} — ${artists}` : track.title;
+}
+
+/** The API instrument's dot + text: colour is never the only carrier (§7). */
+function apiReadout(
+  state: Live<StatusResponse>,
+): { variant: StatusVariant | null; text: string } {
+  if (state.status === 'loading') return { variant: null, text: PLACEHOLDER_LOADING };
+  if (state.status === 'error') return { variant: null, text: PLACEHOLDER_DEGRADED };
+  return state.data.degraded
+    ? { variant: 'warn', text: 'Degraded' }
+    : { variant: 'ok', text: 'Operational' };
+}
+
+export default function HeroInstrumentStrip({
+  siteVersion,
+}: HeroInstrumentStripProps) {
+  const [now, setNow] = useState<Live<NowPlayingResponse>>({ status: 'loading' });
+  const [status, setStatus] = useState<Live<StatusResponse>>({ status: 'loading' });
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    getNowPlaying({ signal: controller.signal })
+      .then((data) => setNow({ status: 'ready', data }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setNow({ status: 'error' });
+        console.error('Hero strip: now-playing unavailable', error);
+      });
+
+    getStatus({ signal: controller.signal })
+      .then((data) => setStatus({ status: 'ready', data }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setStatus({ status: 'error' });
+        console.error('Hero strip: status unavailable', error);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const api = apiReadout(status);
+
+  return (
+    <div className={styles.strip} role="group" aria-label="Live system readouts">
+      <Instrument
+        className={styles.instrument}
+        label="Now playing"
+        value={nowPlayingValue(now)}
+        accent={now.status === 'ready' && now.data.playing}
+        live="polite"
+      />
+      <Instrument
+        className={styles.instrument}
+        label="API"
+        value={api.text}
+        leading={
+          api.variant ? <StatusDot variant={api.variant} /> : undefined
+        }
+        live="polite"
+      />
+      {siteVersion != null && (
+        <Instrument
+          className={styles.instrument}
+          label="Site"
+          value={`v${siteVersion}`}
+          accent
+        />
+      )}
+    </div>
+  );
+}

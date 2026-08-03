@@ -106,7 +106,14 @@ export default function ContentPage() {
           );
           return null;
         }
-        return <Component key={section.id} section={section} media={media} />;
+        return (
+          <Component
+            key={section.id}
+            section={section}
+            media={media}
+            documentVersion={state.document.version}
+          />
+        );
       })}
     </main>
   );
