@@ -1,45 +1,77 @@
+/* Timeline — a vertical rail (--line) with amber node dots (DESIGN.md §5).
+   Mobile-first, tokens only. */
+
 .timeline {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding: var(--space-xl) 0;
+  padding-block: var(--space-6);
 }
 
-.title {
-  font-size: var(--font-size-xl);
-}
-
-.list {
+.rail {
   list-style: none;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-6);
 }
 
 .entry {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
-  padding-left: var(--space-md);
-  border-left: 2px solid var(--color-border);
+  gap: var(--space-2);
+  /* Space for the rail line + node dot on the left. */
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--line);
+}
+
+/* The amber node dot sitting on the rail (DESIGN.md §5), with a soft glow. */
+.node {
+  position: absolute;
+  top: 6px;
+  left: -5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 4px var(--amber-soft);
 }
 
 .dateRange {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
 }
 
 .entryTitle {
-  font-size: var(--font-size-lg);
-}
-
-.media {
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius);
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  color: var(--text-bright);
 }
 
 .description {
-  color: var(--color-text);
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+}
+
+/* Media thumbnails stay hidden on cramped phones and appear from 640px up
+   (DESIGN.md §5). */
+.thumb {
+  display: none;
+  max-width: 340px;
+  margin-top: var(--space-1);
+}
+
+@media (min-width: 640px) {
+  .thumb {
+    display: block;
+  }
 }

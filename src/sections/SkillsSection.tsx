@@ -1,52 +1,59 @@
 import type { SectionProps } from './types';
 import type { SkillsItem } from '../types/content';
+import SectionShell from '../components/ui/SectionShell';
+import Meter from '../components/ui/Meter';
 import styles from './SkillsSection.module.css';
 
 /**
- * A list of skills, each with a proficiency (spec §3.4). Proficiency renders as
- * a native `<meter>` — semantic, and it keeps the "progress width" out of an
- * inline style. Values are treated as a 0–100 scale; `<meter>` clamps anything
- * out of range.
+ * The `skills` section (spec §3.4, DESIGN.md §5) — a grid of rows, each an
+ * icon + name + a {@link Meter} at the item's proficiency percent. The grid is
+ * one column on phones and two from 900px up (§5). Each item is a
+ * `{ title, description, icon_source, proficiency }`; the icon renders as an
+ * `<img>` whose alt is the skill title, and the proficiency (a 0–100 scale) is
+ * the Meter fill, which animates in once on first view (§6). Optional group
+ * labels (eyebrow / intro) render in the shared {@link SectionShell} — the
+ * eyebrow in mono per §5.
  */
 interface SkillsData {
   title?: string;
+  eyebrow?: string;
+  intro?: string;
 }
-
-const PROFICIENCY_MAX = 100;
 
 export default function SkillsSection({ section }: SectionProps) {
   const data = section.data as SkillsData;
 
   return (
-    <section className={styles.skills}>
-      {data.title && <h2 className={styles.title}>{data.title}</h2>}
+    <SectionShell
+      title={data.title ?? 'Skills'}
+      eyebrow={data.eyebrow}
+      intro={data.intro}
+      className={styles.skills}
+    >
       <ul className={styles.list}>
         {section.items.map((item) => {
           const skill = item.data as SkillsItem;
           return (
             <li key={item.id} className={styles.skill}>
-              <div className={styles.heading}>
+              <div className={styles.head}>
                 {skill.icon_source && (
-                  <img className={styles.icon} src={skill.icon_source} alt="" />
+                  <img
+                    className={styles.icon}
+                    src={skill.icon_source}
+                    alt={skill.title}
+                  />
                 )}
-                <h3 className={styles.skillTitle}>{skill.title}</h3>
+                <span className={styles.name}>{skill.title}</span>
               </div>
-              {skill.description && (
-                <p className={styles.description}>{skill.description}</p>
-              )}
-              <meter
-                className={styles.meter}
-                min={0}
-                max={PROFICIENCY_MAX}
+              <Meter
                 value={skill.proficiency}
-                aria-label={`${skill.title} proficiency`}
-              >
-                {skill.proficiency} / {PROFICIENCY_MAX}
-              </meter>
+                label={`${skill.title} proficiency`}
+                showValue
+              />
             </li>
           );
         })}
       </ul>
-    </section>
+    </SectionShell>
   );
 }
