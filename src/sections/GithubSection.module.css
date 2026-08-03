@@ -1,0 +1,85 @@
+/* GitHub — a mono total Instrument above an amber contribution heat grid. The
+   5-step ramp is defined from tokens via color-mix (--panel-2 → --amber); no raw
+   hex (DESIGN.md §5). Tokens only; mobile-first. */
+
+.github {
+  padding-block: var(--space-6);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.total {
+  gap: var(--space-3);
+}
+
+/* The calendar can be wider than a phone; it scrolls inside its own container so
+   the page body never scrolls sideways (DESIGN.md §3). */
+.scroller {
+  overflow-x: auto;
+  /* A little breathing room so the last column's focus/hover isn't clipped. */
+  padding-bottom: var(--space-1);
+}
+
+/* Weeks are columns (oldest→newest, left→right); each column is 7 day-cells. */
+.grid {
+  display: flex;
+  gap: 3px;
+  /* Don't let flex squeeze the columns — a real calendar keeps cell size and
+     scrolls instead (DESIGN.md §5). */
+  width: max-content;
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cell {
+  width: 11px;
+  height: 11px;
+  /* Slightly softened square — a touch under --r-s (DESIGN.md §5). */
+  border-radius: 2px;
+  background: var(--panel-2);
+}
+
+/* The 5-step intensity ramp, --panel-2 through amber washes to --amber. Built by
+   mixing --amber into --panel-2 so both themes track their own tokens (§5). */
+.l0 {
+  background: var(--panel-2);
+}
+
+.l1 {
+  background: color-mix(in srgb, var(--amber) 22%, var(--panel-2));
+}
+
+.l2 {
+  background: color-mix(in srgb, var(--amber) 45%, var(--panel-2));
+}
+
+.l3 {
+  background: color-mix(in srgb, var(--amber) 70%, var(--panel-2));
+}
+
+.l4 {
+  background: var(--amber);
+}
+
+/* One accessible summary sentence stands in for 365 labelled cells (§5, §7).
+   Visually hidden but present in the accessibility tree. */
+.summary {
+  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

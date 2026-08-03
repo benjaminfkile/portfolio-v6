@@ -57,6 +57,8 @@ export type SectionType =
   | 'status'
   | 'blog'
   | 'now_playing'
+  | 'duolingo'
+  | 'github'
   | 'contact';
 
 /* ---- Section item shapes (spec §3.4 item table) --------------------------- */
@@ -89,9 +91,48 @@ export interface PortfolioItem {
   links: Link[];
 }
 
+/* ---- Live-section config shapes (spec §3.5) ------------------------------- */
+
+/**
+ * The `duolingo` section's published config (spec §3.5, v1.2). The section's
+ * *config* is snapshotted; its *data* (streak, course progress) is fetched at
+ * runtime from `GET /api/duolingo?language=<language>`.
+ *
+ * `language` is the Duolingo course code selecting which course to read from the
+ * payload (default `es` — Spanish). `score_label` is a hand-maintained string
+ * for the official in-app "Duolingo Score", which that endpoint does not expose
+ * — the renderer shows it as a `TagChip`, visually distinct from the live mono
+ * values (spec §3.5). Optional `heading` / `eyebrow` / `intro` override the
+ * section header copy.
+ */
+export interface DuolingoSectionData {
+  heading?: string;
+  eyebrow?: string;
+  intro?: string;
+  language?: string;
+  score_label?: string;
+}
+
+/**
+ * The `github` section's published config (spec §3.5, v1.2). The section's
+ * *config* is snapshotted; its *data* (contribution calendar + total) is fetched
+ * at runtime from `GET /api/github`.
+ *
+ * `weeks` is how many weeks of the contribution calendar to show (default 52);
+ * the renderer slices the newest N weeks from the payload's oldest→newest array.
+ * Optional `heading` / `eyebrow` / `intro` override the section header copy.
+ */
+export interface GithubSectionData {
+  heading?: string;
+  eyebrow?: string;
+  intro?: string;
+  weeks?: number;
+}
+
 /**
  * The `data` blob of a repeatable child. Section types without repeatable
- * content (hero, about, status, blog, now_playing, contact) have zero items.
+ * content (hero, about, status, blog, now_playing, duolingo, github, contact)
+ * have zero items.
  */
 export type SectionItemData = TimelineItem | SkillsItem | PortfolioItem;
 

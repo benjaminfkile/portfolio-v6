@@ -1,0 +1,69 @@
+/* Duolingo — an Instrument pair (streak + course) in a Panel, with the manual
+   score_label as a distinct TagChip (DESIGN.md §5). Tokens only; mobile-first. */
+
+.duolingo {
+  padding-block: var(--space-6);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* The two live readouts: stacked on phones, side-by-side once there's room. */
+.instruments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .instruments {
+    flex-direction: row;
+    gap: var(--space-6);
+    align-items: flex-start;
+  }
+}
+
+/* Streak: the count is the live amber value; "days" is a dim mono unit. */
+.streakValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.count {
+  color: var(--amber);
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  line-height: 1.1;
+  /* A live number — hold width as it ticks (DESIGN.md §2.3). */
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  color: var(--text-dim);
+}
+
+/* Course: XP is the live tabular-nums value; crowns sit quietly in --text-dim. */
+.courseValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.xp {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.crowns {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The manual score wears a chip, not the mono live-value voice (DESIGN.md §5). */
+.score {
+  margin: 0;
+}
