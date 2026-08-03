@@ -35,8 +35,11 @@
 }
 
 .filter {
+  display: inline-flex;
+  align-items: center;
   padding: var(--space-1) var(--space-3);
-  min-height: 32px;
+  /* Touch target ≥44px (DESIGN.md §3). */
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: var(--r-s);
   background: transparent;

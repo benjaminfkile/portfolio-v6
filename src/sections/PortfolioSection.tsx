@@ -23,6 +23,26 @@ interface PortfolioData {
   intro?: string;
 }
 
+/**
+ * Derive an accessible name for a tech-stack icon from its URL. `tech_icons` is
+ * just a list of image URLs (§6.8) with no companion label, so the icon image
+ * would otherwise be the sole — and unannounced — carrier of the technology
+ * name (a11y sweep, §7). The filename stem is the name in practice
+ * (`.../icons/react.svg` → "React"), so we humanise it: drop the path and
+ * extension, turn separators into spaces. Falls back to a generic label if the
+ * URL has no usable stem.
+ */
+export function techNameFromIcon(url: string): string {
+  const stem = url
+    .split(/[?#]/)[0] // strip query/hash
+    .split('/')
+    .pop()!
+    .replace(/\.[a-z0-9]+$/i, '') // strip extension
+    .replace(/[-_.]+/g, ' ')
+    .trim();
+  return stem === '' ? 'Technology' : `${stem} logo`;
+}
+
 function ProjectMedia({
   asset,
   item,
@@ -92,7 +112,7 @@ export default function PortfolioSection({ section, media }: SectionProps) {
                             <img
                               className={styles.techIcon}
                               src={icon}
-                              alt=""
+                              alt={techNameFromIcon(icon)}
                             />
                           </TagChip>
                         </li>

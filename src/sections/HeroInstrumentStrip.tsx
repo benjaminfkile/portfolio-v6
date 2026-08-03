@@ -84,6 +84,12 @@ export default function HeroInstrumentStrip({
 
   return (
     <div className={styles.strip} role="group" aria-label="Live system readouts">
+      {/*
+        aria-live sits ONLY on the now-playing instrument (DESIGN.md §7): its
+        value is the one readout worth announcing as it changes. The API and
+        Site readouts update silently — the StatusDot + text label carry the API
+        state without a live region, and Site is static.
+      */}
       <Instrument
         className={styles.instrument}
         label="Now playing"
@@ -98,7 +104,6 @@ export default function HeroInstrumentStrip({
         leading={
           api.variant ? <StatusDot variant={api.variant} /> : undefined
         }
-        live="polite"
       />
       {siteVersion != null && (
         <Instrument

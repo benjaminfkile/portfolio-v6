@@ -5,11 +5,9 @@
  * them and never literal colours. Component appearance stays in co-located
  * *.module.css files.
  *
- * The Control Room restyle (spec §14) lands across a series of tasks. Until the
- * existing v1 components are migrated onto the tokens above, they still consume
- * the small "legacy transitional tokens" block at the bottom of this file so the
- * site keeps rendering. That block is intentionally temporary and later restyle
- * tasks remove it as each component moves to the Control Room tokens.
+ * The Control Room restyle (spec §14) is complete: every component now consumes
+ * the tokens in tokens.css directly. The temporary "legacy transitional tokens"
+ * block that bridged the v1 UI during the migration has been removed.
  */
 
 /* ---- Minimal reset -------------------------------------------------------- */
@@ -144,53 +142,13 @@ main {
   }
 }
 
+/* ---- Links — DESIGN.md §2.1 ---------------------------------------------- */
 /*
- * ============================================================================
- * LEGACY TRANSITIONAL TOKENS — temporary (spec §14 restyle in progress)
- * ----------------------------------------------------------------------------
- * The v1 components still reference these names. They are NOT part of the
- * Control Room system (tokens.css) and are removed by later restyle tasks as
- * each component migrates onto the Control Room tokens. Do not add new usages.
- * ============================================================================
+ * Amber is THE accent, including prose links (blog/markdown copy). Components
+ * that render their own link shells (LinkButton, TagChip, nav) set their own
+ * colour; this is the base for bare anchors. Hover warms nothing extra — amber
+ * is already the accent — so it simply holds the colour.
  */
-:root {
-  --color-bg: var(--ground);
-  --color-surface: var(--panel);
-  --color-text: var(--text);
-  --color-text-muted: var(--text-dim);
-  --color-border: var(--line);
-  --color-link: var(--amber);
-  --color-link-hover: var(--amber);
-  --color-accent: var(--amber);
-  --color-error: var(--err);
-
-  --space-3xs: 0.125rem;
-  --space-2xs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-  --space-3xl: 4rem;
-
-  --font-size-sm: var(--fs-body-s);
-  --font-size-base: var(--fs-body);
-  --font-size-lg: var(--fs-h4);
-  --font-size-xl: var(--fs-h3);
-  --font-size-2xl: var(--fs-h2);
-
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-bold: 600;
-
-  --radius: var(--r-s);
-}
-
 a {
-  color: var(--color-link);
-}
-
-a:hover {
-  color: var(--color-link-hover);
+  color: var(--amber);
 }

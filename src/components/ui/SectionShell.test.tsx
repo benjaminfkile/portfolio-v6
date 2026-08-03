@@ -36,6 +36,15 @@ describe('SectionShell', () => {
     expect(document.querySelector(`.${styles.intro}`)).toBeNull();
   });
 
+  it('renders no heading node for an empty title (never a blank h1, §7)', () => {
+    // A hero whose document has no title passes title="" — SectionShell must
+    // not emit an empty heading (a WCAG failure and a stray outline entry).
+    render(<SectionShell title="" headingLevel="h1" eyebrow="// dev" />);
+    expect(screen.queryByRole('heading')).toBeNull();
+    // The rest of the header (the eyebrow) still renders.
+    expect(document.querySelector(`.${styles.eyebrow}`)).not.toBeNull();
+  });
+
   it('labels the section by its heading for assistive tech', () => {
     const { container } = render(<SectionShell id="status" title="Status" />);
     const section = container.querySelector('section');

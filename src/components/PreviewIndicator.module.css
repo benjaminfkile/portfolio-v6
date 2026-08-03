@@ -1,14 +1,17 @@
 .indicator {
   position: fixed;
-  top: var(--space-xs);
-  right: var(--space-xs);
+  top: var(--space-2);
+  right: var(--space-2);
   z-index: 1000;
-  background-color: var(--color-accent);
-  color: #ffffff;
-  border-radius: var(--radius);
-  padding: var(--space-3xs) var(--space-xs);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  background-color: var(--amber);
+  /* The page-background colour reads as the "inverse" on the amber badge — dark
+     text in the dark theme, light in the light theme — clearing AA either way
+     (tokens only; no raw hex). */
+  color: var(--ground);
+  border-radius: var(--r-s);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-medium);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }

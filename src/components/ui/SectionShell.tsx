@@ -53,9 +53,17 @@ export default function SectionShell({
         {eyebrow != null && eyebrow !== '' && (
           <p className={styles.eyebrow}>{eyebrow}</p>
         )}
-        <Heading id={headingId} className={styles.heading}>
-          {title}
-        </Heading>
+        {/*
+          Never emit an empty heading: an <h1></h1> with no text is a WCAG
+          failure (and a stray, unlabelled heading in the outline). A section
+          given no title simply renders none — the hero, when its document has
+          no title, must not plant a blank page <h1> (a11y sweep, §7).
+        */}
+        {title != null && title !== '' && (
+          <Heading id={headingId} className={styles.heading}>
+            {title}
+          </Heading>
+        )}
         {intro != null && intro !== '' && (
           <p className={styles.intro}>{intro}</p>
         )}
