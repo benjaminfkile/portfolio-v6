@@ -1,0 +1,15 @@
+/* Panel — bordered --panel surface, --r-m; tokens only (DESIGN.md §2.4, §4). */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  padding: var(--space-5);
+  /* No shadow in dark (--shadow: none); light theme supplies the soft token. */
+  box-shadow: var(--shadow);
+}
+
+.raised {
+  /* Elevation in dark = a lighter surface + border, not a drop shadow (§2.4). */
+  background: var(--panel-2);
+}

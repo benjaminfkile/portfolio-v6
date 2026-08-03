@@ -1,0 +1,41 @@
+/* TagChip — mono bordered chip, --r-s; tokens only (DESIGN.md §4). */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* Anchor variant: same shell, but interactive affordances. */
+.link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.link:hover {
+  /* Border brightens to amber; nothing moves (DESIGN.md §6). */
+  border-color: var(--amber);
+  color: var(--text-bright);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link {
+    transition: none;
+  }
+}

@@ -1,0 +1,46 @@
+/* StatusDot — 7px LED with soft glow + 2s pulse; tokens only (DESIGN.md §4, §6).
+   The glow is derived from the semantic status token via color-mix, so no raw
+   colour value ever appears here (tokens.css is the only home for colour). */
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--dot);
+  background: currentColor;
+  /* Soft glow, colour-matched to the status (§4). */
+  box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.ok {
+  --dot: var(--ok);
+}
+
+.warn {
+  --dot: var(--warn);
+}
+
+.err {
+  --dot: var(--err);
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    /* Static under reduced motion; the glow rests at its base ring (§6). */
+    animation: none;
+    box-shadow: 0 0 4px 0 color-mix(in srgb, currentColor 50%, transparent);
+  }
+}

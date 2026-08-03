@@ -1,0 +1,59 @@
+/* LinkButton — amber link + button variants; tokens only (DESIGN.md §4, §7). */
+
+.base {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-medium);
+  color: var(--amber);
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out,
+    background-color 120ms ease-out;
+}
+
+/* Shared focus ring: 2px amber outline, offset 2 (DESIGN.md §4). */
+.base:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: var(--r-s);
+}
+
+/* Text-link variant. */
+.link {
+  display: inline;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: var(--text-bright);
+}
+
+/* Button-shaped variant. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  /* ≥44px touch target (DESIGN.md §3, §7). */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--amber);
+  border-radius: var(--r-s);
+  font-size: var(--fs-body-s);
+  text-decoration: none;
+}
+
+.button:hover {
+  /* Border/fill warm to an amber-soft wash; nothing moves (DESIGN.md §6). */
+  background: var(--amber-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .base {
+    transition: none;
+  }
+}
