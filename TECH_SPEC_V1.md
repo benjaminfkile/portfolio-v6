@@ -733,14 +733,22 @@ playback. The API proxies it for the same reasons `/api/status` proxies the gate
 the credential stays server-side, the exposed shape is a deliberate choice, and a
 server-side cache means visitor traffic never multiplies upstream calls.
 
-**One-time bootstrap.** Create a Spotify app in the developer dashboard (redirect URI
-`http://127.0.0.1:8888/callback`), then run `scripts/spotify-auth.ts` locally: it
-walks the authorization-code flow in a browser, exchanges the code, and prints the
-**refresh token**. Store client id, client secret, and refresh token in Secrets
-Manager (§9.3). Spotify refresh tokens do not expire; if one is ever revoked, the
-symptom is a 400 `invalid_grant` on refresh, and the fix is re-running the bootstrap.
-One Spotify app and one refresh token serve both environments — prod and dev are
-reading the same person's playback.
+**Bootstrap & re-authorization.** Create a Spotify app in the developer dashboard.
+Since Spotify's June 2026 policy change, **refresh tokens expire 180 days after the
+user's authorization** (refreshing does not extend it, and no rotated token is
+returned), so authorization is a twice-a-year routine, not a one-time setup. The
+primary flow is the **admin reconnect** (Integrations page → `adminSpotifyRouter`):
+the admin's browser walks the authorize flow, the API's state-guarded callback
+exchanges the code server-side and stores the refresh token AES-256-GCM-encrypted in
+the `service_tokens` table (key scrypt-derived from the client secret), and
+now-playing uses the stored token from then on. The registered redirect URI is
+`spotify_redirect_uri` in the secrets (loopback `http://127.0.0.1:<port>/…` locally).
+`scripts/spotify-auth.ts` remains as a manual fallback that prints a refresh token
+for the `spotify_refresh_token` secret — the resolution order is stored token first,
+static secret second. An expired/revoked token surfaces as 400 `invalid_grant` on
+refresh; now-playing silently degrades to idle (§3.5) and the admin Integrations
+page shows the expiry countdown. One Spotify app serves both environments — prod and
+dev are reading the same person's playback.
 
 **Runtime flow.** The API holds the current access token in memory, exchanging the
 refresh token for a new one on startup and whenever a request 401s or the ~1-hour
@@ -775,6 +783,53 @@ degrade rule applied.
 
 No Spotify token, in any form, is ever included in a response. The browser's only
 contact with Spotify is the hotlinked album art and the outbound track link (§3.5).
+
+### 4.7 Integrations — current shape and the rule for adding more
+
+Spotify is v1's only third-party integration, and it is **deliberately concrete** —
+there is no `Integration` interface, because an abstraction designed against a single
+case would be guesswork about what actually varies. The system still splits cleanly
+into a generic layer and a Spotify-specific layer, and the boundary is the contract
+for what comes next:
+
+**Already generic (reuse as-is for any integration):**
+
+- `service_tokens` — one row per integration, keyed by a `service` text column;
+  credentials stored only as AES-256-GCM ciphertext. Adding a provider is adding a
+  row, not a table.
+- The token crypto (`encryptToken`/`decryptToken` in `spotifyTokenStore`) and the
+  single-use OAuth `state` pattern (opaque 256-bit tokens, in-memory, 10-minute TTL,
+  mintable only by a verified admin).
+- **The public display surface**: a new integration's visitor-facing presence is a
+  new live section — Zod schema (§3.4) + registry component + a server-side proxy
+  endpoint following the §3.5 rules (curated shape, ~30s cache, degrade-to-idle,
+  credentials never in a response). This pipeline needs no refactor; it is how
+  `status` and `now_playing` already work.
+
+**Spotify-specific today (the part integration #2 generalizes):** the
+`/api/admin/spotify/*` routes, the OAuth endpoints/scopes/180-day expiry policy, and
+the admin Integrations page, which renders one hardcoded Spotify card.
+
+**The rule: implement the generalization WHEN integration #2 arrives — in the same
+change, shaped by the two real cases. Do not build it speculatively before then.**
+The refactor is:
+
+1. An **integration descriptor** per provider: key (the `service_tokens` key),
+   display name, auth kind (`oauth` | `api_key` | `none`), authorize/token URLs,
+   scopes, redirect-URI config key, token-lifetime/expiry policy, and a
+   status-computation function.
+2. The OAuth connect/callback/status/disconnect handlers parameterized by descriptor
+   (the current `adminSpotifyRouter` logic with `spotify` extracted as data), mounted
+   as `/api/admin/integrations/:key/…`; the Spotify routes stay as aliases or move.
+3. `GET /api/admin/integrations` — enumerate every descriptor with its connection
+   status (connected/source/authorized_at/expires_at, shape as today's Spotify
+   status).
+4. The admin Integrations page maps over that list instead of hardcoding a card;
+   per-provider copy (expiry warnings etc.) comes from the descriptor.
+
+The storage layer, crypto, state tokens, and public section pipeline need **zero
+changes** under this refactor — which is the test that the current split put the
+abstraction boundary in the right place.
 
 ---
 
