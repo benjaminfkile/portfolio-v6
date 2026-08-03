@@ -161,6 +161,67 @@ export function getNowPlaying(init?: RequestInit): Promise<NowPlayingResponse> {
   return apiFetch<NowPlayingResponse>('/api/now-playing', init);
 }
 
+/* ---- Live section: duolingo (spec §3.5, v1.2) ----------------------------- */
+
+/** The curated course readout returned by `/api/duolingo` (spec §3.5). */
+export interface DuolingoCourse {
+  title: string;
+  xp: number;
+  crowns: number;
+}
+
+/**
+ * `GET /api/duolingo?language=<code>` — the owner's Duolingo streak and progress
+ * in one course (spec §3.5, v1.2). The API proxies Duolingo's unofficial user
+ * endpoint server-side and returns `{ available: false }` on *any* upstream
+ * failure or shape drift, so the browser never sees an error — the section
+ * simply renders nothing (§3.5 degrade). The official CEFR "Duolingo Score" is
+ * not exposed here; the section's manual `score_label` config carries it.
+ */
+export type DuolingoResponse =
+  | { available: true; streak: number; course: DuolingoCourse }
+  | { available: false };
+
+/**
+ * `GET /api/duolingo` — see {@link DuolingoResponse}. `language` is the course
+ * code (e.g. `es`) forwarded as the `?language=` query param so the API returns
+ * the matching course from the payload.
+ */
+export function getDuolingo(
+  language: string,
+  init?: RequestInit,
+): Promise<DuolingoResponse> {
+  const query = language ? `?language=${encodeURIComponent(language)}` : '';
+  return apiFetch<DuolingoResponse>(`/api/duolingo${query}`, init);
+}
+
+/* ---- Live section: github (spec §3.5, v1.2) ------------------------------- */
+
+/**
+ * One column of the contribution calendar: seven daily contribution counts
+ * (Sun→Sat). Weeks arrive oldest→newest (spec §3.5), so the newest weeks are at
+ * the end of the array and the section slices from the tail.
+ */
+export interface GithubWeek {
+  days: number[];
+}
+
+/**
+ * `GET /api/github` — the owner's contribution calendar and total (spec §3.5,
+ * v1.2). The API proxies GitHub's GraphQL `contributionsCollection` server-side
+ * with a public-scope PAT and returns `{ available: false }` on any failure, so
+ * the section degrades to nothing rather than erroring. The per-day count is the
+ * only signal exposed — there is no per-cell event round-trip (§3.5).
+ */
+export type GithubResponse =
+  | { available: true; total: number; weeks: GithubWeek[] }
+  | { available: false };
+
+/** `GET /api/github` — see {@link GithubResponse}. */
+export function getGithub(init?: RequestInit): Promise<GithubResponse> {
+  return apiFetch<GithubResponse>('/api/github', init);
+}
+
 /* ---- Preview (spec §7) ---------------------------------------------------- */
 
 /**

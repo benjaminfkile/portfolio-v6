@@ -2,9 +2,9 @@ import type { ContentDocument, Post, PostSummary } from '../types/content';
 
 /**
  * The sections of the fixture document's `home` page — every static section type
- * (hero, about, timeline, skills, portfolio, contact) plus the three live
- * sections' config (status, blog, now_playing). Referenced by the media map
- * below via `media_id` (spec §6.8).
+ * (hero, about, timeline, skills, portfolio, contact) plus the live sections'
+ * config (status, blog, now_playing, and the v1.2 duolingo + github). Referenced
+ * by the media map below via `media_id` (spec §6.8).
  */
 const homeSections: ContentDocument['pages'][number]['sections'] = [
     {
@@ -121,6 +121,13 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
       data: { idle: 'hide', show_album_art: true },
       items: [],
     },
+    {
+      id: 'sec-duolingo',
+      type: 'duolingo',
+      data: { language: 'es', score_label: 'Duolingo Score 95' },
+      items: [],
+    },
+    { id: 'sec-github', type: 'github', data: { weeks: 52 }, items: [] },
     {
       id: 'sec-contact',
       type: 'contact',

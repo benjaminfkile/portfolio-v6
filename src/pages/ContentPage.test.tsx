@@ -3,7 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ContentPage from './ContentPage';
 import type { ContentDocument } from '../types/content';
-import type { NowPlayingResponse, StatusResponse } from '../lib/api';
+import type {
+  DuolingoResponse,
+  GithubResponse,
+  NowPlayingResponse,
+  StatusResponse,
+} from '../lib/api';
 import { fixtureDocument, fixturePostSummaries } from '../test/fixtures';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
@@ -34,6 +39,18 @@ const nowPlaying: NowPlayingResponse = {
   },
 };
 
+const duolingo: DuolingoResponse = {
+  available: true,
+  streak: 847,
+  course: { title: 'Spanish', xp: 48210, crowns: 155 },
+};
+
+const github: GithubResponse = {
+  available: true,
+  total: 2143,
+  weeks: [{ days: [0, 1, 2, 3, 4, 5, 0] }],
+};
+
 /**
  * A URL-aware fetch mock. A content page's live sections (status, blog,
  * now_playing) each fetch their own endpoint at runtime (§3.5), so the mock must
@@ -43,6 +60,8 @@ function stubApi(opts: {
   content?: (path: string) => Response;
   status?: Response;
   now?: Response;
+  duolingo?: Response;
+  github?: Response;
   posts?: Response;
 } = {}) {
   const fetchMock = vi.fn((path: string) => {
@@ -51,6 +70,12 @@ function stubApi(opts: {
     }
     if (path.startsWith('/api/now-playing')) {
       return Promise.resolve(opts.now ?? jsonResponse(nowPlaying));
+    }
+    if (path.startsWith('/api/duolingo')) {
+      return Promise.resolve(opts.duolingo ?? jsonResponse(duolingo));
+    }
+    if (path.startsWith('/api/github')) {
+      return Promise.resolve(opts.github ?? jsonResponse(github));
     }
     if (path.startsWith('/api/posts')) {
       return Promise.resolve(
@@ -170,6 +195,23 @@ describe('ContentPage', () => {
       'href',
       '/blog/first-post',
     );
+  });
+
+  it('renders the v1.2 duolingo + github live sections from the registry (§3.4)', async () => {
+    stubApi();
+
+    renderPage('/');
+
+    // duolingo — the streak, course readout, and the manual score chip (from the
+    // fixture document's config).
+    expect(await screen.findByText('847')).toBeInTheDocument();
+    expect(screen.getByText('Spanish')).toBeInTheDocument();
+    expect(screen.getByText('Duolingo Score 95')).toBeInTheDocument();
+
+    // github — the total contributions and the accessible summary sentence.
+    expect(
+      screen.getByText('2,143 contributions in the last year'),
+    ).toBeInTheDocument();
   });
 
   it('selects the page matching "/:slug" and renders its sections', async () => {
