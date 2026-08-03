@@ -99,6 +99,10 @@ describe('PortfolioSection (DESIGN.md §5)', () => {
     const icons = container.querySelectorAll('img');
     expect(icons).toHaveLength(2);
     expect(icons[0]).toHaveAttribute('src', 'https://media.benkile.com/react.svg');
+    // Each icon carries an accessible name derived from its filename (§7) — the
+    // tech mark is otherwise unannounced to assistive tech.
+    expect(icons[0]).toHaveAttribute('alt', 'react logo');
+    expect(icons[1]).toHaveAttribute('alt', 'node logo');
   });
 
   it('alternates the media/text layout side per item', () => {

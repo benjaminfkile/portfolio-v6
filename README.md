@@ -4,13 +4,24 @@ The public site for [benkile.com](https://benkile.com) — a client-rendered
 Vite + React + TypeScript SPA that fetches published content from the
 `portfolio-v6-api` and renders it as plain, semantic HTML.
 
-It is deliberately plain by design (see `TECH_SPEC_V1.md` §14): semantic markup,
-co-located [CSS Modules](https://github.com/css-modules/css-modules), and a
-single global stylesheet (`src/styles/global.css`) holding a reset plus the
-design tokens (`--color-*`, `--space-*`, `--font-*`) that every component
-references. There is **no component library, no CSS framework, and no
-CSS-in-JS** — that containment is what keeps the eventual restyle wide but
-shallow (§14.3).
+The frontend follows the **"Control Room" design system** — see
+[`DESIGN.md`](./DESIGN.md), which is authoritative for tokens, type, primitives,
+section treatments, motion, and accessibility (it governs the §14 restyle of
+this public site). The site presents as a quietly humming operations console:
+amber accents, monospace for every live value, a humanist sans for prose,
+dark-native with a light "console in a lit room" theme toggled by `data-theme`
+on `<html>`.
+
+Its structure: semantic markup, co-located
+[CSS Modules](https://github.com/css-modules/css-modules), and a small set of
+UI primitives in `src/components/ui/` (SectionShell, Panel, Instrument, Meter,
+StatusDot, …). All design tokens are CSS custom properties in
+`src/styles/tokens.css` (both themes); `src/styles/global.css` holds the reset,
+base type, the plotting-grid ground, and the focus ring. **Components consume
+tokens only — a raw hex in a component module is a review failure** — and each
+works in both themes and down to 320px wide. There is **no component library, no
+CSS framework, and no CSS-in-JS**. Contrast (`src/styles/tokens.contrast.test.ts`)
+and 320px overflow (`src/App.overflow.test.tsx`) are enforced as tests.
 
 The admin app (fully themed MUI) and the API live in separate repos
 (`portfolio-v6-admin`, `portfolio-v6-api`).
@@ -83,10 +94,12 @@ the SPA rewrite in `vercel.json` in production; the dev server serves
     ├── pages/                  HomePage, BlogIndexPage, BlogPostPage
     ├── sections/               one component per section type (§3.4)
     ├── blocks/                 one component per block type (§3.7)
-    ├── components/             shared leaf components (LinkList, …)
+    ├── components/             shared chrome (SiteNav, ThemeToggle, …)
+    │   └── ui/                 Control Room primitives — DESIGN.md §4
     ├── lib/                    api fetch layer, preview helpers, OG middleware core
     ├── registry.ts             SECTION_REGISTRY + BLOCK_REGISTRY
-    ├── styles/global.css       reset + design tokens
+    ├── styles/tokens.css       all design tokens, both themes — DESIGN.md §2
+    ├── styles/global.css       reset, base type, ground grid, focus ring
     └── types/content.ts        generated from the API schema — do not edit (§8.4)
 ```
 

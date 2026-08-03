@@ -52,12 +52,14 @@ never raw hex.
 | `--grid` | `rgba(70,90,130,0.06)` |
 | `--text` | `#333B47` |
 | `--text-bright` | `#151A22` |
-| `--text-dim` | `#69727F` |
-| `--amber` | `#B87514` (darkened for contrast on white; ≥4.5:1 on `--panel`) |
-| `--amber-soft` | `rgba(184,117,20,0.12)` |
+| `--text-dim` | `#636C79` (darkened from `#69727F`, which fell to 4.42:1 on `--ground`) |
+| `--amber` | `#9A5F0E` (darkened from `#B87514`, which was only 3.75:1 on `--panel`; now ≥4.5:1 on `--panel` and `--ground`) |
+| `--amber-soft` | `rgba(154,95,14,0.12)` |
 | `--ok` / `--warn` / `--err` | `#1F8F5F` / `#9A7B12` / `#C24A40` |
 
-Contrast floor: WCAG AA (4.5:1 body, 3:1 large text/UI) in BOTH themes — verify, don't eyeball.
+Contrast floor: WCAG AA (4.5:1 body, 3:1 large text/UI) in BOTH themes — verify,
+don't eyeball. Enforced by `src/styles/tokens.contrast.test.ts`, which parses
+this token set and fails the build if any pair regresses below its floor.
 
 ### 2.3 Type
 

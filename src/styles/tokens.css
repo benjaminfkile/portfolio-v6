@@ -80,9 +80,9 @@
   --grid: rgba(70, 90, 130, 0.06);
   --text: #333b47;
   --text-bright: #151a22;
-  --text-dim: #69727f;
-  --amber: #b87514; /* darkened for contrast on white; ≥4.5:1 on --panel */
-  --amber-soft: rgba(184, 117, 20, 0.12);
+  --text-dim: #636c79; /* darkened from #69727f — was 4.42:1 on --ground, now ≥4.5:1 (§2 floor) */
+  --amber: #9a5f0e; /* darkened from #b87514 (was 3.75:1 on --panel) — now ≥4.5:1 on --panel and --ground */
+  --amber-soft: rgba(154, 95, 14, 0.12); /* washes track --amber's rgb; alpha wash, not a text pair */
   --ok: #1f8f5f;
   --warn: #9a7b12;
   --err: #c24a40;

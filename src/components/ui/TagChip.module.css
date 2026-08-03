@@ -18,6 +18,9 @@
 
 /* Anchor variant: same shell, but interactive affordances. */
 .link {
+  /* Interactive chips are touch targets — keep them ≥44px tall (DESIGN.md §3).
+     The plain <span> tag variant is not interactive and stays compact. */
+  min-height: 44px;
   text-decoration: none;
   cursor: pointer;
   transition: border-color 120ms ease-out, color 120ms ease-out;
