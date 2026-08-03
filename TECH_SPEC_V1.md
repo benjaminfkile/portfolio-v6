@@ -260,6 +260,7 @@ const SECTION_REGISTRY = {
   now_playing: NowPlayingSection,  // live — §3.5
   duolingo:    DuolingoSection,    // live — §3.5 (v1.2)
   github:      GithubSection,      // live — §3.5 (v1.2)
+  ops:         OpsSection,         // live — §3.5 (v1.3)
   contact:     ContactSection,
 } satisfies Record<SectionType, ComponentType<any>>;
 ```
@@ -280,6 +281,7 @@ doesn't recognize degrades rather than crashes.
 | `now_playing` | no | — (live; config only) |
 | `duolingo` | no | — (live; config only, v1.2) |
 | `github` | no | — (live; config only, v1.2) |
+| `ops` | no | — (live; config only, v1.3) |
 | `contact` | no | — |
 
 #### The `Link` type
@@ -319,9 +321,9 @@ under small headings ("Repositories", "Live", "Docs"). No cap on count.
 
 ### 3.5 Live sections
 
-`status`, `blog`, `now_playing`, and (v1.2) `duolingo` and `github` are **live
-sections**: their *configuration* is published into the snapshot, but their *data* is
-fetched at runtime by the component.
+`status`, `blog`, `now_playing`, (v1.2) `duolingo` and `github`, and (v1.3) `ops`
+are **live sections**: their *configuration* is published into the snapshot, but
+their *data* is fetched at runtime by the component.
 
 This exists because `/api/content` is an immutable document served with `ETag: W/"v42"`
 (§3.3) — the entire caching model depends on it not changing between publishes. Service
@@ -335,6 +337,7 @@ neither can live inside the snapshot without breaking that guarantee.
 | `now_playing` | idle behavior (`hide` \| `message`), whether to show album art | `GET /api/now-playing` |
 | `duolingo` | `language` (course code, default `es`), optional manual `score_label` | `GET /api/duolingo` |
 | `github` | how many weeks of the contribution calendar to show (default 52) | `GET /api/github` |
+| `ops` | `window_hours` (metric lookback, 1–24, default 3) | `GET /api/ops` |
 
 Live-section components must render a loading state and must **degrade rather than
 error** — a failed `/api/status` fetch renders the section as unavailable, never a
@@ -435,6 +438,54 @@ shape:
   number-per-day is intentionally NOT exposed per-cell in a tooltip API round-trip —
   the curated shape is the calendar, not the events behind it.
 - Standard live-section rules: loading state, degrade to nothing on failure.
+
+#### `ops` (v1.3)
+
+Real production telemetry as a public page: the owner's CloudWatch gateway dashboard
+rendered through the site's own gauge/chart components. Not a third-party integration
+(§4.7 does not apply — there is no credential to manage; the deployed API reads
+CloudWatch through its runtime IAM role, so `ops` never appears on the admin
+Integrations page). Typically placed alone on a dedicated page (§3.10) such as `/ops`.
+
+**Dashboard-driven by design.** `GET /api/ops` reads the CloudWatch dashboard named
+by the `cloudwatch_dashboard_name` secret (an infra identifier — env/Secrets Manager
+only, NEVER in a repo), parses each metric widget's definitions from `GetDashboard`,
+and batches one `GetMetricData` call for the lookback window (`?window_hours=`,
+validated 1–24, default 3, 5-minute period). Editing the dashboard in AWS is editing
+the page — CloudWatch is the CMS for this section.
+
+**Sanitized curated shape** — the §3.5 degrade rules plus an explicit
+identifier-scrubbing pass, because raw widget definitions contain account and
+resource identifiers that must never reach the public payload:
+
+```jsonc
+{ "available": true, "window_hours": 3,
+  "widgets": [
+    { "title": "ALB - Request Count",   // the human title, only ever the title
+      "kind": "gauge" | "chart",        // inferred: gauge = single-series percent-like
+      "unit": "%" | "MB/s" | null,
+      "latest": 12.4,
+      "series": [ { "label": "…"|null, "points": [ { "t": 1690000000, "v": 12.4 } ] } ] }
+  ] }
+// or
+{ "available": false }
+```
+
+- Only widget **titles** and explicitly user-set series labels pass through; metric
+  namespaces, dimensions, ARNs, and region/account values are stripped server-side,
+  and any label matching a resource-identifier pattern (`i-…`, `arn:…`, instance/lb
+  names) is replaced with null. The sanitizer is allowlist-shaped: it emits the
+  curated fields, never a filtered copy of the raw definition.
+- `kind` inference: single-series widgets whose unit is Percent (or whose title
+  clearly reads as a utilization) render as gauges; everything else is a chart. The
+  renderer always shows `latest` prominently either way.
+- ~5-minute in-memory cache with single-flight; the client refetches ~60s. At ~15
+  metrics per refresh this costs on the order of $1–3/month in `GetMetricData` calls.
+- Failure of any kind — missing secret, IAM denied, throttling, malformed dashboard —
+  returns `{ "available": false }`, never a 5xx. Locally (IS_LOCAL, no AWS) the
+  endpoint simply degrades.
+- Infra prerequisite (owner-side): the deployed API's instance/task role needs
+  `cloudwatch:GetDashboard` and `cloudwatch:GetMetricData` (read-only).
 
 ### 3.6 The blog
 
@@ -629,6 +680,7 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/now-playing` | Current Spotify track for the `now_playing` section (§3.5, §4.6). Cached ~30s. |
 | `GET` | `/api/duolingo` | Streak + course progress for the `duolingo` section (§3.5, v1.2). Cached ~1h. |
 | `GET` | `/api/github` | Contribution calendar for the `github` section (§3.5, v1.2). Cached ~1h. |
+| `GET` | `/api/ops` | Sanitized CloudWatch dashboard telemetry for the `ops` section (§3.5, v1.3). Cached ~5m. |
 | `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
 | `GET` | `/api/posts/:slug` | One published post, `published_body` only. `ETag`. |
 

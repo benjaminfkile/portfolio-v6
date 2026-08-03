@@ -111,6 +111,14 @@ Each = one component + one CSS Module, tokens only, zero dependencies:
 | `LinkButton` | text link and button-shaped variants; amber; visible `:focus-visible` ring (`2px` amber outline, offset 2) |
 | `MediaFrame` | image/video wrapper: border, radius, `aspect-ratio` box, lazy loading, `object-fit: cover` |
 | `Ticker` (optional) | marquee row for dense live data; paused when `prefers-reduced-motion` |
+| `Gauge` | SVG arc gauge: `--line` track, amber sweep, big tabular-nums value + unit, mono label; sweep animates on first reveal, renders static under reduced-motion |
+| `AreaChart` | hand-rolled SVG time series (NO chart library): amber 1.5px line + `--amber-soft` fill, faint horizontal grid (3–4 rules, `--line`), emphasized latest point (amber dot), min/max mono labels only — no axis clutter; multi-series uses amber + `--text-dim` strokes |
+| `StatBlock` | big tabular-nums value + unit + mono label, optional small delta line |
+
+Chart rules (all three): values in mono `tabular-nums`; charts are decorative to a
+screen reader — `aria-hidden` on the SVG with a visually-hidden one-sentence text
+summary alongside; container queries/width-aware `viewBox` so they scale, never
+overflow; no tooltips in v1 (latest + min/max labels carry the information).
 
 ## 5. Section treatments (public sections, §3.4)
 
@@ -142,6 +150,12 @@ Each = one component + one CSS Module, tokens only, zero dependencies:
   config narrows the weeks), the page never does. One accessible summary sentence
   (visually hidden) instead of 365 labeled cells.
 - **contact** — closing panel: heading, `LinkButton`s row.
+- **ops** — the flagship Control Room page: a responsive grid of `Panel`s (1-col
+  base → 2-col ≥900 → 3-col ≥1200), each with a mono widget title, a `Gauge` (for
+  utilization-kind widgets) or `AreaChart` (everything else), and the latest value
+  as a `StatBlock`-style readout. A mono strip above the grid: window label
+  ("LAST 3H"), last-refresh timestamp, and a `StatusDot`. Refetch ~60s, paused when
+  `document.hidden`. Degrades to nothing when `{ available: false }`.
 - **404 / empty states** — instrument voice: mono `NO SIGNAL` label + plain link home.
 
 ## 6. Motion
