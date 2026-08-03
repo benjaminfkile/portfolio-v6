@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import { fixtureDocument, fixturePostSummaries } from './test/fixtures';
@@ -126,18 +126,46 @@ describe('App routing', () => {
 
     renderAt('/');
 
-    const nav = await screen.findByRole('navigation', { name: /primary/i });
-    expect(await within(nav).findByRole('link', { name: 'Home' })).toHaveAttribute(
-      'href',
-      '/',
+    // The inline "Primary" nav is visually hidden below 900px (jsdom applies the
+    // mobile base styles), so it sits outside the accessibility tree: it is
+    // located by `aria-label` with `hidden: true` and its links by role.
+    const nav = screen
+      .getAllByRole('navigation', { hidden: true })
+      .find((n) => n.getAttribute('aria-label') === 'Primary')!;
+    await waitFor(() =>
+      expect(within(nav).getAllByRole('link', { hidden: true })).toHaveLength(3),
     );
-    expect(within(nav).getByRole('link', { name: 'Projects' })).toHaveAttribute(
-      'href',
-      '/projects',
-    );
-    expect(within(nav).getByRole('link', { name: 'Blog' })).toHaveAttribute(
-      'href',
-      '/blog',
-    );
+    const links = within(nav).getAllByRole('link', { hidden: true });
+    const href = (text: string) =>
+      links.find((a) => a.textContent === text)!.getAttribute('href');
+    expect(href('Home')).toBe('/');
+    expect(href('Projects')).toBe('/projects');
+    expect(href('Blog')).toBe('/blog');
+  });
+
+  it('exposes the header, main, and footer landmarks (§7)', async () => {
+    stubApi();
+
+    renderAt('/');
+
+    await screen.findByRole('heading', { level: 1, name: 'Ben Kile' });
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('main')).toBeInTheDocument();
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+  });
+
+  it('renders a skip-to-content link as the first focusable, targeting main (§7)', async () => {
+    stubApi();
+
+    renderAt('/');
+
+    const skip = screen.getByRole('link', { name: /skip to content/i });
+    // It is the first link in document order (the first focusable element).
+    expect(screen.getAllByRole('link')[0]).toBe(skip);
+
+    // Its href targets the id on the main landmark.
+    const main = await screen.findByRole('main');
+    expect(main).toHaveAttribute('id', 'main-content');
+    expect(skip).toHaveAttribute('href', '#main-content');
   });
 });

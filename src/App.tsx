@@ -1,23 +1,9 @@
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import ContentPage from './pages/ContentPage';
 import BlogIndexPage from './pages/BlogIndexPage';
 import BlogPostPage from './pages/BlogPostPage';
 import NotFound from './pages/NotFound';
-import SiteNav from './components/SiteNav';
-
-/**
- * The shared layout: the site nav (generated from the published document, §3.10)
- * above every page's own `<main>`, so the nav renders on content pages and blog
- * pages alike.
- */
-function SiteLayout() {
-  return (
-    <>
-      <SiteNav />
-      <Outlet />
-    </>
-  );
-}
+import SiteLayout from './components/SiteLayout';
 
 /**
  * The route table. Content pages are dynamic (v1.1, spec §3.10): `/` renders the
