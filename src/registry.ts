@@ -13,6 +13,7 @@ import BlogSection from './sections/BlogSection';
 import NowPlayingSection from './sections/NowPlayingSection';
 import DuolingoSection from './sections/DuolingoSection';
 import GithubSection from './sections/GithubSection';
+import OpsSection from './sections/OpsSection';
 import ContactSection from './sections/ContactSection';
 
 import HeadingBlock from './blocks/HeadingBlock';
@@ -34,9 +35,9 @@ import DividerBlock from './blocks/DividerBlock';
  * `satisfies Record<SectionType, …>` makes the table exhaustive at compile time:
  * adding a `SectionType` without a component here is a build error.
  *
- * `status`, `blog`, `now_playing`, and (v1.2) `duolingo` and `github` are live
- * sections (§3.5): their config is in the snapshot but their data is fetched at
- * runtime by the component.
+ * `status`, `blog`, `now_playing`, (v1.2) `duolingo` and `github`, and (v1.3)
+ * `ops` are live sections (§3.5): their config is in the snapshot but their data
+ * is fetched at runtime by the component.
  */
 export const SECTION_REGISTRY = {
   hero: HeroSection,
@@ -49,6 +50,7 @@ export const SECTION_REGISTRY = {
   now_playing: NowPlayingSection,
   duolingo: DuolingoSection,
   github: GithubSection,
+  ops: OpsSection,
   contact: ContactSection,
 } satisfies Record<SectionType, ComponentType<SectionProps>>;
 

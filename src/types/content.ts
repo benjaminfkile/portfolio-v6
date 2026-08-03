@@ -59,6 +59,7 @@ export type SectionType =
   | 'now_playing'
   | 'duolingo'
   | 'github'
+  | 'ops'
   | 'contact';
 
 /* ---- Section item shapes (spec §3.4 item table) --------------------------- */
@@ -130,9 +131,27 @@ export interface GithubSectionData {
 }
 
 /**
+ * The `ops` section's published config (spec §3.5, DESIGN.md §5, v1.3). The
+ * section's *config* is snapshotted; its *data* (the CloudWatch dashboard's
+ * curated gauge/chart widgets) is fetched at runtime from
+ * `GET /api/ops?window_hours=<window_hours>`.
+ *
+ * `window_hours` is the metric lookback in hours, validated 1–24 (default 3) and
+ * forwarded as the `?window_hours=` query param; the renderer also derives the
+ * strip's window label ("LAST 3H") from it. Optional `heading` / `eyebrow` /
+ * `intro` override the section header copy.
+ */
+export interface OpsSectionData {
+  heading?: string;
+  eyebrow?: string;
+  intro?: string;
+  window_hours?: number;
+}
+
+/**
  * The `data` blob of a repeatable child. Section types without repeatable
- * content (hero, about, status, blog, now_playing, duolingo, github, contact)
- * have zero items.
+ * content (hero, about, status, blog, now_playing, duolingo, github, ops,
+ * contact) have zero items.
  */
 export type SectionItemData = TimelineItem | SkillsItem | PortfolioItem;
 

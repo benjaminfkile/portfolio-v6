@@ -222,6 +222,66 @@ export function getGithub(init?: RequestInit): Promise<GithubResponse> {
   return apiFetch<GithubResponse>('/api/github', init);
 }
 
+/* ---- Live section: ops (spec §3.5, v1.3) ---------------------------------- */
+
+/** One time-series sample in an ops widget: `t` epoch seconds, `v` the value. */
+export interface OpsPoint {
+  t: number;
+  v: number;
+}
+
+/**
+ * One curated series within an ops widget. `label` is either an explicitly
+ * user-set series label or `null` — every identifier-bearing label (namespaces,
+ * ARNs, instance/lb names) is scrubbed to `null` server-side (spec §3.5), so the
+ * renderer shows a label only when it is non-null.
+ */
+export interface OpsSeries {
+  label: string | null;
+  points: OpsPoint[];
+}
+
+/**
+ * One curated CloudWatch dashboard widget. `title` is the only free text that
+ * passes through; `kind` is inferred server-side (`gauge` for single-series
+ * percent-like utilization, `chart` otherwise); `unit` is a display suffix or
+ * `null`; `latest` is the most recent reading (shown prominently either way) or
+ * `null` when the window held no data.
+ */
+export interface OpsWidget {
+  title: string;
+  kind: 'gauge' | 'chart';
+  unit: string | null;
+  latest: number | null;
+  series: OpsSeries[];
+}
+
+/**
+ * `GET /api/ops?window_hours=<n>` — the owner's CloudWatch dashboard rendered as
+ * a public page (spec §3.5, v1.3). The API reads the dashboard, scrubs every
+ * account/resource identifier, and returns this curated shape; on *any* failure
+ * (missing secret, IAM denied, throttling, malformed dashboard) or locally with
+ * no AWS it returns `{ available: false }`, so the section degrades to nothing
+ * rather than erroring (§3.5).
+ */
+export type OpsResponse =
+  | { available: true; window_hours: number; widgets: OpsWidget[] }
+  | { available: false };
+
+/**
+ * `GET /api/ops` — see {@link OpsResponse}. `windowHours` is the metric lookback
+ * (validated 1–24 server-side) forwarded as the `?window_hours=` query param.
+ */
+export function getOps(
+  windowHours: number,
+  init?: RequestInit,
+): Promise<OpsResponse> {
+  return apiFetch<OpsResponse>(
+    `/api/ops?window_hours=${encodeURIComponent(String(windowHours))}`,
+    init,
+  );
+}
+
 /* ---- Preview (spec §7) ---------------------------------------------------- */
 
 /**
