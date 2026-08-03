@@ -1,0 +1,42 @@
+/* ThemeToggle — mono "instrument" chip; tokens only (DESIGN.md §2, §4). */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* ≥44px touch target (DESIGN.md §3). */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  cursor: pointer;
+  transition: border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.toggle:hover {
+  /* Border brightens to an amber-soft wash; nothing moves (DESIGN.md §6). */
+  border-color: var(--amber);
+  color: var(--text-bright);
+}
+
+.icon {
+  color: var(--amber);
+  font-size: 1em;
+  line-height: 1;
+}
+
+.label {
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle {
+    transition: none;
+  }
+}
