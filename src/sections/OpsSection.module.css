@@ -1,0 +1,122 @@
+/* Ops — the flagship Control Room page: a mono strip over a responsive grid of
+   widget Panels, each a Gauge or an AreaChart + StatBlock readout (DESIGN.md §5).
+   Tokens only; mobile-first; both themes. */
+
+.ops {
+  padding-block: var(--space-6);
+}
+
+/* Mono strip above the grid: window label, last-refresh time, StatusDot. */
+.strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+}
+
+.window {
+  color: var(--amber);
+  font-weight: var(--fw-medium);
+}
+
+.refresh {
+  color: var(--text-dim);
+  /* The clock holds its width as the seconds tick (DESIGN.md §2.3). */
+  font-variant-numeric: tabular-nums;
+}
+
+/* The StatusDot sits at the far end of the strip. */
+.strip > :last-child {
+  margin-left: auto;
+}
+
+/* Responsive Panel grid: 1-col base → 2-col ≥900 → 3-col ≥1200 (DESIGN.md §5). */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.widget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* Panel carries its own padding/border; the min-width:0 lets charts shrink. */
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.chartBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.readout {
+  gap: var(--space-1);
+}
+
+/* The AreaChart needs headroom for its absolutely-positioned min/max labels. */
+.chart {
+  margin-top: var(--space-2);
+}
+
+/* Series legend — small mono labels, one row, only when labels are non-null. */
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+}
+
+/* A small swatch keying the legend to the chart's two series (amber / dim). */
+.legendItem::before {
+  content: '';
+  width: 10px;
+  height: 2px;
+  border-radius: var(--r-s);
+  background: var(--amber);
+}
+
+.legendItem[data-series='1']::before {
+  background: var(--text-dim);
+}

@@ -208,6 +208,36 @@ export const fixtureDocument: ContentDocument = {
 };
 
 /**
+ * A document whose single `ops` page carries one `ops` section (spec §3.5,
+ * v1.3), for driving the ops section through `SECTION_REGISTRY`. Its *data* is
+ * fetched at runtime from `GET /api/ops` — this fixture is only the published
+ * config (a `window_hours` and header copy), mirroring how the snapshot stores a
+ * live section (§3.5).
+ */
+export const fixtureOpsDocument: ContentDocument = {
+  version: 43,
+  published_at: '2026-08-01T12:00:00Z',
+  media: {},
+  pages: [
+    {
+      id: 'page-ops',
+      slug: 'ops',
+      title: 'Ops',
+      nav_label: 'Ops',
+      nav_position: 0,
+      sections: [
+        {
+          id: 'sec-ops',
+          type: 'ops',
+          data: { heading: 'Ops', window_hours: 6 },
+          items: [],
+        },
+      ],
+    },
+  ],
+};
+
+/**
  * A post whose body exercises every one of the eight block types (spec §3.7),
  * plus a trailing unknown block that must degrade to nothing. Its media map
  * resolves the one `media` block's id. Used to drive the block-pipeline tests.
