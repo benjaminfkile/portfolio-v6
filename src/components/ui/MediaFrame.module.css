@@ -1,0 +1,68 @@
+/* MediaFrame — bordered, rounded aspect-ratio box; media covers it. The play
+   button appears in reduced-motion/touch mode over the poster (DESIGN.md §4,
+   §5, §6). Tokens only. */
+
+.frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--panel);
+  /* aspect-ratio is supplied inline (a dynamic prop) — DESIGN.md §14.1 rule 4. */
+}
+
+.media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Fill the frame so the whole poster is a ≥44px tap target (DESIGN.md §3). */
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: var(--amber-soft);
+  color: var(--amber);
+  cursor: pointer;
+}
+
+.playIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: var(--fs-h4);
+  line-height: 1;
+  border: 1px solid var(--amber);
+  border-radius: 50%;
+  background: var(--panel);
+  /* Optical centering of the triangle glyph. */
+  padding-left: 3px;
+}
+
+.play:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.play:hover .playIcon {
+  background: var(--panel-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play:hover .playIcon {
+    background: var(--panel-2);
+    transition: none;
+  }
+}

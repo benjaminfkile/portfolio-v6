@@ -1,0 +1,40 @@
+/* Ticker — seamless horizontal marquee via duplicated content. The track holds
+   two identical groups and scrolls left by exactly half its width, so the loop
+   is continuous. Paused entirely under reduced motion (DESIGN.md §4, §6).
+   Tokens only. */
+
+.ticker {
+  /* The page body never scrolls horizontally; the marquee is clipped here
+     (DESIGN.md §3). */
+  overflow: hidden;
+  width: 100%;
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  /* Half the track (one full copy) scrolls past, then the duplicate takes over. */
+  animation: tickerScroll var(--ticker-duration, 30s) linear infinite;
+}
+
+.group {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+@keyframes tickerScroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    /* Static ticker: no scroll under reduced motion (DESIGN.md §6). */
+    animation: none;
+  }
+}
