@@ -1,19 +1,24 @@
+/* Quote block — a body pull-quote with an amber rule and a mono attribution
+   (DESIGN.md §2.3, §5). Tokens only. */
+
 .block {
-  margin-block: var(--space-lg);
+  margin-block: var(--space-5);
 }
 
 .quote {
   margin: 0;
-  padding-inline-start: var(--space-md);
-  border-inline-start: 3px solid var(--color-border);
-  color: var(--color-text-muted);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 3px solid var(--amber);
+  color: var(--text);
   font-style: italic;
+  line-height: var(--lh-prose);
 }
 
 .attribution {
-  margin-top: var(--space-xs);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
 }
 
 .attribution::before {

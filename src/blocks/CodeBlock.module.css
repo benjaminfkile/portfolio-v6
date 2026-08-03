@@ -1,24 +1,30 @@
+/* Code block — a tokenised frame around Shiki's highlighted output. We restyle
+   the frame only; the per-token colours stay Shiki's (inline styles in the TSX).
+   Wide code scrolls inside its own container, never the page (DESIGN.md §3).
+   Tokens only. */
+
 .block {
-  margin-block: var(--space-lg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  margin-block: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
   overflow: hidden;
+  background: var(--panel);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
-  padding: var(--space-2xs) var(--space-sm);
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
 }
 
 .filename {
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
 }
 
 /* When there is no filename the copy button sits alone at the right. */
@@ -27,29 +33,40 @@
 }
 
 .copy {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  padding: var(--space-3xs) var(--space-xs);
-  font-size: var(--font-size-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--text-dim);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
   cursor: pointer;
+  transition: border-color 120ms ease-out, color 120ms ease-out;
 }
 
 .copy:hover {
-  background-color: var(--color-surface);
+  border-color: var(--amber);
+  color: var(--text-bright);
 }
 
 .pre {
   margin: 0;
-  padding: var(--space-md);
+  padding: var(--space-4);
+  /* Wide code scrolls in its own container — the page never scrolls (§3). */
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--fs-body-s);
   line-height: 1.5;
+  color: var(--text);
 }
 
 .line {
   display: inline;
   white-space: pre;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy {
+    transition: none;
+  }
 }

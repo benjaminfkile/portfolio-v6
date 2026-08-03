@@ -1,11 +1,16 @@
+/* Paragraph block — body prose with inline-code chips (DESIGN.md §2.3).
+   Tokens only. */
+
 .paragraph {
-  margin-block: var(--space-md);
+  margin-block: var(--space-4);
+  line-height: var(--lh-prose);
 }
 
 .paragraph code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background-color: var(--color-surface);
+  background: var(--panel-2);
+  color: var(--text-bright);
   padding: 0.1em 0.3em;
-  border-radius: var(--radius);
+  border-radius: var(--r-s);
 }

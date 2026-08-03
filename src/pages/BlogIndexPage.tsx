@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { getPosts } from '../lib/api';
 import type { PostSummary } from '../types/content';
+import Panel from '../components/ui/Panel';
+import TagChip from '../components/ui/TagChip';
 import styles from './BlogIndexPage.module.css';
 
 /**
@@ -39,7 +41,7 @@ function formatDate(iso: string): string {
 function TeaserCard({ post }: { post: PostSummary }) {
   return (
     <li>
-      <article className={styles.card}>
+      <Panel as="article" className={styles.card}>
         <RouterLink className={styles.cardLink} to={`/blog/${post.slug}`}>
           {post.cover && (
             <img
@@ -48,22 +50,22 @@ function TeaserCard({ post }: { post: PostSummary }) {
               alt={post.cover.alt ?? ''}
             />
           )}
+          <time className={styles.date} dateTime={post.published_at}>
+            {formatDate(post.published_at)}
+          </time>
           <h2 className={styles.cardTitle}>{post.title}</h2>
+          {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
         </RouterLink>
-        <time className={styles.date} dateTime={post.published_at}>
-          {formatDate(post.published_at)}
-        </time>
-        {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
         {post.tags.length > 0 && (
           <ul className={styles.tags}>
             {post.tags.map((tag) => (
-              <li key={tag} className={styles.tag}>
-                {tag}
+              <li key={tag}>
+                <TagChip>{tag}</TagChip>
               </li>
             ))}
           </ul>
         )}
-      </article>
+      </Panel>
     </li>
   );
 }
@@ -119,7 +121,10 @@ export default function BlogIndexPage() {
 
   return (
     <main id="main-content" className={styles.page}>
-      <h1>Blog</h1>
+      <header className={styles.header}>
+        <p className={styles.eyebrow}>// writing</p>
+        <h1 className={styles.pageTitle}>Blog</h1>
+      </header>
 
       {knownTags.length > 0 && (
         <nav className={styles.filters} aria-label="Filter posts by tag">

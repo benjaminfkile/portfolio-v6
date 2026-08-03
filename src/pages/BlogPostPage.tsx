@@ -126,8 +126,9 @@ export default function BlogPostPage() {
   return (
     <main id="main-content" className={styles.page}>
       {preview && <PreviewIndicator />}
-      <article>
+      <article className={styles.article}>
         <header className={styles.header}>
+          <p className={styles.eyebrow}>// post</p>
           <h1 className={styles.title}>{post.title}</h1>
           <time className={styles.date} dateTime={post.published_at}>
             {formatDate(post.published_at)}
@@ -140,7 +141,9 @@ export default function BlogPostPage() {
             alt={post.cover.alt ?? ''}
           />
         )}
-        <BlockRenderer body={post.body} media={post.media ?? {}} />
+        <div className={styles.body}>
+          <BlockRenderer body={post.body} media={post.media ?? {}} />
+        </div>
       </article>
     </main>
   );

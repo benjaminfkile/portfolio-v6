@@ -1,15 +1,20 @@
+/* Media block — a bordered, rounded image with a mono caption (DESIGN.md §4).
+   Tokens only. */
+
 .block {
-  margin-block: var(--space-lg);
+  margin-block: var(--space-5);
 }
 
 .media {
   width: 100%;
-  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
 }
 
 .caption {
-  margin-top: var(--space-xs);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
   text-align: center;
 }

@@ -1,45 +1,87 @@
+/* Now playing — an Instrument-style readout: small album-art MediaFrame, track
+   title + artists, and a thin amber progress Meter that creeps (DESIGN.md §5).
+   Tokens only; mobile-first. */
+
 .nowPlaying {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+  padding-block: var(--space-6);
 }
 
-.title {
-  font-size: var(--font-size-xl);
+.panel {
+  display: block;
 }
 
 .muted {
-  color: var(--color-text-muted);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-body-s);
 }
 
 .track {
   display: flex;
-  align-items: center;
-  gap: var(--space-md);
+  align-items: flex-start;
+  gap: var(--space-4);
 }
 
+/* Small square album art — a fixed instrument-sized thumbnail (DESIGN.md §5). */
 .art {
-  width: 4rem;
-  height: 4rem;
-  border-radius: var(--radius);
   flex: none;
+  width: 64px;
 }
 
-.meta {
+.body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3xs);
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 .trackTitle {
-  font-weight: var(--font-weight-medium);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-medium);
+  color: var(--amber);
+  text-decoration: none;
+  /* Keep long titles on one calm line. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 120ms ease-out;
+}
+
+.trackTitle:hover {
+  color: var(--text-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .artists {
-  color: var(--color-text);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text);
 }
 
 .album {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+}
+
+.progress {
+  margin-top: var(--space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trackTitle {
+    transition: none;
+  }
 }
