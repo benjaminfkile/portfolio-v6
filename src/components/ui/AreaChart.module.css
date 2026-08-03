@@ -1,0 +1,82 @@
+/* AreaChart — hand-rolled SVG time series: amber line + --amber-soft fill, faint
+   --line grid, amber latest-point dot, mono min/max labels (DESIGN.md §4). The
+   SVG scales to its container width and never overflows (§3). Tokens only; SVG
+   strokes/fills reference custom properties, never raw hex. */
+
+.chart {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.area {
+  fill: var(--amber-soft);
+  stroke: none;
+}
+
+.line {
+  stroke: var(--amber);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Second series: dim stroke, no fill (DESIGN.md §4). */
+.series {
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.dot {
+  fill: var(--amber);
+  stroke: var(--panel);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Min/max readouts — small mono labels, no axis clutter (DESIGN.md §4). */
+.axisLabel {
+  position: absolute;
+  right: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.axisMax {
+  top: 0;
+}
+
+.axisMin {
+  bottom: 0;
+}
+
+/* Visually-hidden summary in place of the decorative SVG (Chart rules, §7). */
+.summary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

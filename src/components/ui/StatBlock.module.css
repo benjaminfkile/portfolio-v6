@@ -1,0 +1,44 @@
+/* StatBlock — big tabular-nums value + unit over a mono uppercase label, with
+   an optional small delta line (DESIGN.md §4). Tokens only; no raw colour. */
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-medium);
+  line-height: 1.1;
+  color: var(--text-bright);
+  /* Live numbers hold their width as digits tick (DESIGN.md §2.3). */
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-regular);
+  color: var(--text-dim);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.delta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}

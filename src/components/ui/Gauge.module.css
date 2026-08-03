@@ -1,0 +1,100 @@
+/* Gauge — SVG arc gauge: --line track, amber value arc, centred mono value +
+   unit, mono label beneath. The value arc sweeps in on first reveal and rests
+   static under reduced motion (DESIGN.md §4, §6). Tokens only; SVG strokes
+   reference custom properties, never raw hex. */
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* Holds the SVG dial and the value readout overlaid at its centre. */
+.dial {
+  position: relative;
+  width: 100%;
+  max-width: 200px;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.track {
+  stroke: var(--line);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.arc {
+  stroke: var(--amber);
+  stroke-width: 7;
+  stroke-linecap: round;
+  /* stroke-dasharray / -dashoffset are set inline so the reveal animates the
+     sweep from empty to its final angle (DESIGN.md §6). */
+  transition: stroke-dashoffset 1000ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc {
+    /* useRevealOnce resolves to revealed immediately; kill the transition so
+       nothing sweeps even if the offset changes (DESIGN.md §6). */
+    transition: none;
+  }
+}
+
+/* The value sits centred within the dial's opening. */
+.readout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.value {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  color: var(--text-bright);
+  /* Live numbers hold width as they tick (DESIGN.md §2.3). */
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-regular);
+  color: var(--text-dim);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* Visually-hidden reading in place of the decorative SVG (Chart rules, §7). */
+.summary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
