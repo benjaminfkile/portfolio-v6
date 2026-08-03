@@ -90,7 +90,7 @@ export default function BlogPostPage() {
 
   if (state.status === 'loading') {
     return (
-      <main className={styles.page}>
+      <main id="main-content" className={styles.page}>
         {preview && <PreviewIndicator />}
         <p>Loading…</p>
       </main>
@@ -99,7 +99,7 @@ export default function BlogPostPage() {
 
   if (state.status === 'notfound') {
     return (
-      <main className={styles.page}>
+      <main id="main-content" className={styles.page}>
         <h1>Post not found</h1>
         <p>
           This post doesn’t exist, or isn’t published. <RouterLink to="/blog">Back to the blog</RouterLink>.
@@ -110,7 +110,7 @@ export default function BlogPostPage() {
 
   if (state.status === 'error') {
     return (
-      <main className={styles.page}>
+      <main id="main-content" className={styles.page}>
         {preview && <PreviewIndicator />}
         <p role="alert">
           {preview
@@ -124,7 +124,7 @@ export default function BlogPostPage() {
   const { post } = state;
 
   return (
-    <main className={styles.page}>
+    <main id="main-content" className={styles.page}>
       {preview && <PreviewIndicator />}
       <article>
         <header className={styles.header}>

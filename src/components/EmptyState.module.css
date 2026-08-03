@@ -1,0 +1,65 @@
+/* EmptyState — 404 / empty "NO SIGNAL" block; tokens only (DESIGN.md §5). */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-8) 0;
+}
+
+.signal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+}
+
+/* The blinking "no signal" LED — amber ring; static under reduced motion (§6). */
+.signal::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: signalBlink 2s ease-in-out infinite;
+}
+
+.heading {
+  margin: 0;
+}
+
+.message {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--text);
+}
+
+.action {
+  margin-top: var(--space-2);
+}
+
+@keyframes signalBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal::before {
+    animation: none;
+  }
+}

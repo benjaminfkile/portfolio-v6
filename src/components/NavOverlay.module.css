@@ -1,0 +1,90 @@
+/* NavOverlay — mobile full-screen menu; tokens only (DESIGN.md §3, §6). */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  /* A veiled ground so the console reads as "modal", not a new page. */
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 100%;
+  padding: var(--space-4) var(--space-5) var(--space-8);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.close {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* ≥44px touch target (DESIGN.md §3). */
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-h4);
+  cursor: pointer;
+  transition: border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.close:hover {
+  border-color: var(--amber);
+  color: var(--text-bright);
+}
+
+.nav {
+  flex: 1;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: block;
+  padding: var(--space-3) 0;
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-medium);
+  border-bottom: 1px solid var(--line);
+  transition: color 120ms ease-out;
+}
+
+.link:hover {
+  color: var(--amber);
+}
+
+.active {
+  color: var(--amber);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .close,
+  .link {
+    transition: none;
+  }
+}
+
+/* The overlay is a phone affordance; hidden once inline links appear (§3). */
+@media (min-width: 900px) {
+  .backdrop {
+    display: none;
+  }
+}
