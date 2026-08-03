@@ -131,6 +131,16 @@ Each = one component + one CSS Module, tokens only, zero dependencies:
   artist, live progress bar (thin amber `Meter` that creeps); idle state per
   section config. Poll ~30s, matching the API cache.
 - **blog** (teaser) — list of post panels: mono date, title, excerpt.
+- **duolingo** — an `Instrument` pair: STREAK (mono amber count + day label) and the
+  course readout (title, XP in tabular-nums; crowns small in --text-dim). The manual
+  `score_label`, when configured, renders as a `TagChip` — visually distinct from
+  live values, which are always mono. Degrades to nothing.
+- **github** — contribution calendar as an amber heat grid: 5-step ramp from
+  `--panel-2` through `--amber-soft` to `--amber`; cell 10–12px, 3px gap, `--r-s`
+  minus; total contributions as a mono `Instrument` above. The grid lives in its own
+  `overflow-x: auto` container — on phones it scrolls horizontally (or the section
+  config narrows the weeks), the page never does. One accessible summary sentence
+  (visually hidden) instead of 365 labeled cells.
 - **contact** — closing panel: heading, `LinkButton`s row.
 - **404 / empty states** — instrument voice: mono `NO SIGNAL` label + plain link home.
 

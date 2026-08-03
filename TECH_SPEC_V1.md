@@ -258,6 +258,8 @@ const SECTION_REGISTRY = {
   status:      StatusSection,      // live — §3.5
   blog:        BlogSection,        // live — §3.5
   now_playing: NowPlayingSection,  // live — §3.5
+  duolingo:    DuolingoSection,    // live — §3.5 (v1.2)
+  github:      GithubSection,      // live — §3.5 (v1.2)
   contact:     ContactSection,
 } satisfies Record<SectionType, ComponentType<any>>;
 ```
@@ -276,6 +278,8 @@ doesn't recognize degrades rather than crashes.
 | `status` | no | — (live; config only) |
 | `blog` | no | — (live; config only) |
 | `now_playing` | no | — (live; config only) |
+| `duolingo` | no | — (live; config only, v1.2) |
+| `github` | no | — (live; config only, v1.2) |
 | `contact` | no | — |
 
 #### The `Link` type
@@ -315,8 +319,9 @@ under small headings ("Repositories", "Live", "Docs"). No cap on count.
 
 ### 3.5 Live sections
 
-`status`, `blog`, and `now_playing` are **live sections**: their *configuration* is
-published into the snapshot, but their *data* is fetched at runtime by the component.
+`status`, `blog`, `now_playing`, and (v1.2) `duolingo` and `github` are **live
+sections**: their *configuration* is published into the snapshot, but their *data* is
+fetched at runtime by the component.
 
 This exists because `/api/content` is an immutable document served with `ETag: W/"v42"`
 (§3.3) — the entire caching model depends on it not changing between publishes. Service
@@ -328,6 +333,8 @@ neither can live inside the snapshot without breaking that guarantee.
 | `status` | which services to show, whether to show response times | `GET /api/status` |
 | `blog` | how many posts, tag filter | `GET /api/posts` |
 | `now_playing` | idle behavior (`hide` \| `message`), whether to show album art | `GET /api/now-playing` |
+| `duolingo` | `language` (course code, default `es`), optional manual `score_label` | `GET /api/duolingo` |
+| `github` | how many weeks of the contribution calendar to show (default 52) | `GET /api/github` |
 
 Live-section components must render a loading state and must **degrade rather than
 error** — a failed `/api/status` fetch renders the section as unavailable, never a
@@ -382,6 +389,52 @@ a Spotify credential (§4.6).
 A "recently played" fallback (showing the last track when idle) is a deliberate
 non-goal for v1 — it needs a second Spotify scope and endpoint. The response shape
 leaves room for it (§4.6) if it's ever wanted.
+
+#### `duolingo` (v1.2)
+
+Shows the owner's Duolingo streak and progress in one course (Spanish). Data comes
+from `GET /api/duolingo`, which proxies Duolingo's **unofficial** public user endpoint
+(`/2017-06-30/users?username=…`) server-side using the username stored via the
+Integrations page (§4.7). Curated shape:
+
+```jsonc
+{ "available": true, "streak": 847,
+  "course": { "title": "Spanish", "xp": 48210, "crowns": 155 } }
+// or
+{ "available": false }
+```
+
+- The endpoint is unofficial and may break without notice — which is exactly why the
+  §3.5 degrade rule and the ~1h server-side cache make it acceptable: on ANY upstream
+  failure or shape drift the API returns `{ available: false }` and the section
+  renders nothing. Low stakes, by construction.
+- The official in-app "Duolingo Score" (the CEFR-aligned number) is NOT exposed by
+  this endpoint. The section's optional `score_label` config exists for that: a
+  hand-maintained string (e.g. "Duolingo Score 95") edited in the admin when it
+  changes. Live data and manual data are visually distinguished by the renderer.
+- The course is selected by the `language` config (course code, default `es`); the
+  API returns the matching course from the payload.
+
+#### `github` (v1.2)
+
+Shows the owner's GitHub contribution calendar and total, fetched from
+`GET /api/github`, which proxies the GitHub GraphQL API (`contributionsCollection`)
+server-side with a PAT stored encrypted via the Integrations page (§4.7). Curated
+shape:
+
+```jsonc
+{ "available": true, "total": 2143,
+  "weeks": [ { "days": [0, 3, 1, 0, 5, 2, 0] } /* … oldest → newest */ ] }
+// or
+{ "available": false }
+```
+
+- The PAT needs no scopes beyond public data (`read:user`); it never appears in any
+  response or log. ~1h server-side cache — contribution data does not change faster.
+- The renderer maps counts to a 5-step intensity ramp of the accent color; the
+  number-per-day is intentionally NOT exposed per-cell in a tooltip API round-trip —
+  the curated shape is the calendar, not the events behind it.
+- Standard live-section rules: loading state, degrade to nothing on failure.
 
 ### 3.6 The blog
 
@@ -574,6 +627,8 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/content` | Latest `page_versions.document`, media refs resolved to CDN URLs. `ETag` + `Cache-Control`. |
 | `GET` | `/api/status` | Curated service health for the `status` section (§3.5). Cached ~30s. |
 | `GET` | `/api/now-playing` | Current Spotify track for the `now_playing` section (§3.5, §4.6). Cached ~30s. |
+| `GET` | `/api/duolingo` | Streak + course progress for the `duolingo` section (§3.5, v1.2). Cached ~1h. |
+| `GET` | `/api/github` | Contribution calendar for the `github` section (§3.5, v1.2). Cached ~1h. |
 | `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
 | `GET` | `/api/posts/:slug` | One published post, `published_body` only. `ETag`. |
 
@@ -811,8 +866,10 @@ for what comes next:
 the admin Integrations page, which renders one hardcoded Spotify card.
 
 **The rule: implement the generalization WHEN integration #2 arrives — in the same
-change, shaped by the two real cases. Do not build it speculatively before then.**
-The refactor is:
+change, shaped by the real cases. Do not build it speculatively before then.**
+*(Triggered 2026-08-02: integrations #2 and #3 are `github` — auth kind `api_key`,
+a PAT — and `duolingo` — auth kind `value`, a public username. With `spotify`
+(`oauth`) that is three distinct auth kinds shaping the descriptor.)* The refactor is:
 
 1. An **integration descriptor** per provider: key (the `service_tokens` key),
    display name, auth kind (`oauth` | `api_key` | `none`), authorize/token URLs,
