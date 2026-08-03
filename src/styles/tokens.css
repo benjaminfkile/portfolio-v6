@@ -1,0 +1,92 @@
+/*
+ * Control Room design tokens — the single source of truth for every custom
+ * property on the PUBLIC site (DESIGN.md §2). Dark is the native theme and its
+ * values live on :root; the light theme ("console in a lit room") overrides
+ * only the colours it needs under :root[data-theme="light"]. Components consume
+ * these tokens and NEVER raw hex — a literal colour in a component module is a
+ * review failure. Values here are verbatim from the DESIGN.md §2.1–§2.4 tables.
+ */
+
+:root {
+  /* ---- Colour — dark (native), DESIGN.md §2.1 ---------------------------- */
+  --ground: #0b0e14; /* page background (blue-black, never pure black) */
+  --panel: #12161f; /* cards, instrument panels */
+  --panel-2: #171c28; /* raised/hover panel */
+  --line: #1e2532; /* borders, rules */
+  --grid: rgba(120, 140, 175, 0.07); /* faint plotting grid on the ground */
+  --text: #c9d2e0; /* body text */
+  --text-bright: #edf1f7; /* headings */
+  --text-dim: #7a8598; /* secondary text, labels */
+  --amber: #e8a33d; /* THE accent: live values, active nav, links, meters */
+  --amber-soft: rgba(232, 163, 61, 0.14); /* accent washes/glows */
+  --ok: #4fcb8d; /* status good (semantic, not an accent) */
+  --warn: #e0b341; /* status degraded */
+  --err: #e06056; /* status down */
+
+  /* No drop shadows in dark — elevation is --panel-2 + border (§2.4). */
+  --shadow: none;
+
+  /* ---- Type — DESIGN.md §2.3 -------------------------------------------- */
+  /* Self-hosted @fontsource families (weights imported in main.tsx). */
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo,
+    Consolas, 'Liberation Mono', monospace;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* Scale (rem): 13 label · 15 body-s · 17 body · 20 h4 · 24 h3 · 30 h2 ·
+     38–52 h1 (mobile → desktop via clamp). */
+  --fs-label: 0.8125rem; /* 13px */
+  --fs-body-s: 0.9375rem; /* 15px */
+  --fs-body: 1.0625rem; /* 17px */
+  --fs-h4: 1.25rem; /* 20px */
+  --fs-h3: 1.5rem; /* 24px */
+  --fs-h2: 1.875rem; /* 30px */
+  --fs-h1: clamp(2.375rem, 1.9rem + 2vw, 3.25rem); /* 38 → 52px */
+
+  --lh-prose: 1.55;
+  --lh-heading: 1.15;
+
+  /* Uppercase labels; live numbers use tabular-nums where they update. */
+  --ls-label: 0.12em;
+
+  /* ---- Space — DESIGN.md §2.4 ------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+
+  /* ---- Radius — DESIGN.md §2.4 ------------------------------------------ */
+  --r-s: 6px; /* chips, tags */
+  --r-m: 10px; /* panels */
+
+  /* ---- Layout ----------------------------------------------------------- */
+  --content-max: 1100px;
+}
+
+/* ---- Light theme — "console in a lit room", DESIGN.md §2.2 -------------- */
+:root[data-theme='light'] {
+  --ground: #f2f4f7; /* cool paper, slight blue bias */
+  --panel: #ffffff;
+  --panel-2: #f7f9fc;
+  --line: #dce1ea;
+  --grid: rgba(70, 90, 130, 0.06);
+  --text: #333b47;
+  --text-bright: #151a22;
+  --text-dim: #69727f;
+  --amber: #b87514; /* darkened for contrast on white; ≥4.5:1 on --panel */
+  --amber-soft: rgba(184, 117, 20, 0.12);
+  --ok: #1f8f5f;
+  --warn: #9a7b12;
+  --err: #c24a40;
+
+  /* Light theme may use one soft shadow token (§2.4). */
+  --shadow: 0 1px 3px rgba(21, 26, 34, 0.08);
+}

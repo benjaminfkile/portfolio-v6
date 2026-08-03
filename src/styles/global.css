@@ -1,65 +1,16 @@
 /*
- * Global stylesheet — the ONLY global CSS on the public site (spec §14.1 rule 3).
+ * Global stylesheet — reset, base type, the plotting-grid ground, selection and
+ * the default :focus-visible ring (DESIGN.md §2.3, §2.4, §6, §7). All design
+ * tokens live in tokens.css (imported first in main.tsx); this file references
+ * them and never literal colours. Component appearance stays in co-located
+ * *.module.css files.
  *
- * Two responsibilities and nothing else:
- *   1. A minimal reset, so the browser default box model and spacing are sane.
- *   2. Design tokens as CSS custom properties (--color-*, --space-*, --font-*).
- *
- * Component appearance lives in co-located *.module.css files that reference
- * these tokens and never literal values (§14.1 rule 3). The v1 look is
- * deliberately plain: a readable centered column, system fonts, no animations,
- * no dark mode, no custom fonts (§14.2). Restyling later maps this one file
- * onto whatever replaces it (§14.3).
+ * The Control Room restyle (spec §14) lands across a series of tasks. Until the
+ * existing v1 components are migrated onto the tokens above, they still consume
+ * the small "legacy transitional tokens" block at the bottom of this file so the
+ * site keeps rendering. That block is intentionally temporary and later restyle
+ * tasks remove it as each component moves to the Control Room tokens.
  */
-
-/* ---- Design tokens -------------------------------------------------------- */
-
-:root {
-  /* Color — a plain light palette. No dark mode in v1 (§14.2). */
-  --color-bg: #ffffff;
-  --color-surface: #f6f6f6;
-  --color-text: #1a1a1a;
-  --color-text-muted: #555555;
-  --color-border: #e0e0e0;
-  --color-link: #0b5fff;
-  --color-link-hover: #0847c4;
-  --color-accent: #0b5fff;
-  --color-error: #b00020;
-
-  /* Spacing — a simple modular scale. */
-  --space-3xs: 0.125rem;
-  --space-2xs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-  --space-3xl: 4rem;
-
-  /* Typography — system font stack, no custom fonts (§14.2). */
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
-
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.25rem;
-  --font-size-xl: 1.75rem;
-  --font-size-2xl: 2.25rem;
-
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-bold: 700;
-
-  --line-height-base: 1.6;
-  --line-height-heading: 1.2;
-
-  /* Layout — the readable centered column (§14.2). */
-  --content-max-width: 44rem;
-  --radius: 6px;
-}
 
 /* ---- Minimal reset -------------------------------------------------------- */
 
@@ -79,13 +30,19 @@ html {
 
 body {
   min-height: 100vh;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  /* The page body NEVER scrolls horizontally (DESIGN.md §3). */
+  overflow-x: hidden;
+  background-color: var(--ground);
+  color: var(--text);
   font-family: var(--font-sans);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-base);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-prose);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+/* ---- Base type — DESIGN.md §2.3 ------------------------------------------ */
 
 h1,
 h2,
@@ -93,12 +50,30 @@ h3,
 h4,
 h5,
 h6 {
-  line-height: var(--line-height-heading);
-  font-weight: var(--font-weight-bold);
+  color: var(--text-bright);
+  line-height: var(--lh-heading);
+  font-weight: var(--fw-semibold);
+  /* Balance ragged headings (DESIGN.md §2.3). */
+  text-wrap: balance;
 }
 
-/* Fluid media is the entire responsive strategy alongside single-column
- * flow (§14.2). */
+h1 {
+  font-size: var(--fs-h1);
+}
+
+h2 {
+  font-size: var(--fs-h2);
+}
+
+h3 {
+  font-size: var(--fs-h3);
+}
+
+h4 {
+  font-size: var(--fs-h4);
+}
+
+/* Fluid media alongside single-column flow. */
 img,
 picture,
 video,
@@ -116,6 +91,84 @@ select {
   color: inherit;
 }
 
+/* ---- Plotting-grid ground — DESIGN.md §2.4 ------------------------------- */
+/*
+ * Two faint linear-gradients draw a 28px plotting grid over --ground. Mobile is
+ * kept calm (no grid) per the mobile-first rule; the grid appears from 640px up.
+ */
+@media (min-width: 640px) {
+  body {
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: center top;
+  }
+}
+
+/* ---- Selection ----------------------------------------------------------- */
+
+::selection {
+  background: var(--amber-soft);
+  color: var(--text-bright);
+}
+
+/* ---- Focus ring — DESIGN.md §7 ------------------------------------------- */
+/* Visible ring on every interactive element that shows focus via the keyboard. */
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* Suppress the ring for pointer users where the UA supports :focus-visible. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/*
+ * ============================================================================
+ * LEGACY TRANSITIONAL TOKENS — temporary (spec §14 restyle in progress)
+ * ----------------------------------------------------------------------------
+ * The v1 components still reference these names. They are NOT part of the
+ * Control Room system (tokens.css) and are removed by later restyle tasks as
+ * each component migrates onto the Control Room tokens. Do not add new usages.
+ * ============================================================================
+ */
+:root {
+  --color-bg: var(--ground);
+  --color-surface: var(--panel);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-dim);
+  --color-border: var(--line);
+  --color-link: var(--amber);
+  --color-link-hover: var(--amber);
+  --color-accent: var(--amber);
+  --color-error: var(--err);
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  --font-size-sm: var(--fs-body-s);
+  --font-size-base: var(--fs-body);
+  --font-size-lg: var(--fs-h4);
+  --font-size-xl: var(--fs-h3);
+  --font-size-2xl: var(--fs-h2);
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 600;
+
+  --radius: var(--r-s);
+  --content-max-width: 44rem;
+}
+
 a {
   color: var(--color-link);
 }
@@ -124,8 +177,7 @@ a:hover {
   color: var(--color-link-hover);
 }
 
-/* The readable centered column: max-width content wrapper (§14.2). Applied to
- * the app root so every page inherits the same measure. */
+/* The v1 readable centred column (removed when the site layout lands). */
 #root {
   max-width: var(--content-max-width);
   margin-inline: auto;
