@@ -258,6 +258,9 @@ const SECTION_REGISTRY = {
   status:      StatusSection,      // live — §3.5
   blog:        BlogSection,        // live — §3.5
   now_playing: NowPlayingSection,  // live — §3.5
+  duolingo:    DuolingoSection,    // live — §3.5 (v1.2)
+  github:      GithubSection,      // live — §3.5 (v1.2)
+  ops:         OpsSection,         // live — §3.5 (v1.3)
   contact:     ContactSection,
 } satisfies Record<SectionType, ComponentType<any>>;
 ```
@@ -276,6 +279,9 @@ doesn't recognize degrades rather than crashes.
 | `status` | no | — (live; config only) |
 | `blog` | no | — (live; config only) |
 | `now_playing` | no | — (live; config only) |
+| `duolingo` | no | — (live; config only, v1.2) |
+| `github` | no | — (live; config only, v1.2) |
+| `ops` | no | — (live; config only, v1.3) |
 | `contact` | no | — |
 
 #### The `Link` type
@@ -315,8 +321,9 @@ under small headings ("Repositories", "Live", "Docs"). No cap on count.
 
 ### 3.5 Live sections
 
-`status`, `blog`, and `now_playing` are **live sections**: their *configuration* is
-published into the snapshot, but their *data* is fetched at runtime by the component.
+`status`, `blog`, `now_playing`, (v1.2) `duolingo` and `github`, and (v1.3) `ops`
+are **live sections**: their *configuration* is published into the snapshot, but
+their *data* is fetched at runtime by the component.
 
 This exists because `/api/content` is an immutable document served with `ETag: W/"v42"`
 (§3.3) — the entire caching model depends on it not changing between publishes. Service
@@ -328,6 +335,9 @@ neither can live inside the snapshot without breaking that guarantee.
 | `status` | which services to show, whether to show response times | `GET /api/status` |
 | `blog` | how many posts, tag filter | `GET /api/posts` |
 | `now_playing` | idle behavior (`hide` \| `message`), whether to show album art | `GET /api/now-playing` |
+| `duolingo` | `language` (course code, default `es`), optional manual `score_label` | `GET /api/duolingo` |
+| `github` | how many weeks of the contribution calendar to show (default 52) | `GET /api/github` |
+| `ops` | `window_hours` (metric lookback, 1–24, default 3) | `GET /api/ops` |
 
 Live-section components must render a loading state and must **degrade rather than
 error** — a failed `/api/status` fetch renders the section as unavailable, never a
@@ -382,6 +392,100 @@ a Spotify credential (§4.6).
 A "recently played" fallback (showing the last track when idle) is a deliberate
 non-goal for v1 — it needs a second Spotify scope and endpoint. The response shape
 leaves room for it (§4.6) if it's ever wanted.
+
+#### `duolingo` (v1.2)
+
+Shows the owner's Duolingo streak and progress in one course (Spanish). Data comes
+from `GET /api/duolingo`, which proxies Duolingo's **unofficial** public user endpoint
+(`/2017-06-30/users?username=…`) server-side using the username stored via the
+Integrations page (§4.7). Curated shape:
+
+```jsonc
+{ "available": true, "streak": 847,
+  "course": { "title": "Spanish", "xp": 48210, "crowns": 155 } }
+// or
+{ "available": false }
+```
+
+- The endpoint is unofficial and may break without notice — which is exactly why the
+  §3.5 degrade rule and the ~1h server-side cache make it acceptable: on ANY upstream
+  failure or shape drift the API returns `{ available: false }` and the section
+  renders nothing. Low stakes, by construction.
+- The official in-app "Duolingo Score" (the CEFR-aligned number) is NOT exposed by
+  this endpoint. The section's optional `score_label` config exists for that: a
+  hand-maintained string (e.g. "Duolingo Score 95") edited in the admin when it
+  changes. Live data and manual data are visually distinguished by the renderer.
+- The course is selected by the `language` config (course code, default `es`); the
+  API returns the matching course from the payload.
+
+#### `github` (v1.2)
+
+Shows the owner's GitHub contribution calendar and total, fetched from
+`GET /api/github`, which proxies the GitHub GraphQL API (`contributionsCollection`)
+server-side with a PAT stored encrypted via the Integrations page (§4.7). Curated
+shape:
+
+```jsonc
+{ "available": true, "total": 2143,
+  "weeks": [ { "days": [0, 3, 1, 0, 5, 2, 0] } /* … oldest → newest */ ] }
+// or
+{ "available": false }
+```
+
+- The PAT needs no scopes beyond public data (`read:user`); it never appears in any
+  response or log. ~1h server-side cache — contribution data does not change faster.
+- The renderer maps counts to a 5-step intensity ramp of the accent color; the
+  number-per-day is intentionally NOT exposed per-cell in a tooltip API round-trip —
+  the curated shape is the calendar, not the events behind it.
+- Standard live-section rules: loading state, degrade to nothing on failure.
+
+#### `ops` (v1.3)
+
+Real production telemetry as a public page: the owner's CloudWatch gateway dashboard
+rendered through the site's own gauge/chart components. Not a third-party integration
+(§4.7 does not apply — there is no credential to manage; the deployed API reads
+CloudWatch through its runtime IAM role, so `ops` never appears on the admin
+Integrations page). Typically placed alone on a dedicated page (§3.10) such as `/ops`.
+
+**Dashboard-driven by design.** `GET /api/ops` reads the CloudWatch dashboard named
+by the `cloudwatch_dashboard_name` secret (an infra identifier — env/Secrets Manager
+only, NEVER in a repo), parses each metric widget's definitions from `GetDashboard`,
+and batches one `GetMetricData` call for the lookback window (`?window_hours=`,
+validated 1–24, default 3, 5-minute period). Editing the dashboard in AWS is editing
+the page — CloudWatch is the CMS for this section.
+
+**Sanitized curated shape** — the §3.5 degrade rules plus an explicit
+identifier-scrubbing pass, because raw widget definitions contain account and
+resource identifiers that must never reach the public payload:
+
+```jsonc
+{ "available": true, "window_hours": 3,
+  "widgets": [
+    { "title": "ALB - Request Count",   // the human title, only ever the title
+      "kind": "gauge" | "chart",        // inferred: gauge = single-series percent-like
+      "unit": "%" | "MB/s" | null,
+      "latest": 12.4,
+      "series": [ { "label": "…"|null, "points": [ { "t": 1690000000, "v": 12.4 } ] } ] }
+  ] }
+// or
+{ "available": false }
+```
+
+- Only widget **titles** and explicitly user-set series labels pass through; metric
+  namespaces, dimensions, ARNs, and region/account values are stripped server-side,
+  and any label matching a resource-identifier pattern (`i-…`, `arn:…`, instance/lb
+  names) is replaced with null. The sanitizer is allowlist-shaped: it emits the
+  curated fields, never a filtered copy of the raw definition.
+- `kind` inference: single-series widgets whose unit is Percent (or whose title
+  clearly reads as a utilization) render as gauges; everything else is a chart. The
+  renderer always shows `latest` prominently either way.
+- ~5-minute in-memory cache with single-flight; the client refetches ~60s. At ~15
+  metrics per refresh this costs on the order of $1–3/month in `GetMetricData` calls.
+- Failure of any kind — missing secret, IAM denied, throttling, malformed dashboard —
+  returns `{ "available": false }`, never a 5xx. Locally (IS_LOCAL, no AWS) the
+  endpoint simply degrades.
+- Infra prerequisite (owner-side): the deployed API's instance/task role needs
+  `cloudwatch:GetDashboard` and `cloudwatch:GetMetricData` (read-only).
 
 ### 3.6 The blog
 
@@ -574,6 +678,9 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/content` | Latest `page_versions.document`, media refs resolved to CDN URLs. `ETag` + `Cache-Control`. |
 | `GET` | `/api/status` | Curated service health for the `status` section (§3.5). Cached ~30s. |
 | `GET` | `/api/now-playing` | Current Spotify track for the `now_playing` section (§3.5, §4.6). Cached ~30s. |
+| `GET` | `/api/duolingo` | Streak + course progress for the `duolingo` section (§3.5, v1.2). Cached ~1h. |
+| `GET` | `/api/github` | Contribution calendar for the `github` section (§3.5, v1.2). Cached ~1h. |
+| `GET` | `/api/ops` | Sanitized CloudWatch dashboard telemetry for the `ops` section (§3.5, v1.3). Cached ~5m. |
 | `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
 | `GET` | `/api/posts/:slug` | One published post, `published_body` only. `ETag`. |
 
@@ -733,14 +840,22 @@ playback. The API proxies it for the same reasons `/api/status` proxies the gate
 the credential stays server-side, the exposed shape is a deliberate choice, and a
 server-side cache means visitor traffic never multiplies upstream calls.
 
-**One-time bootstrap.** Create a Spotify app in the developer dashboard (redirect URI
-`http://127.0.0.1:8888/callback`), then run `scripts/spotify-auth.ts` locally: it
-walks the authorization-code flow in a browser, exchanges the code, and prints the
-**refresh token**. Store client id, client secret, and refresh token in Secrets
-Manager (§9.3). Spotify refresh tokens do not expire; if one is ever revoked, the
-symptom is a 400 `invalid_grant` on refresh, and the fix is re-running the bootstrap.
-One Spotify app and one refresh token serve both environments — prod and dev are
-reading the same person's playback.
+**Bootstrap & re-authorization.** Create a Spotify app in the developer dashboard.
+Since Spotify's June 2026 policy change, **refresh tokens expire 180 days after the
+user's authorization** (refreshing does not extend it, and no rotated token is
+returned), so authorization is a twice-a-year routine, not a one-time setup. The
+primary flow is the **admin reconnect** (Integrations page → `adminSpotifyRouter`):
+the admin's browser walks the authorize flow, the API's state-guarded callback
+exchanges the code server-side and stores the refresh token AES-256-GCM-encrypted in
+the `service_tokens` table (key scrypt-derived from the client secret), and
+now-playing uses the stored token from then on. The registered redirect URI is
+`spotify_redirect_uri` in the secrets (loopback `http://127.0.0.1:<port>/…` locally).
+`scripts/spotify-auth.ts` remains as a manual fallback that prints a refresh token
+for the `spotify_refresh_token` secret — the resolution order is stored token first,
+static secret second. An expired/revoked token surfaces as 400 `invalid_grant` on
+refresh; now-playing silently degrades to idle (§3.5) and the admin Integrations
+page shows the expiry countdown. One Spotify app serves both environments — prod and
+dev are reading the same person's playback.
 
 **Runtime flow.** The API holds the current access token in memory, exchanging the
 refresh token for a new one on startup and whenever a request 401s or the ~1-hour
@@ -775,6 +890,55 @@ degrade rule applied.
 
 No Spotify token, in any form, is ever included in a response. The browser's only
 contact with Spotify is the hotlinked album art and the outbound track link (§3.5).
+
+### 4.7 Integrations — current shape and the rule for adding more
+
+Spotify is v1's only third-party integration, and it is **deliberately concrete** —
+there is no `Integration` interface, because an abstraction designed against a single
+case would be guesswork about what actually varies. The system still splits cleanly
+into a generic layer and a Spotify-specific layer, and the boundary is the contract
+for what comes next:
+
+**Already generic (reuse as-is for any integration):**
+
+- `service_tokens` — one row per integration, keyed by a `service` text column;
+  credentials stored only as AES-256-GCM ciphertext. Adding a provider is adding a
+  row, not a table.
+- The token crypto (`encryptToken`/`decryptToken` in `spotifyTokenStore`) and the
+  single-use OAuth `state` pattern (opaque 256-bit tokens, in-memory, 10-minute TTL,
+  mintable only by a verified admin).
+- **The public display surface**: a new integration's visitor-facing presence is a
+  new live section — Zod schema (§3.4) + registry component + a server-side proxy
+  endpoint following the §3.5 rules (curated shape, ~30s cache, degrade-to-idle,
+  credentials never in a response). This pipeline needs no refactor; it is how
+  `status` and `now_playing` already work.
+
+**Spotify-specific today (the part integration #2 generalizes):** the
+`/api/admin/spotify/*` routes, the OAuth endpoints/scopes/180-day expiry policy, and
+the admin Integrations page, which renders one hardcoded Spotify card.
+
+**The rule: implement the generalization WHEN integration #2 arrives — in the same
+change, shaped by the real cases. Do not build it speculatively before then.**
+*(Triggered 2026-08-02: integrations #2 and #3 are `github` — auth kind `api_key`,
+a PAT — and `duolingo` — auth kind `value`, a public username. With `spotify`
+(`oauth`) that is three distinct auth kinds shaping the descriptor.)* The refactor is:
+
+1. An **integration descriptor** per provider: key (the `service_tokens` key),
+   display name, auth kind (`oauth` | `api_key` | `none`), authorize/token URLs,
+   scopes, redirect-URI config key, token-lifetime/expiry policy, and a
+   status-computation function.
+2. The OAuth connect/callback/status/disconnect handlers parameterized by descriptor
+   (the current `adminSpotifyRouter` logic with `spotify` extracted as data), mounted
+   as `/api/admin/integrations/:key/…`; the Spotify routes stay as aliases or move.
+3. `GET /api/admin/integrations` — enumerate every descriptor with its connection
+   status (connected/source/authorized_at/expires_at, shape as today's Spotify
+   status).
+4. The admin Integrations page maps over that list instead of hardcoding a card;
+   per-provider copy (expiry warnings etc.) comes from the descriptor.
+
+The storage layer, crypto, state tokens, and public section pipeline need **zero
+changes** under this refactor — which is the test that the current split put the
+abstraction boundary in the right place.
 
 ---
 
