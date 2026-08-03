@@ -1,0 +1,35 @@
+/* SiteFooter — quiet console footer; tokens only (DESIGN.md §2, §7). */
+
+.footer {
+  margin-top: var(--space-8);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+}
+
+@media (min-width: 900px) {
+  .inner {
+    padding: var(--space-5) var(--space-6);
+  }
+}
+
+.brand {
+  color: var(--amber);
+  font-weight: var(--fw-medium);
+}
+
+.line {
+  color: var(--text-dim);
+}

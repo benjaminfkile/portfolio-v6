@@ -125,6 +125,25 @@ select {
   outline: none;
 }
 
+/* ---- Content column — DESIGN.md §3 --------------------------------------- */
+/*
+ * Every page's <main> is the centred content column (max 1100px) the shared
+ * layout brackets between the header and footer. Side padding follows the
+ * mobile-first scale, widening at 900px; the header/footer centre their own
+ * inner rows to the same measure so everything lines up.
+ */
+main {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+@media (min-width: 900px) {
+  main {
+    padding: var(--space-7) var(--space-6);
+  }
+}
+
 /*
  * ============================================================================
  * LEGACY TRANSITIONAL TOKENS — temporary (spec §14 restyle in progress)
@@ -166,7 +185,6 @@ select {
   --font-weight-bold: 600;
 
   --radius: var(--r-s);
-  --content-max-width: 44rem;
 }
 
 a {
@@ -175,11 +193,4 @@ a {
 
 a:hover {
   color: var(--color-link-hover);
-}
-
-/* The v1 readable centred column (removed when the site layout lands). */
-#root {
-  max-width: var(--content-max-width);
-  margin-inline: auto;
-  padding: var(--space-xl) var(--space-md);
 }

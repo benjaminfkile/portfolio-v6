@@ -1,27 +1,170 @@
-.nav {
-  border-bottom: 1px solid var(--color-border);
+/* SiteNav — Control Room top bar; tokens only (DESIGN.md §3, §6). */
+
+.header {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .bar {
+    padding: var(--space-3) var(--space-6);
+  }
+}
+
+/* ---- Brand --------------------------------------------------------------- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--amber);
+  transition: box-shadow 120ms ease-out;
+}
+
+.brand:hover .brandText {
+  color: var(--amber);
+}
+
+.brand:hover .mark {
+  box-shadow: 0 0 6px 0 var(--amber-soft);
+}
+
+/* ---- Inline page links (≥900px) ----------------------------------------- */
+
+.primary {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .primary {
+    display: block;
+    margin-right: auto;
+  }
 }
 
 .list {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-lg);
+  align-items: center;
+  gap: var(--space-5);
   margin: 0;
-  padding: var(--space-md) 0;
+  padding: 0;
   list-style: none;
 }
 
 .link {
-  color: var(--color-text-muted);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body-s);
   text-decoration: none;
-  font-weight: var(--font-weight-medium);
+  transition: color 120ms ease-out;
 }
 
 .link:hover {
-  color: var(--color-link-hover);
+  color: var(--amber);
 }
 
 .active {
-  color: var(--color-text);
-  text-decoration: underline;
+  color: var(--amber);
+}
+
+/* ---- Right-side actions -------------------------------------------------- */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* Push actions to the right on phones (no inline nav to consume the space). */
+  margin-left: auto;
+}
+
+@media (min-width: 900px) {
+  .actions {
+    margin-left: 0;
+  }
+}
+
+.statusDot {
+  /* Sit the LED on the text baseline of the neighbouring controls. */
+  margin-inline: var(--space-1);
+}
+
+/* ---- Hamburger (<900px) ------------------------------------------------- */
+
+.hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* ≥44px touch target (DESIGN.md §3). */
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  cursor: pointer;
+  transition: border-color 120ms ease-out;
+}
+
+.hamburger:hover {
+  border-color: var(--amber);
+}
+
+.hamburgerBars,
+.hamburgerBars::before,
+.hamburgerBars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--text);
+  content: '';
+}
+
+.hamburgerBars {
+  position: relative;
+}
+
+.hamburgerBars::before {
+  position: absolute;
+  top: -6px;
+}
+
+.hamburgerBars::after {
+  position: absolute;
+  top: 6px;
+}
+
+@media (min-width: 900px) {
+  .hamburger {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark,
+  .link,
+  .hamburger {
+    transition: none;
+  }
 }

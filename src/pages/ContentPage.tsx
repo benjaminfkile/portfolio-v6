@@ -5,6 +5,7 @@ import type { SectionProps } from '../sections/types';
 import { useContentDocument } from '../lib/useContentDocument';
 import { useDocumentTitle, pageTitle } from '../lib/useDocumentTitle';
 import PreviewIndicator from '../components/PreviewIndicator';
+import EmptyState from '../components/EmptyState';
 import NotFound from './NotFound';
 import styles from './ContentPage.module.css';
 
@@ -50,7 +51,7 @@ export default function ContentPage() {
 
   if (state.status === 'loading') {
     return (
-      <main className={styles.page}>
+      <main id="main-content" className={styles.page}>
         {preview && <PreviewIndicator />}
         <p>Loading…</p>
       </main>
@@ -59,7 +60,7 @@ export default function ContentPage() {
 
   if (state.status === 'error') {
     return (
-      <main className={styles.page}>
+      <main id="main-content" className={styles.page}>
         {preview && <PreviewIndicator />}
         <p role="alert">
           {preview
@@ -76,11 +77,26 @@ export default function ContentPage() {
     return <NotFound />;
   }
 
-  const sections = page?.sections ?? [];
   const media = state.document.media ?? {};
 
+  // The home route with nothing ever published (no `home` page): the "nothing
+  // published" empty state, in the instrument voice (DESIGN.md §5).
+  if (!page) {
+    return (
+      <main id="main-content" className={styles.page}>
+        {preview && <PreviewIndicator />}
+        <EmptyState
+          heading="Nothing published yet"
+          message="This console has no signal to display. Content will appear here once it’s published."
+        />
+      </main>
+    );
+  }
+
+  const sections = page.sections ?? [];
+
   return (
-    <main className={styles.page}>
+    <main id="main-content" className={styles.page}>
       {preview && <PreviewIndicator />}
       {sections.map((section) => {
         const Component = REGISTRY[section.type];
