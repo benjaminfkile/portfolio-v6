@@ -1,14 +1,20 @@
+/* About — prose Panel at a 62ch measure (DESIGN.md §5). Tokens only. */
+
 .about {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-xl) 0;
+  padding-block: var(--space-6);
 }
 
-.title {
-  font-size: var(--font-size-xl);
+.prose {
+  /* Comfortable reading measure (DESIGN.md §5). */
+  max-width: 62ch;
 }
 
 .paragraph {
-  color: var(--color-text);
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+}
+
+.paragraph + .paragraph {
+  margin-top: var(--space-4);
 }

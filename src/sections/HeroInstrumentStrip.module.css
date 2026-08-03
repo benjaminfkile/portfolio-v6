@@ -1,0 +1,16 @@
+/* Hero instrument strip — three readouts below the hero (DESIGN.md §5).
+   Tokens only; a raw colour here is a review failure. */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
+  padding-top: var(--space-5);
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+.instrument {
+  /* Each readout holds its own column but never forces horizontal scroll. */
+  min-width: 0;
+}

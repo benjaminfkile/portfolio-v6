@@ -12,4 +12,12 @@ import type { MediaMap, Section } from '../types/content';
 export interface SectionProps {
   section: Section;
   media: MediaMap;
+  /**
+   * The published document's version number (spec §3.3, §4.1), threaded down
+   * from `ContentPage` so the hero's instrument strip can render the SITE vN
+   * readout (DESIGN.md §5) without a second fetch. Optional: sections that don't
+   * surface a version ignore it, and a document that predates the field renders
+   * without the readout rather than crashing.
+   */
+  documentVersion?: number;
 }

@@ -1,14 +1,24 @@
+/* Contact — closing Panel with a wrapping LinkButton row (DESIGN.md §5). */
+
 .contact {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-xl) 0;
+  padding-block: var(--space-6);
 }
 
-.title {
-  font-size: var(--font-size-xl);
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 62ch;
 }
 
 .body {
-  color: var(--color-text);
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
