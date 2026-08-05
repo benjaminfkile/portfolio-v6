@@ -9,8 +9,11 @@ export interface AreaPoint {
 export interface AreaChartProps {
   /** Primary series, oldest → newest. The latest point is emphasised. */
   points: AreaPoint[];
-  /** Optional second series — drawn in `--text-dim`, no area fill (DESIGN.md §4). */
-  series?: AreaPoint[];
+  /**
+   * Optional overlay series — each drawn in `--text-dim`, no area fill
+   * (DESIGN.md §4). A single series may be passed bare for convenience.
+   */
+  series?: AreaPoint[] | AreaPoint[][];
   /**
    * One-sentence description of the chart for assistive tech; the SVG itself is
    * decorative (`aria-hidden`) so this carries the information (Chart rules, §7).
@@ -73,18 +76,23 @@ export default function AreaChart({
 }: AreaChartProps) {
   const classes = [styles.chart, className].filter(Boolean).join(' ');
 
-  // Domain spans every sample across both series so both fit the same box.
+  // Normalize: a bare second series becomes a one-entry overlay list.
+  const overlays: AreaPoint[][] =
+    series == null ? [] : Array.isArray(series[0]) ? (series as AreaPoint[][]) : [series as AreaPoint[]];
+
+  // Domain spans every sample across every series so all fit the same box.
   const allValues = [
     ...points.map((p) => p.v),
-    ...(series ?? []).map((p) => p.v),
+    ...overlays.flat().map((p) => p.v),
   ];
   const hasData = allValues.length > 0;
   const min = hasData ? Math.min(...allValues) : 0;
   const max = hasData ? Math.max(...allValues) : 0;
 
   const primaryLine = points.length >= 2 ? linePath(points, min, max) : '';
-  const seriesLine =
-    series && series.length >= 2 ? linePath(series, min, max) : '';
+  const overlayLines = overlays
+    .filter((o) => o.length >= 2)
+    .map((o) => linePath(o, min, max));
 
   // Area fill closes the primary line down to the baseline and back.
   const baseline = VB_H - PAD_Y;
@@ -126,15 +134,16 @@ export default function AreaChart({
             vectorEffect="non-scaling-stroke"
           />
         )}
-        {seriesLine !== '' && (
+        {overlayLines.map((d, i) => (
           <path
+            key={i}
             className={styles.series}
             data-role="series"
-            d={seriesLine}
+            d={d}
             fill="none"
             vectorEffect="non-scaling-stroke"
           />
-        )}
+        ))}
         {primaryLine !== '' && (
           <path
             className={styles.line}

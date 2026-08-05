@@ -120,3 +120,9 @@
 .legendItem[data-series='1']::before {
   background: var(--text-dim);
 }
+
+/* Per-series latest reading beside the label (multi-series widgets). */
+.legendValue {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

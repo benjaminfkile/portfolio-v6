@@ -81,6 +81,24 @@ describe('AreaChart', () => {
     expect(container.querySelectorAll('[data-role="area"]')).toHaveLength(1);
   });
 
+  it('draws every overlay when series is an array of series (3-metric widgets)', () => {
+    const overlayA: AreaPoint[] = [
+      { t: 0, v: 5 },
+      { t: 1, v: 8 },
+    ];
+    const overlayB: AreaPoint[] = [
+      { t: 0, v: 500 },
+      { t: 1, v: 540 },
+    ];
+    const { container } = render(
+      <AreaChart points={three} series={[overlayA, overlayB]} summary="three series" />,
+    );
+    expect(container.querySelectorAll('[data-role="series"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-role="area"]')).toHaveLength(1);
+    // Domain spans ALL series: max label comes from the tallest overlay.
+    expect(screen.getByText('540')).toBeInTheDocument();
+  });
+
   it('handles a single point by drawing only the latest dot (no line)', () => {
     const { container } = render(
       <AreaChart points={[{ t: 0, v: 42 }]} summary="one point" />,

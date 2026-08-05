@@ -101,45 +101,68 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
     );
   }
 
-  // Chart: the primary series draws the area, a second series (when present)
-  // overlays; the latest value is emphasised as a StatBlock readout.
+  // Chart. Single-series: the latest value is emphasised as a StatBlock
+  // readout. Multi-series: a single "Latest" is MISLEADING — the payload's
+  // `latest` is only the first series, and on a widget like CPU credits
+  // (SurplusCharged≈0, Usage≈0, Balance=500+) it reads as the wrong line — so
+  // each series gets its own latest in the legend instead.
   const series = withPoints(widget);
   const primary = series[0]?.points ?? [];
-  const secondary = series[1]?.points;
-  const labels = series
-    .map((s) => s.label)
-    .filter((label): label is string => label != null && label !== '');
+  const overlays = series.slice(1).map((s) => s.points);
+  const multi = series.length > 1;
+
+  const seriesLatest = (s: OpsSeries): number | null =>
+    s.points.length > 0 ? s.points[s.points.length - 1].v : null;
 
   const latestText =
     widget.latest != null
       ? `${formatValue(widget.latest, widget.unit)}${unitText}`
       : 'no data';
-  const summary = `${widget.title}: latest ${latestText}`;
+  const summary = multi
+    ? `${widget.title}: ${series
+        .map(
+          (s, i) =>
+            `${s.label ?? `series ${i + 1}`} ${
+              seriesLatest(s) != null
+                ? `${formatValue(seriesLatest(s)!, widget.unit)}${unitText}`
+                : 'no data'
+            }`,
+        )
+        .join(', ')}`
+    : `${widget.title}: latest ${latestText}`;
 
   return (
     <Panel as="li" className={styles.widget}>
       <h3 className={styles.title}>{widget.title}</h3>
       <div className={styles.chartBody}>
-        <StatBlock
-          className={styles.readout}
-          value={widget.latest != null ? formatValue(widget.latest, widget.unit) : '—'}
-          unit={widget.latest != null ? unit : undefined}
-          label="Latest"
-        />
+        {!multi && (
+          <StatBlock
+            className={styles.readout}
+            value={widget.latest != null ? formatValue(widget.latest, widget.unit) : '—'}
+            unit={widget.latest != null ? unit : undefined}
+            label="Latest"
+          />
+        )}
         <AreaChart
           className={styles.chart}
           points={primary}
-          series={secondary}
+          series={overlays.length > 0 ? overlays : undefined}
           summary={summary}
           format={(v) => formatValue(v, widget.unit)}
         />
-        {/* Series labels render only when explicitly set (non-null) — scrubbed
-            identifier labels arrive as null and are omitted (§3.5, §5). */}
-        {labels.length > 0 && (
+        {/* Multi-series: per-series latest readouts (labels fall back to the
+            metric name server-side; scrubbed identifier labels arrive null and
+            render as "series N"). */}
+        {multi && (
           <ul className={styles.legend}>
-            {labels.map((label, i) => (
+            {series.map((s, i) => (
               <li key={i} className={styles.legendItem} data-series={i}>
-                {label}
+                {s.label ?? `series ${i + 1}`}{' '}
+                <span className={styles.legendValue}>
+                  {seriesLatest(s) != null
+                    ? `${formatValue(seriesLatest(s)!, widget.unit)}${unitText}`
+                    : '—'}
+                </span>
               </li>
             ))}
           </ul>

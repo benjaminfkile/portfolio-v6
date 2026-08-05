@@ -87,10 +87,12 @@ describe('OpsSection (spec §3.5, DESIGN.md §5, v1.3)', () => {
     // Gauge summary carries the reading (label + value + unit) to assistive tech.
     expect(screen.getByText('CPU Utilization 42%')).toBeInTheDocument();
 
-    // The chart widget shows its latest value prominently as a StatBlock readout
-    // ("128" also appears as the chart's axis-max label, hence getAllByText).
-    expect(screen.getAllByText('128').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Latest').length).toBeGreaterThan(0);
+    // The multi-series chart widget shows PER-SERIES latests in the legend — a
+    // single "Latest" readout would silently mean "first series only".
+    expect(screen.getAllByText('128req/s').length).toBeGreaterThan(0);
+    expect(screen.getByText('2xx')).toBeInTheDocument();
+    expect(screen.getByText('5xx')).toBeInTheDocument();
+    expect(screen.queryByText('Latest')).not.toBeInTheDocument();
 
     // Two widgets → two Panels in the grid.
     expect(container.querySelectorAll('li').length).toBeGreaterThanOrEqual(2);
@@ -150,9 +152,10 @@ describe('OpsSection (spec §3.5, DESIGN.md §5, v1.3)', () => {
     expect(svgs.length).toBeGreaterThan(0);
     svgs.forEach((svg) => expect(svg).toHaveAttribute('aria-hidden', 'true'));
 
-    // The chart's summary sentence stands in for the decorative SVG.
+    // The chart's summary sentence stands in for the decorative SVG — for a
+    // multi-series widget it enumerates every series' latest reading.
     expect(
-      screen.getByText('ALB Request Count: latest 128req/s'),
+      screen.getByText('ALB Request Count: 2xx 128req/s, 5xx 2req/s'),
     ).toBeInTheDocument();
   });
 
