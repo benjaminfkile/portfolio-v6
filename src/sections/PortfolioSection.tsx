@@ -4,6 +4,7 @@ import SectionShell from '../components/ui/SectionShell';
 import Panel from '../components/ui/Panel';
 import MediaFrame from '../components/ui/MediaFrame';
 import TagChip from '../components/ui/TagChip';
+import { sendEvent } from '../lib/beacon';
 import styles from './PortfolioSection.module.css';
 
 /**
@@ -62,6 +63,17 @@ function ProjectMedia({
       src={asset.url}
       type={isVideo ? 'video' : 'image'}
       alt={alt}
+      // Beacon the first play of a portfolio demo clip (§4.8); the project title
+      // rides along as meta when present, capped at 100 chars.
+      onFirstPlay={
+        isVideo
+          ? () =>
+              sendEvent(
+                'video_play',
+                item.title ? { title: item.title.slice(0, 100) } : undefined,
+              )
+          : undefined
+      }
     />
   );
 }
