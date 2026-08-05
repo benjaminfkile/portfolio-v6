@@ -52,9 +52,18 @@ function clampWindowHours(hours: number | undefined): number {
   return Math.min(24, Math.max(1, Math.trunc(hours)));
 }
 
-/** Compact number formatting for readouts and axis labels (tabular-friendly). */
-function formatValue(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+/**
+ * Compact, unit-aware number formatting for readouts and axis labels.
+ *
+ * Unitless metrics are counts (connections, requests, credits) — a 5-minute
+ * `Average` produces values like 12.4 connections, which is statistically real
+ * but reads absurd, so counts display as whole numbers. Percent readings get
+ * one decimal; other units two; anything ≥100 drops decimals entirely.
+ */
+function formatValue(value: number, unit: string | null): string {
+  const digits =
+    unit == null || Math.abs(value) >= 100 ? 0 : unit === '%' ? 1 : 2;
+  return value.toLocaleString('en-US', { maximumFractionDigits: digits });
 }
 
 /** `HH:MM:SS` local time for the last-refresh readout. */
@@ -82,7 +91,12 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
     return (
       <Panel as="li" className={styles.widget}>
         <h3 className={styles.title}>{widget.title}</h3>
-        <Gauge value={widget.latest ?? 0} unit={unit} label={widget.title} />
+        <Gauge
+          value={widget.latest ?? 0}
+          unit={unit}
+          label={widget.title}
+          format={(v) => formatValue(v, widget.unit)}
+        />
       </Panel>
     );
   }
@@ -97,7 +111,9 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
     .filter((label): label is string => label != null && label !== '');
 
   const latestText =
-    widget.latest != null ? `${formatValue(widget.latest)}${unitText}` : 'no data';
+    widget.latest != null
+      ? `${formatValue(widget.latest, widget.unit)}${unitText}`
+      : 'no data';
   const summary = `${widget.title}: latest ${latestText}`;
 
   return (
@@ -106,7 +122,7 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
       <div className={styles.chartBody}>
         <StatBlock
           className={styles.readout}
-          value={widget.latest != null ? formatValue(widget.latest) : '—'}
+          value={widget.latest != null ? formatValue(widget.latest, widget.unit) : '—'}
           unit={widget.latest != null ? unit : undefined}
           label="Latest"
         />
@@ -115,7 +131,7 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
           points={primary}
           series={secondary}
           summary={summary}
-          format={formatValue}
+          format={(v) => formatValue(v, widget.unit)}
         />
         {/* Series labels render only when explicitly set (non-null) — scrubbed
             identifier labels arrive as null and are omitted (§3.5, §5). */}

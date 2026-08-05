@@ -14,8 +14,17 @@ export interface GaugeProps {
    * 12%") that stands in for the decorative SVG (DESIGN.md §4, Chart rules).
    */
   label: string;
+  /**
+   * Formats the displayed reading (readout + hidden summary). The arc geometry
+   * always uses the raw value. Defaults to a compact locale format (≤1 decimal)
+   * so a raw metric double never overflows the dial.
+   */
+  format?: (value: number) => string;
   className?: string;
 }
+
+const defaultFormat = (value: number): string =>
+  value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 
 /* Dial geometry: a 240° arc with the gap centred at the bottom, drawn over the
    top from the lower-left endpoint (−120°) clockwise to the lower-right (120°).
@@ -62,6 +71,7 @@ export default function Gauge({
   max = 100,
   unit,
   label,
+  format = defaultFormat,
   className,
 }: GaugeProps) {
   const [ref, revealed] = useRevealOnce<HTMLDivElement>();
@@ -76,7 +86,8 @@ export default function Gauge({
 
   const classes = [styles.gauge, className].filter(Boolean).join(' ');
   const unitText = unit ?? '';
-  const summary = `${label} ${shown}${unitText}`;
+  const shownText = format(shown);
+  const summary = `${label} ${shownText}${unitText}`;
 
   return (
     <div ref={ref} className={classes}>
@@ -106,7 +117,7 @@ export default function Gauge({
         </svg>
         <div className={styles.readout}>
           <span className={styles.value}>
-            {shown}
+            {shownText}
             {unitText !== '' && <span className={styles.unit}>{unitText}</span>}
           </span>
         </div>

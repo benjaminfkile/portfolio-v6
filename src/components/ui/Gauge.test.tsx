@@ -34,6 +34,22 @@ describe('Gauge', () => {
     expect(screen.getByText('CPU utilization 12%')).toBeInTheDocument();
   });
 
+  it('formats raw metric doubles compactly by default, and via a custom format', () => {
+    restores.push(mockReducedMotion(true), installIntersectionObserver());
+
+    // A raw CloudWatch double must never render verbatim (it overflows the dial).
+    const raw = render(
+      <Gauge value={4.131730772880646} label="RDS CPU" unit="%" />,
+    );
+    expect(raw.getByText('RDS CPU 4.1%')).toBeInTheDocument();
+    expect(raw.container.textContent).not.toContain('4.131730772880646');
+
+    const custom = render(
+      <Gauge value={92.55} label="Memory" unit="%" format={(v) => String(Math.round(v))} />,
+    );
+    expect(custom.getByText('Memory 93%')).toBeInTheDocument();
+  });
+
   it('clamps out-of-range values for both readout and arc', () => {
     restores.push(mockReducedMotion(true), installIntersectionObserver());
 

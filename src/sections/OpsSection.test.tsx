@@ -96,6 +96,36 @@ describe('OpsSection (spec §3.5, DESIGN.md §5, v1.3)', () => {
     expect(container.querySelectorAll('li').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('formats readouts unit-aware: unitless counts as whole numbers, % to 1dp', async () => {
+    const payload: OpsResponse = {
+      available: true,
+      window_hours: 3,
+      widgets: [
+        {
+          title: 'Database Connections',
+          kind: 'chart',
+          unit: null, // unitless = a count; a 5-min Average like 12.4 shows as "12"
+          latest: 12.4,
+          series: [{ label: null, points: points([11.8, 12.1, 12.4]) }],
+        },
+        {
+          title: 'CPU Utilization',
+          kind: 'gauge',
+          unit: '%',
+          latest: 4.13,
+          series: [{ label: null, points: points([4.1, 4.2, 4.13]) }],
+        },
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(payload)));
+    renderOps({ window_hours: 3 });
+
+    // Readout and axis-max label both format to a whole "12" — never "12.4".
+    expect((await screen.findAllByText('12')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('12.4')).not.toBeInTheDocument();
+    expect(screen.getByText('CPU Utilization 4.1%')).toBeInTheDocument();
+  });
+
   it('renders series labels only when non-null (scrubbed labels are omitted, §3.5)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(available)));
 
