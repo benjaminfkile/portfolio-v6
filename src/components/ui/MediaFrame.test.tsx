@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { fireEvent } from '@testing-library/dom';
 import MediaFrame from './MediaFrame';
@@ -76,5 +76,25 @@ describe('MediaFrame', () => {
       screen.queryByRole('button', { name: /play video/i }),
     ).not.toBeInTheDocument();
     expect(container.querySelector('video')).toHaveAttribute('controls');
+  });
+
+  it('fires onFirstPlay only on the first play of a video (§4.8)', () => {
+    restores.push(mockReducedMotion(false));
+    const onFirstPlay = vi.fn();
+
+    const { container } = render(
+      <MediaFrame
+        type="video"
+        src="https://media.example/clip.mp4"
+        alt="Demo"
+        onFirstPlay={onFirstPlay}
+      />,
+    );
+    const video = container.querySelector('video') as HTMLVideoElement;
+
+    fireEvent.play(video);
+    fireEvent.play(video);
+
+    expect(onFirstPlay).toHaveBeenCalledTimes(1);
   });
 });

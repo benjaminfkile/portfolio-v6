@@ -16,6 +16,13 @@ export interface MediaFrameProps {
   aspectRatio?: string;
   /** Poster frame for video mode; shown before playback and under reduced motion. */
   poster?: string;
+  /**
+   * Fired once, the first time a video actually starts playing (analytics
+   * §4.8 — `video_play`). Covers both autoplay and an explicit tap-to-play;
+   * ignored for images. Kept minimal — the caller decides what, if anything,
+   * to report.
+   */
+  onFirstPlay?: () => void;
   className?: string;
 }
 
@@ -32,12 +39,22 @@ export default function MediaFrame({
   alt,
   aspectRatio = '16 / 9',
   poster,
+  onFirstPlay,
   className,
 }: MediaFrameProps) {
   const reduced = usePrefersReducedMotion();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const firstPlayFired = useRef(false);
   const [started, setStarted] = useState(false);
   const classes = [styles.frame, className].filter(Boolean).join(' ');
+
+  // Report only the first real playback start (§4.8). Fires for autoplay and
+  // for an explicit play alike, since both raise the video's `play` event.
+  const handleFirstPlay = () => {
+    if (firstPlayFired.current) return;
+    firstPlayFired.current = true;
+    onFirstPlay?.();
+  };
 
   const handlePlay = () => {
     setStarted(true);
@@ -67,6 +84,7 @@ export default function MediaFrame({
           playsInline
           autoPlay={autoplay}
           controls={started}
+          onPlay={handleFirstPlay}
           aria-label={alt || undefined}
         />
         {showPlayButton && (

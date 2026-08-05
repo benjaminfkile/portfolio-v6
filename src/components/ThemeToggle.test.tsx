@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ThemeToggle from './ThemeToggle';
+import * as beacon from '../lib/beacon';
 
 function setInitialTheme(theme: 'dark' | 'light') {
   document.documentElement.dataset.theme = theme;
@@ -15,6 +16,7 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.clear();
   delete document.documentElement.dataset.theme;
+  vi.restoreAllMocks();
 });
 
 describe('ThemeToggle', () => {
@@ -60,5 +62,14 @@ describe('ThemeToggle', () => {
     expect(
       screen.getByRole('button', { name: 'Switch to dark theme' }),
     ).toBeInTheDocument();
+  });
+
+  it('beacons a theme_toggle event on each click (§4.8)', () => {
+    const spy = vi.spyOn(beacon, 'sendEvent').mockImplementation(() => {});
+    render(<ThemeToggle />);
+
+    fireEvent.click(screen.getByRole('button'));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenLastCalledWith('theme_toggle');
   });
 });

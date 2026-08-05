@@ -40,6 +40,20 @@ export function usePreviewParams(): PreviewParams {
 }
 
 /**
+ * Whether the current URL carries a preview token (spec §7), read imperatively
+ * from `window.location` rather than through the router. Non-hook code — the
+ * analytics beacon (§4.8) — needs this to stay silent in preview mode, and it
+ * runs outside React's render (event handlers, effects) where {@link
+ * usePreviewParams} is unavailable. The empty-`?preview=` rule matches the hook:
+ * a stray `?preview` with no value does not count as previewing.
+ */
+export function hasPreviewToken(): boolean {
+  if (typeof window === 'undefined') return false;
+  const raw = new URLSearchParams(window.location.search).get('preview');
+  return raw ? true : false;
+}
+
+/**
  * While `active`, inject `<meta name="robots" content="noindex">` into the
  * document head and remove it on cleanup (spec §7: preview must be `noindex`).
  * The public site is a SPA, so the `<meta>` equivalent is what it can set

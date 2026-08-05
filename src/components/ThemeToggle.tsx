@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { sendEvent } from '../lib/beacon';
 import styles from './ThemeToggle.module.css';
 
 export type Theme = 'dark' | 'light';
@@ -28,6 +29,8 @@ export default function ThemeToggle() {
   }, [theme]);
 
   const toggle = useCallback(() => {
+    // Fire-and-forget analytics (spec §4.8); suppressed under DNT/GPC/preview.
+    sendEvent('theme_toggle');
     setTheme((current) => {
       const next: Theme = current === 'dark' ? 'light' : 'dark';
       try {
