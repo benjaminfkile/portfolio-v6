@@ -139,6 +139,7 @@ export default function AreaChart({
             key={i}
             className={styles.series}
             data-role="series"
+            data-series={(i % 2) + 1}
             d={d}
             fill="none"
             vectorEffect="non-scaling-stroke"

@@ -93,7 +93,12 @@ describe('AreaChart', () => {
     const { container } = render(
       <AreaChart points={three} series={[overlayA, overlayB]} summary="three series" />,
     );
-    expect(container.querySelectorAll('[data-role="series"]')).toHaveLength(2);
+    const overlays = container.querySelectorAll('[data-role="series"]');
+    expect(overlays).toHaveLength(2);
+    // Overlays are keyed so CSS can differentiate them (solid vs dashed) and
+    // the legend swatches can mirror the actual strokes.
+    expect(overlays[0]).toHaveAttribute('data-series', '1');
+    expect(overlays[1]).toHaveAttribute('data-series', '2');
     expect(container.querySelectorAll('[data-role="area"]')).toHaveLength(1);
     // Domain spans ALL series: max label comes from the tallest overlay.
     expect(screen.getByText('540')).toBeInTheDocument();

@@ -32,12 +32,18 @@
   stroke-linecap: round;
 }
 
-/* Second series: dim stroke, no fill (DESIGN.md §4). */
+/* Overlay series: dim stroke, no fill (DESIGN.md §4). To keep multiple
+   overlays distinguishable (and the legend honest), the second overlay is
+   dashed; further overlays cycle the two treatments. */
 .series {
   stroke: var(--text-dim);
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+.series[data-series='2'] {
+  stroke-dasharray: 4 3;
 }
 
 .dot {

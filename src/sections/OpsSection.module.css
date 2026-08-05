@@ -108,17 +108,29 @@
   color: var(--text-dim);
 }
 
-/* A small swatch keying the legend to the chart's two series (amber / dim). */
+/* A small swatch keying each legend entry to its ACTUAL stroke in the chart:
+   series 0 = amber primary, overlays = dim (the second overlay dashed, matching
+   AreaChart). The dim default keeps any further series from falsely claiming
+   the amber primary. */
 .legendItem::before {
   content: '';
   width: 10px;
   height: 2px;
   border-radius: var(--r-s);
+  background: var(--text-dim);
+}
+
+.legendItem[data-series='0']::before {
   background: var(--amber);
 }
 
-.legendItem[data-series='1']::before {
-  background: var(--text-dim);
+.legendItem[data-series='2']::before {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--text-dim) 0 3px,
+    transparent 3px 6px
+  );
+  border-radius: 0;
 }
 
 /* Per-series latest reading beside the label (multi-series widgets). */
