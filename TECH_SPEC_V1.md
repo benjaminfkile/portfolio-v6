@@ -681,6 +681,7 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/duolingo` | Streak + course progress for the `duolingo` section (§3.5, v1.2). Cached ~1h. |
 | `GET` | `/api/github` | Contribution calendar for the `github` section (§3.5, v1.2). Cached ~1h. |
 | `GET` | `/api/ops` | Sanitized CloudWatch dashboard telemetry for the `ops` section (§3.5, v1.3). Cached ~5m. |
+| `POST` | `/api/beacon` | First-party analytics ingest (§4.8, v1.4). Always 204. |
 | `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
 | `GET` | `/api/posts/:slug` | One published post, `published_body` only. `ETag`. |
 
@@ -754,6 +755,7 @@ read-only access to exactly those two routes and nothing else.
 | `DELETE` | `/api/admin/posts/:id` | Delete a post |
 | `POST` | `/api/admin/posts/:id/publish` | Validate + `published_body := draft_body` |
 | `POST` | `/api/admin/posts/:id/unpublish` | Null `published_at`, retain `published_body` |
+| `GET` | `/api/admin/analytics` | Aggregated first-party analytics (§4.8, v1.4). `?days=` |
 | `POST` | `/api/admin/preview-token` | Mint an opaque 15-min read-only preview token (§7) |
 | `GET` | `/api/admin/preview` † | Serialize the **draft** page in `/api/content` shape |
 | `GET` | `/api/admin/preview/posts/:id` † | Serialize a post's **draft** body |
@@ -939,6 +941,95 @@ a PAT — and `duolingo` — auth kind `value`, a public username. With `spotify
 The storage layer, crypto, state tokens, and public section pipeline need **zero
 changes** under this refactor — which is the test that the current split put the
 abstraction boundary in the right place.
+
+---
+
+### 4.8 First-party analytics (v1.4)
+
+Hand-rolled, first-party, privacy-respecting analytics: the public site beacons a
+small set of events to the API, the API stores them in Postgres, and the ADMIN
+renders the aggregates. No third-party script, no cookies, no consent banner
+needed, and — because it is same-origin through the gateway — effectively immune
+to ad-blockers, which systematically undercount a developer/recruiter audience.
+Analytics are **admin-only**: nothing from this feature ever appears on the
+public site.
+
+**Privacy design (load-bearing, not optional):**
+
+- **No PII is ever stored.** The visitor key is `sha256(day_salt | client_ip |
+  user_agent)` truncated to 32 hex chars, computed server-side and stored as
+  `session_key`. The salt derives from the token-encryption key material +
+  the UTC date, so keys rotate DAILY — cross-day visitor tracking is
+  **impossible by construction**, which is the feature, not a limitation.
+  Raw IP and user-agent are used only as hash input, never stored, never logged.
+  (Client IP = first `X-Forwarded-For` entry when present — the gateway/ALB sets
+  it — else the socket address.)
+- **Do Not Track is honored**: the public site sends nothing when
+  `navigator.doNotTrack === "1"` or `globalPrivacyControl` is set. Preview mode
+  (§7) never beacons.
+- **Referrers are stored as origin only** (scheme + host); same-origin referrers
+  store null. `path` is the site's own path.
+- **Known bots are dropped at ingest** (UA contains bot/crawler/spider/headless
+  etc. — a coarse filter; the real human signal is interaction events, which
+  bots essentially never fire).
+- **Retention**: events older than 365 days are pruned opportunistically at
+  ingest (cheap gated DELETE, at most once per day per process).
+
+**Schema** (§3.2 family):
+
+```sql
+CREATE TABLE analytics_events (
+  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  occurred_at  timestamptz NOT NULL DEFAULT now(),
+  session_key  text        NOT NULL,   -- daily-rotating visitor hash (above)
+  event        text        NOT NULL,   -- allowlist below
+  path         text        NOT NULL,
+  referrer     text,                   -- origin only, null when same-origin
+  meta         jsonb       NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX idx_analytics_time ON analytics_events (occurred_at DESC);
+CREATE INDEX idx_analytics_session ON analytics_events (session_key, occurred_at);
+```
+
+**Ingest — `POST /api/beacon` (public, §4.1).** Body
+`{ event, path, referrer?, meta? }`. Hard allowlist of events —
+`pageview | link_out | video_play | theme_toggle | scroll_depth` — anything else
+is dropped. `path` must start with `/` (≤200 chars); `meta` is a small object
+whose keys are allowlisted per event (`link_out`: `href` ≤200 chars;
+`video_play`: `title` ≤100; others: none) — unknown keys are stripped, never
+stored. A light in-memory per-IP rate limit (~60 events/min) silently drops
+floods. The endpoint **always answers 204** — invalid input, rate-limited, DB
+down, all 204; a broken beacon must never affect a visitor, and probing it
+teaches nothing (§3.5 spirit).
+
+**Aggregates — `GET /api/admin/analytics` (requireAdmin, §4.2).**
+`?days=7|30|90` (default 30). One curated summary:
+
+```jsonc
+{ "days": 30,
+  "totals": { "pageviews": n, "visitors": n,          // distinct session_key
+              "engaged": n },                          // sessions with ≥1 non-pageview event
+  "daily":  [ { "date": "2026-08-01", "pageviews": n, "visitors": n } ],
+  "top_pages":     [ { "path": "/", "views": n } ],
+  "top_referrers": [ { "origin": "https://…", "count": n } ],
+  "events":        [ { "event": "link_out", "count": n } ],
+  "top_outbound":  [ { "href": "github.com/…", "count": n } ] }
+```
+
+"Engaged" (a session that scrolled, clicked out, played a video, toggled the
+theme) is the honest humans-were-here metric — bots load pages; they do not
+interact.
+
+**Public-site client** (`src/lib/beacon.ts`): `navigator.sendBeacon` with a
+`fetch(…, { keepalive: true })` fallback; a `pageview` per route change; global
+listeners fire `link_out` (anchor clicks to a different origin), `video_play`
+(first play of a portfolio video), `theme_toggle`, and `scroll_depth` (once per
+pageview at 75%). Fire-and-forget: no retries, no queues, errors swallowed.
+
+**Admin UI**: an Analytics page — totals as stat cards, a daily bar chart
+(small hand-rolled SVG; the admin has no chart dependency and gains none),
+top pages/referrers/outbound and the event breakdown as tables, 7/30/90 range
+toggle.
 
 ---
 
