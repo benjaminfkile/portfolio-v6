@@ -10,12 +10,27 @@ import type { SkillSphereSkill } from './SkillSphere';
 /** Shared, mutable drag/rotation state — mutated by DOM handlers and read in
  *  the render loop without re-rendering React on every pointer move. */
 interface DragState {
-  rotX: number;
-  rotY: number;
+  /** Accumulated orientation. Screen-space increments are premultiplied in, so
+   *  the drag is a free trackball — no per-axis clamps, infinite tumble. */
+  quat: THREE.Quaternion;
   dragging: boolean;
   lastX: number;
   lastY: number;
 }
+
+/* Scratch objects for the per-frame math (drag increments, tile realignment).
+   Module-shared is safe: the frame loop and DOM handlers are single-threaded
+   and every use fully overwrites them. */
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const TMP_STEP_Q = new THREE.Quaternion();
+const TMP_PARENT_Q = new THREE.Quaternion();
+const TMP_WORLD_N = new THREE.Vector3();
+const TMP_REF = new THREE.Vector3();
+const TMP_X = new THREE.Vector3();
+const TMP_Y = new THREE.Vector3();
+const TMP_BASIS = new THREE.Matrix4();
+const TMP_Q = new THREE.Quaternion();
 
 interface CanvasProps {
   skills: SkillSphereSkill[];
@@ -168,11 +183,12 @@ export function letterTexture(
   return canvasToTexture(canvas);
 }
 
-/** A skill's face-tile transform: where the tile sits, how it is oriented to
- *  lie in the face plane, and how big it is (the face's incircle diameter). */
+/** A skill's face-tile anchor: where the tile sits, the outward face normal it
+ *  stays glued to (its in-plane roll is applied per-frame to keep the glyph
+ *  screen-upright), and how big it is (the face's incircle diameter). */
 interface FacePlacement {
   position: [number, number, number];
-  quaternion: [number, number, number, number];
+  normal: [number, number, number];
   size: number;
 }
 
@@ -180,10 +196,10 @@ interface FacePlacement {
  * Face tiles for `count` skills spread evenly across the geometry's faces.
  * Each selected triangle (read off the non-indexed position attribute) yields a
  * placement lying FLAT on the face: positioned at the centroid nudged just
- * above the face plane (no z-fighting with the wireframe), oriented so the
- * tile's +Z is the outward face normal with its +Y as upright as the plane
- * allows, and sized to the triangle's incircle — the circular backing chip
- * fills the face without spilling over the edges. Skills are sampled across
+ * above the face plane (no z-fighting with the wireframe), carrying the
+ * outward face normal (the tile's per-frame roll around it keeps the glyph
+ * screen-upright), and sized to the triangle's incircle — the circular backing
+ * chip fills the face without spilling over the edges. Skills are sampled across
  * the whole face list — `floor(i·faces/count)` — so N skills on a denser
  * sphere don't clump at one pole.
  */
@@ -219,23 +235,10 @@ function facePlacements(
         .length() / 2;
     const inradius = semi > 0 ? area / semi : 0;
 
-    // Basis: +Z out of the face, +Y the most-upright in-plane direction (a
-    // near-polar face falls back to +X as the reference to avoid a degenerate
-    // cross product).
-    const ref =
-      Math.abs(normal.y) > 0.99
-        ? new THREE.Vector3(1, 0, 0)
-        : new THREE.Vector3(0, 1, 0);
-    const xAxis = new THREE.Vector3().crossVectors(ref, normal).normalize();
-    const yAxis = new THREE.Vector3().crossVectors(normal, xAxis);
-    const q = new THREE.Quaternion().setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(xAxis, yAxis, normal),
-    );
-
     const lifted = centroid.clone().addScaledVector(normal, 0.01);
     faces.push({
       position: [lifted.x, lifted.y, lifted.z],
-      quaternion: [q.x, q.y, q.z, q.w],
+      normal: [normal.x, normal.y, normal.z],
       size: inradius * 2 * 0.96,
     });
   }
@@ -243,7 +246,7 @@ function facePlacements(
   const n = faces.length;
   const fallback: FacePlacement = {
     position: [0, 0, 1.01],
-    quaternion: [0, 0, 0, 1],
+    normal: [0, 0, 1],
     size: 0.3,
   };
   const out: FacePlacement[] = [];
@@ -275,6 +278,34 @@ function SkillFace({
   invalidate: () => void;
 }) {
   const [map, setMap] = useState<THREE.Texture | null>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const normal = useMemo(
+    () => new THREE.Vector3(...placement.normal),
+    [placement],
+  );
+
+  // Keep the glyph readable from any sphere orientation: the tile stays glued
+  // flat to its face (+Z tracks the rotating face normal) but rolls around
+  // that normal so its +Y matches screen-up (the camera is axis-aligned, so
+  // that is world +Y). A near-vertical world normal falls back to +Z as the
+  // reference — those tiles are nearly edge-on to the camera anyway.
+  useFrame(() => {
+    const mesh = meshRef.current;
+    const parent = mesh?.parent;
+    if (!mesh || !parent) return;
+    parent.getWorldQuaternion(TMP_PARENT_Q);
+    TMP_WORLD_N.copy(normal).applyQuaternion(TMP_PARENT_Q);
+    if (Math.abs(TMP_WORLD_N.y) > 0.99) TMP_REF.set(0, 0, 1);
+    else TMP_REF.set(0, 1, 0);
+    TMP_X.crossVectors(TMP_REF, TMP_WORLD_N).normalize();
+    TMP_Y.crossVectors(TMP_WORLD_N, TMP_X);
+    TMP_Q.setFromRotationMatrix(
+      TMP_BASIS.makeBasis(TMP_X, TMP_Y, TMP_WORLD_N),
+    );
+    // Desired orientation is in world space; store it locally by undoing the
+    // parent group's rotation.
+    mesh.quaternion.copy(TMP_PARENT_Q).invert().multiply(TMP_Q);
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -301,8 +332,8 @@ function SkillFace({
 
   return (
     <mesh
+      ref={meshRef}
       position={placement.position}
-      quaternion={placement.quaternion}
       scale={[placement.size, placement.size, 1]}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
@@ -380,10 +411,11 @@ function Scene({
     if (!group) return;
     const s = stateRef.current;
     if (!reduced && !s.dragging) {
-      s.rotY += delta * 0.25; // slow auto-rotation
+      // Slow auto-spin about the screen-vertical axis.
+      s.quat.premultiply(TMP_STEP_Q.setFromAxisAngle(Y_AXIS, delta * 0.25));
     }
-    group.rotation.x = s.rotX;
-    group.rotation.y = s.rotY;
+    // Renormalize: thousands of premultiplied small steps drift numerically.
+    group.quaternion.copy(s.quat.normalize());
   });
 
   return (
@@ -435,8 +467,8 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   const stateRef = useRef<DragState>({
-    rotX: 0.32,
-    rotY: 0,
+    // Start with the same gentle downward tilt the sphere always had.
+    quat: new THREE.Quaternion().setFromAxisAngle(X_AXIS, 0.32),
     dragging: false,
     lastX: 0,
     lastY: 0,
@@ -479,9 +511,15 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const s = stateRef.current;
     if (!s.dragging) return;
-    s.rotY += (e.clientX - s.lastX) * 0.01;
-    s.rotX += (e.clientY - s.lastY) * 0.01;
-    s.rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, s.rotX));
+    // Screen-space trackball: premultiplying world-axis increments keeps the
+    // drag direction tied to the screen (the camera is axis-aligned) with no
+    // per-axis clamps — the sphere tumbles infinitely in any direction.
+    s.quat.premultiply(
+      TMP_STEP_Q.setFromAxisAngle(Y_AXIS, (e.clientX - s.lastX) * 0.01),
+    );
+    s.quat.premultiply(
+      TMP_STEP_Q.setFromAxisAngle(X_AXIS, (e.clientY - s.lastY) * 0.01),
+    );
     s.lastX = e.clientX;
     s.lastY = e.clientY;
     // In demand/never modes the dragged frame only renders if we ask for it.

@@ -135,8 +135,10 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   hemisphere is occluded, not see-through) with amber wireframe edges showing
   the triangle intersections, and one skill icon lying flat on a triangular
   face (incircle-sized tile, oriented to the face normal; far-side tiles are
-  back-face culled), on a `--panel` Control Room surface. Slow auto-rotate; pointer-drag
-  spins it; hovering a face shows its skill title in the mono instrument voice.
+  back-face culled; each tile rolls around its normal per-frame so the glyph
+  stays screen-upright and readable), on a `--panel` Control Room surface.
+  Slow auto-rotate; pointer-drag tumbles it freely (quaternion trackball, no
+  clamps); hovering a face shows its skill title in the mono instrument voice.
   Sphere density comes from the section's `sphere_detail` config (0–4); absent =
   auto-fit to the icon count. `prefers-reduced-motion` renders it static, and
   where WebGL is unavailable (older browsers, the jsdom test path) it degrades to
