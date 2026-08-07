@@ -112,34 +112,34 @@ function useSceneTokens() {
 export const TEX_SIZE = 128;
 
 /**
- * Fill the tile's incircle disc with the face albedo, transparent outside the
- * circle. The disc is the glyph's ground and must be the SAME colour as the
- * sphere faces (and rendered by the same lit material), so it disappears into
- * its facet — no visible ring. It stays a disc, not a full square: the square
- * tile's corners poke past the triangle's incircle, and opaque corners would
- * smear onto neighbouring (differently shaded) faces and the edge lines.
+ * Fill the whole texture square with the face albedo — the glyph's ground,
+ * the SAME colour as the sphere faces (rendered by the same lit material), so
+ * the tile disappears into its facet. The texture is fully opaque
+ * edge-to-edge ON PURPOSE: any alpha edge in the texture gets bilinear-mixed
+ * with transparent-black texels (a 2D canvas stores premultiplied, so
+ * transparent texels are irrecoverably black) and renders as a dark ring
+ * around the icon. The circular shape comes from the tile's CircleGeometry
+ * instead — a geometry edge, MSAA'd against the identically-coloured facet.
  * Shared by the icon and the letter-fallback pipelines.
  */
-function fillDisc(
+function fillGround(
   ctx: CanvasRenderingContext2D,
   size: number,
   fill: string,
 ): void {
-  const r = size / 2;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(r, r, r - 1, 0, Math.PI * 2);
-  ctx.closePath();
   ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.restore();
+  ctx.fillRect(0, 0, size, size);
 }
 
-/** Wrap a finished 2D canvas as a sprite texture in the sRGB working space so
- *  the panel/icon colours are not washed out on upload. */
+/** Wrap a finished 2D canvas as a tile texture: sRGB working space so the
+ *  panel/icon colours are not washed out on upload; opaque, so no alpha
+ *  channel gymnastics. Mipmaps off: tiles render near 1:2 of the texture
+ *  size, where plain linear minification is sharp and artifact-free. */
 function canvasToTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
   return tex;
 }
 
@@ -177,7 +177,7 @@ export function rasterizeIcon(
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        fillDisc(ctx, TEX_SIZE, fill);
+        fillGround(ctx, TEX_SIZE, fill);
 
         // Contain-fit inside a padded square. dw/dh are always explicit so the
         // draw does not depend on the SVG's (often absent) intrinsic size.
@@ -227,7 +227,7 @@ export function letterTexture(
   canvas.height = TEX_SIZE;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    fillDisc(ctx, TEX_SIZE, fill);
+    fillGround(ctx, TEX_SIZE, fill);
     ctx.fillStyle = color;
     ctx.font = `600 ${TEX_SIZE * 0.5}px 'IBM Plex Mono', ui-monospace, monospace`;
     ctx.textAlign = 'center';
@@ -393,19 +393,20 @@ function SkillFace({
       }}
       onPointerOut={() => onHover(null)}
     >
-      <planeGeometry args={[1, 1]} />
+      {/* A circle, not a plane: the disc shape lives in GEOMETRY, and the
+          texture is opaque edge-to-edge. Any texture alpha edge gets
+          bilinear-mixed with transparent-black texels (2D canvases store
+          premultiplied — transparent texels are irrecoverably black) and
+          renders as a dark ring around the icon; a geometry rim is MSAA'd
+          directly against the identically-coloured facet instead. Radius 0.5
+          so the tile `size` scale is the disc diameter, as before. */}
+      <circleGeometry args={[0.5, 48]} />
       {/* Lit with the SAME material params as the sphere fill so the tile's
-          albedo-coloured disc renders pixel-identical to the facet under it —
-          discs vanish, icons shade with the sphere. FrontSide (the default) is
-          load-bearing: it culls far-hemisphere tiles so icons never show
+          albedo-coloured ground renders pixel-identical to the facet under it
+          — tiles vanish, icons shade with the sphere. FrontSide (the default)
+          is load-bearing: it culls far-hemisphere tiles so icons never show
           through the wireframe mirrored. */}
-      <meshStandardMaterial
-        map={map}
-        transparent
-        depthWrite={false}
-        roughness={0.85}
-        metalness={0}
-      />
+      <meshStandardMaterial map={map} roughness={0.85} metalness={0} />
     </mesh>
   );
 }

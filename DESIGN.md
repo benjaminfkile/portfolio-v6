@@ -143,9 +143,8 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   icon ground is indistinguishable from its facet; oriented to the face
   normal; far-side tiles are
   back-face culled; each tile rolls around its normal per-frame so the glyph
-  stays screen-upright and readable), floating on a transparent stage directly
-  over the page's `--ground` + grid (no panel card — the facets must read as
-  the page background itself).
+  stays screen-upright and readable), on a bordered `--panel` instrument card
+  (`--r-m` rounded).
   Slow auto-rotate; pointer-drag tumbles it freely (quaternion trackball, no
   clamps); hovering a face shows its skill title in the mono instrument voice.
   Sphere density comes from the section's `sphere_detail` config (0–4); absent =

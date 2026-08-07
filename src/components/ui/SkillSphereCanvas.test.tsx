@@ -7,18 +7,10 @@ import { letterTexture, rasterizeIcon, TEX_SIZE } from './SkillSphereCanvas';
 // network, no WebGL — only the draw calls we can assert against.
 
 interface FakeCtx {
-  save: ReturnType<typeof vi.fn>;
-  restore: ReturnType<typeof vi.fn>;
-  beginPath: ReturnType<typeof vi.fn>;
-  closePath: ReturnType<typeof vi.fn>;
-  arc: ReturnType<typeof vi.fn>;
-  fill: ReturnType<typeof vi.fn>;
-  stroke: ReturnType<typeof vi.fn>;
+  fillRect: ReturnType<typeof vi.fn>;
   drawImage: ReturnType<typeof vi.fn>;
   fillText: ReturnType<typeof vi.fn>;
   fillStyle: string;
-  strokeStyle: string;
-  lineWidth: number;
   font: string;
   textAlign: string;
   textBaseline: string;
@@ -26,18 +18,10 @@ interface FakeCtx {
 
 function makeCtx(): FakeCtx {
   return {
-    save: vi.fn(),
-    restore: vi.fn(),
-    beginPath: vi.fn(),
-    closePath: vi.fn(),
-    arc: vi.fn(),
-    fill: vi.fn(),
-    stroke: vi.fn(),
+    fillRect: vi.fn(),
     drawImage: vi.fn(),
     fillText: vi.fn(),
     fillStyle: '',
-    strokeStyle: '',
-    lineWidth: 0,
     font: '',
     textAlign: '',
     textBaseline: '',
@@ -90,7 +74,7 @@ afterEach(() => {
 });
 
 describe('rasterizeIcon', () => {
-  it('fills the face-albedo disc and draws a contain-fit icon on success', async () => {
+  it('fills the opaque albedo ground and draws a contain-fit icon on success', async () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
@@ -99,11 +83,10 @@ describe('rasterizeIcon', () => {
     expect(canvas).toBeInstanceOf(HTMLCanvasElement);
     expect(canvas.width).toBe(TEX_SIZE);
     expect(canvas.height).toBe(TEX_SIZE);
-    // Albedo disc: filled circle, NO stroke — the disc must be
-    // indistinguishable from the facet it sits on.
-    expect(ctx.arc).toHaveBeenCalled();
-    expect(ctx.fill).toHaveBeenCalled();
-    expect(ctx.stroke).not.toHaveBeenCalled();
+    // Opaque edge-to-edge albedo ground — the disc shape lives in the tile's
+    // CircleGeometry, never in a texture alpha edge (alpha edges bilinear-mix
+    // with transparent-black texels and render as a ring around the icon).
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, TEX_SIZE, TEX_SIZE);
     // Icon drawn with an EXPLICIT destination size (the load-bearing fix).
     expect(ctx.drawImage).toHaveBeenCalledTimes(1);
     const [, , , dw, dh] = ctx.drawImage.mock.calls[0];
@@ -171,17 +154,15 @@ describe('rasterizeIcon', () => {
   });
 });
 
-describe('letterTexture (shared albedo-disc fallback)', () => {
-  it('fills the albedo disc and draws the initial, tagged sRGB', () => {
+describe('letterTexture (shared albedo-ground fallback)', () => {
+  it('fills the albedo ground and draws the initial, tagged sRGB', () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
     const tex = letterTexture('React', '#fff', '#111');
 
-    // Same disc pipeline as a real icon — fill only, no stroke.
-    expect(ctx.arc).toHaveBeenCalled();
-    expect(ctx.fill).toHaveBeenCalled();
-    expect(ctx.stroke).not.toHaveBeenCalled();
+    // Same opaque-ground pipeline as a real icon.
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, TEX_SIZE, TEX_SIZE);
     // The uppercased initial, centred.
     expect(ctx.fillText).toHaveBeenCalledWith('R', TEX_SIZE / 2, TEX_SIZE / 2);
     expect(tex).toBeInstanceOf(THREE.CanvasTexture);

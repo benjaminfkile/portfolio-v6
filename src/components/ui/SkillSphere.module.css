@@ -7,16 +7,18 @@
   width: 100%;
 }
 
-/* The canvas stage is transparent — the sphere's --ground faces sit directly
-   on the page background so the facets truly match it (a panel background
-   here would read lighter/darker than the sphere in dark mode). The wrapper
-   is decorative (aria-hidden); the reading lives in .srOnly. */
+/* The canvas lives on a dark instrument panel card, --r-m rounded (§2.4). It
+   is decorative (aria-hidden on the wrapper); the reading lives in .srOnly. */
 .canvasWrap {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   max-width: 420px;
   margin-inline: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  overflow: hidden;
   touch-action: none; /* pointer-drag rotates instead of scrolling the page */
   cursor: grab;
 }
