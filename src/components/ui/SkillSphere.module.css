@@ -78,6 +78,26 @@
   object-fit: contain;
 }
 
+/* Per-theme icon variants (Icons v1.6) — CSS-only swap, no JS listener in the
+   fallback path. When a skill ships a dark override both imgs render; the dark
+   variant shows by default (dark is native, incl. before data-theme is
+   stamped) and the light variant only under the light theme. */
+.chipIconLight {
+  display: none;
+}
+
+.chipIconDark {
+  display: inline-block;
+}
+
+:root[data-theme='light'] .chipIconLight {
+  display: inline-block;
+}
+
+:root[data-theme='light'] .chipIconDark {
+  display: none;
+}
+
 /* Visually-hidden list of skill titles for assistive tech (Chart rules, §7) —
    always rendered alongside the decorative canvas. */
 .srOnly {

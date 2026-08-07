@@ -152,7 +152,11 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   where WebGL is unavailable (older browsers, the jsdom test path) it degrades to
   a plain grid of icon + name chips. The canvas is decorative (`aria-hidden`) with
   a visually-hidden list of skill titles alongside for assistive tech. Group
-  labels in mono.
+  labels in mono. Icons are theme-aware (Icons v1.6): a skill may ship an optional
+  `icon_source_dark` override alongside the default `icon_source` — the dark theme
+  uses it (falling back to `icon_source` when absent), the light theme always uses
+  `icon_source`. The sphere re-rasterizes the tile texture on theme toggle via the
+  existing token observer; the chip fallback swaps variants with CSS only.
 - **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop ONLY
   if reduced-motion off; tap-to-play on touch), title, intro, `TagChip` tech
   icons row, links. ≥900px: media left / text right alternating; <900px stacked.

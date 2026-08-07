@@ -5,6 +5,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePrefersReducedMotion } from '../../lib/prefersReducedMotion';
 import styles from './SkillSphere.module.css';
+import { resolveSkillIconUrl } from './SkillSphere';
 import type { SkillSphereSkill } from './SkillSphere';
 
 /** Shared, mutable drag/rotation state — mutated by DOM handlers and read in
@@ -328,6 +329,7 @@ function facePlacements(
  *  away and is culled, as on a solid object. */
 function SkillFace({
   skill,
+  iconUrl,
   placement,
   color,
   fill,
@@ -335,6 +337,10 @@ function SkillFace({
   invalidate,
 }: {
   skill: SkillSphereSkill;
+  /** The theme-resolved icon URL (Icons v1.6) — see {@link resolveSkillIconUrl}.
+   *  Passed in (not read off `skill`) so a theme toggle changes this dep and
+   *  re-runs the rasterize effect, swapping the texture live. */
+  iconUrl: string;
   placement: FacePlacement;
   color: string;
   fill: string;
@@ -373,7 +379,7 @@ function SkillFace({
 
   useEffect(() => {
     let cancelled = false;
-    rasterizeIcon(skill.icon_source, fill)
+    rasterizeIcon(iconUrl, fill)
       .then((canvas) => {
         if (cancelled) return;
         setMap(canvasToTexture(canvas));
@@ -387,7 +393,7 @@ function SkillFace({
     return () => {
       cancelled = true;
     };
-  }, [skill.icon_source, skill.title, color, fill, invalidate]);
+  }, [iconUrl, skill.title, color, fill, invalidate]);
 
   // Free the GPU texture when it is replaced or the sprite unmounts.
   useEffect(() => () => map?.dispose(), [map]);
@@ -548,6 +554,7 @@ function Scene({
           <SkillFace
             key={skill.id}
             skill={skill}
+            iconUrl={resolveSkillIconUrl(skill, tokens.lightTheme)}
             placement={placements[i]}
             color={tokens.amber}
             fill={tokens.panel}
