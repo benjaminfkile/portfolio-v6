@@ -1,0 +1,67 @@
+/* Scrubber — a draggable playhead (DESIGN.md §5/§7). Tokens only; both themes.
+   The interactive element is a ≥44px target with a visible focus ring. */
+
+.scrubber {
+  width: 100%;
+}
+
+/* The track IS the slider: a full-width, ≥44px hit area so touch/keyboard meet
+   the target-size floor (DESIGN.md §3). The visible rail sits centred within it. */
+.track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding-block: var(--space-3);
+  cursor: pointer;
+  touch-action: none; /* pointer drag owns horizontal gestures, no scroll-jank */
+}
+
+.track:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: var(--r-s);
+}
+
+/* The faint full-width rail. */
+.rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: var(--r-s);
+  background: var(--line);
+}
+
+/* Amber fill from the start of the day to the playhead. */
+.fill {
+  position: absolute;
+  left: 0;
+  height: 3px;
+  border-radius: var(--r-s);
+  background: var(--amber);
+}
+
+/* The draggable thumb, centred on the playhead position. */
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 3px var(--ground);
+}
+
+/* A hair of easing so the thumb glides between keyboard steps; motion is opt-out
+   under prefers-reduced-motion (DESIGN.md §6). */
+@media (prefers-reduced-motion: no-preference) {
+  .fill,
+  .thumb {
+    transition:
+      left 90ms ease-out,
+      width 90ms ease-out;
+  }
+}

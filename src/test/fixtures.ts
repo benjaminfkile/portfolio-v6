@@ -213,10 +213,10 @@ export const fixtureDocument: ContentDocument = {
 
 /**
  * A document whose single `ops` page carries one `ops` section (spec §3.5,
- * v1.3), for driving the ops section through `SECTION_REGISTRY`. Its *data* is
- * fetched at runtime from `GET /api/ops` — this fixture is only the published
- * config (a `window_hours` and header copy), mirroring how the snapshot stores a
- * live section (§3.5).
+ * v1.7), for driving the ops section through `SECTION_REGISTRY`. Its *data* is
+ * the daily report fetched at runtime from `GET /api/ops` — this fixture is only
+ * the published config (header copy), mirroring how the snapshot stores a live
+ * section (§3.5). As of v1.7 the config is header copy only (no `window_hours`).
  */
 export const fixtureOpsDocument: ContentDocument = {
   version: 43,
@@ -233,8 +233,64 @@ export const fixtureOpsDocument: ContentDocument = {
         {
           id: 'sec-ops',
           type: 'ops',
-          data: { heading: 'Ops', window_hours: 6 },
+          data: { heading: 'Ops', intro: 'Yesterday, on the record.' },
           items: [],
+        },
+      ],
+    },
+  ],
+};
+
+/**
+ * A daily ops report (spec §3.5, v1.7) covering the UTC day 2026-08-06 at the
+ * fixed 5-minute grain. The two series here are sparse (a handful of the day's
+ * 288 slots) so tests can assert exact playhead → readout values by slot; a real
+ * report carries the full grid. `t` is ISO-8601 (the report builder's spelling).
+ */
+export const fixtureOpsReport = {
+  report_date: '2026-08-06',
+  generated_at: '2026-08-07T00:17:00Z',
+  grain_minutes: 5,
+  available_dates: ['2026-08-06', '2026-08-05'],
+  widgets: [
+    {
+      title: 'CPU Utilization',
+      kind: 'gauge' as const,
+      unit: '%',
+      latest: 42,
+      series: [
+        {
+          label: null,
+          points: [
+            // slot 0 (00:00Z), slot 6 (00:30Z), slot 287 (23:55Z)
+            { t: '2026-08-06T00:00:00Z', v: 40 },
+            { t: '2026-08-06T00:30:00Z', v: 55 },
+            { t: '2026-08-06T23:55:00Z', v: 42 },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'ALB Request Count',
+      kind: 'chart' as const,
+      unit: 'req/s',
+      latest: 128,
+      series: [
+        {
+          label: '2xx',
+          points: [
+            { t: '2026-08-06T00:00:00Z', v: 100 },
+            { t: '2026-08-06T00:30:00Z', v: 210 },
+            { t: '2026-08-06T23:55:00Z', v: 128 },
+          ],
+        },
+        {
+          label: '5xx',
+          points: [
+            { t: '2026-08-06T00:00:00Z', v: 1 },
+            { t: '2026-08-06T00:30:00Z', v: 7 },
+            { t: '2026-08-06T23:55:00Z', v: 2 },
+          ],
         },
       ],
     },

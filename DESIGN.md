@@ -177,12 +177,22 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   config narrows the weeks), the page never does. One accessible summary sentence
   (visually hidden) instead of 365 labeled cells.
 - **contact** — closing panel: heading, `LinkButton`s row.
-- **ops** — the flagship Control Room page: a responsive grid of `Panel`s (1-col
-  base → 2-col ≥900 → 3-col ≥1200), each with a mono widget title, a `Gauge` (for
-  utilization-kind widgets) or `AreaChart` (everything else), and the latest value
-  as a `StatBlock`-style readout. A mono strip above the grid: window label
-  ("LAST 3H"), last-refresh timestamp, and a `StatusDot`. Refetch ~60s, paused when
-  `document.hidden`. Degrades to nothing when `{ available: false }`.
+- **ops** — the flagship Control Room page, a **daily flight-recorder replay**
+  (v1.7): `GET /api/ops` returns one immutable report per UTC day (built once,
+  server-side, from the *curated* public dashboard — day-delayed by design, no
+  live feedback loop), replayed entirely client-side; no polling. A responsive
+  grid of `Panel`s (1-col base → 2-col ≥900 → 3-col ≥1200), each a mono widget
+  title over a `Gauge` (utilization-kind) or `AreaChart` (everything else); every
+  series spans the FULL UTC day at a fixed 5-minute grain (288 points). A
+  draggable **playhead** `Scrubber` (mouse + touch + keyboard arrows/Page/Home/End,
+  ≥44px target, focus-visible ring, §7) selects a moment: the `Gauge`/`StatBlock`
+  readouts show the value there and the `AreaChart`s draw a cursor line at it.
+  Times along the scrubber and readouts are the VIEWER's local zone; a mono strip
+  labels the window honestly ("24h ending <local datetime of 00:00 UTC>" — it
+  spans two local calendar days for most viewers) alongside `report_date` +
+  `generated_at` and a `StatusDot`. No auto-play in v1 (any easing honors
+  `prefers-reduced-motion`). No report yet (API 404) → a calm placeholder panel;
+  missing datapoints within the day render as gaps, never zeros.
 - **404 / empty states** — instrument voice: mono `NO SIGNAL` label + plain link home.
 
 ## 6. Motion

@@ -121,6 +121,58 @@ describe('AreaChart', () => {
     expect(screen.getByText('no data')).toBeInTheDocument();
   });
 
+  it('maps x by time when a domain is given (gaps read as spacing, not compression)', () => {
+    // Two samples an hour apart within a 24h domain sit near the left edge.
+    const domain: [number, number] = [0, 24 * 60];
+    const timed: AreaPoint[] = [
+      { t: 0, v: 10 },
+      { t: 60, v: 20 },
+    ];
+    const { container } = render(
+      <AreaChart points={timed} domain={domain} summary="timed" />,
+    );
+    const line = container.querySelector('[data-role="line"]') as SVGPathElement;
+    const xs = [...line.getAttribute('d')!.matchAll(/[ML] ([\d.]+)/g)].map((m) =>
+      parseFloat(m[1]),
+    );
+    // First at the very left; second only ~1/24 of the width in — not the far right.
+    expect(xs[0]).toBeLessThan(5);
+    expect(xs[1]).toBeLessThan(12);
+  });
+
+  it('draws a playhead cursor line and dot, and drops the latest dot', () => {
+    const domain: [number, number] = [0, 100];
+    const { container } = render(
+      <AreaChart
+        points={three.map((p, i) => ({ t: i * 50, v: p.v }))}
+        domain={domain}
+        cursor={{ t: 50, v: 30 }}
+        summary="cursor"
+      />,
+    );
+    const cursor = container.querySelector('[data-role="cursor"]');
+    expect(cursor).toBeTruthy();
+    // The cursor at t=50 sits mid-plot.
+    expect(parseFloat(cursor!.getAttribute('x1')!)).toBeGreaterThan(45);
+    // The emphasised dot follows the playhead, not the newest sample.
+    expect(container.querySelector('[data-role="cursor-dot"]')).toBeTruthy();
+    expect(container.querySelector('[data-role="dot"]')).toBeNull();
+  });
+
+  it('draws the cursor line but no dot at a gap (null value)', () => {
+    const domain: [number, number] = [0, 100];
+    const { container } = render(
+      <AreaChart
+        points={three.map((p, i) => ({ t: i * 50, v: p.v }))}
+        domain={domain}
+        cursor={{ t: 20, v: null }}
+        summary="gap cursor"
+      />,
+    );
+    expect(container.querySelector('[data-role="cursor"]')).toBeTruthy();
+    expect(container.querySelector('[data-role="cursor-dot"]')).toBeNull();
+  });
+
   it('renders its final static geometry under reduced motion', () => {
     restores.push(mockReducedMotion(true));
     const { container } = render(
