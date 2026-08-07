@@ -1,11 +1,32 @@
 import { lazy, Suspense, useMemo } from 'react';
 import styles from './SkillSphere.module.css';
 
-/** One skill placed on the sphere: an id, its title, and the icon URL. */
+/**
+ * One skill placed on the sphere: an id, its title, and the icon URL(s).
+ * `icon_source` is the default (light-theme) URL; `icon_source_dark` is an
+ * optional dark-theme override (Icons v1.6) resolved per theme by
+ * {@link resolveSkillIconUrl}.
+ */
 export interface SkillSphereSkill {
   id: string;
   title: string;
   icon_source: string;
+  icon_source_dark?: string;
+}
+
+/**
+ * The effective icon URL for a skill under the current theme (Icons v1.6). Dark
+ * theme prefers `icon_source_dark` and falls back to `icon_source` when it is
+ * absent; light theme always uses `icon_source`. Both the WebGL texture
+ * pipeline (via the scene's `lightTheme` token) and any JS-driven path resolve
+ * through here so the two never diverge.
+ */
+export function resolveSkillIconUrl(
+  skill: Pick<SkillSphereSkill, 'icon_source' | 'icon_source_dark'>,
+  lightTheme: boolean,
+): string {
+  if (lightTheme) return skill.icon_source;
+  return skill.icon_source_dark ?? skill.icon_source;
 }
 
 export interface SkillSphereProps {
@@ -66,18 +87,49 @@ function Chips({ skills }: { skills: SkillSphereSkill[] }) {
     <ul className={styles.chips}>
       {skills.map((skill) => (
         <li key={skill.id} className={styles.chip}>
-          {skill.icon_source && (
-            <img
-              className={styles.chipIcon}
-              src={skill.icon_source}
-              alt=""
-              aria-hidden="true"
-            />
-          )}
+          <ChipIcon skill={skill} />
           <span>{skill.title}</span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * A chip's icon. When a skill carries a dark-theme override (Icons v1.6) we
+ * render BOTH `<img>`s and swap them with CSS only — the dark variant shows by
+ * default (dark is the native theme, incl. before `data-theme` is stamped) and
+ * is hidden under `:root[data-theme='light']`, where the light variant shows.
+ * The fallback path stays JS-listener-free so it costs nothing on the WebGL
+ * path it stands in for. A single-URL skill renders one img, as before.
+ */
+function ChipIcon({ skill }: { skill: SkillSphereSkill }) {
+  if (!skill.icon_source) return null;
+  if (skill.icon_source_dark) {
+    return (
+      <>
+        <img
+          className={`${styles.chipIcon} ${styles.chipIconLight}`}
+          src={skill.icon_source}
+          alt=""
+          aria-hidden="true"
+        />
+        <img
+          className={`${styles.chipIcon} ${styles.chipIconDark}`}
+          src={skill.icon_source_dark}
+          alt=""
+          aria-hidden="true"
+        />
+      </>
+    );
+  }
+  return (
+    <img
+      className={styles.chipIcon}
+      src={skill.icon_source}
+      alt=""
+      aria-hidden="true"
+    />
   );
 }
 

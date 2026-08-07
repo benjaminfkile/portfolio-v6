@@ -8,8 +8,9 @@ import styles from './SkillsSection.module.css';
 /**
  * The `skills` section (spec §3.4, DESIGN.md §5) — a 3D geodesic sphere
  * ({@link SkillSphere}) with one skill icon per face, on a Control Room panel
- * surface. Each item is a `{ title, description, icon_source }` (the v5 skill
- * rating was dropped in v1.5). The optional `sphere_detail` config (0–4) sets the
+ * surface. Each item is a `{ title, description, icon_source, icon_source_dark? }`
+ * (the v5 skill rating was dropped in v1.5; the optional dark-theme icon override
+ * arrived in Icons v1.6). The optional `sphere_detail` config (0–4) sets the
  * icosahedron density; when absent the sphere auto-fits to the item count.
  * Optional group labels (eyebrow / intro) render in the shared
  * {@link SectionShell} — the eyebrow in mono per §5.
@@ -26,7 +27,14 @@ export default function SkillsSection({ section }: SectionProps) {
 
   const skills: SkillSphereSkill[] = section.items.map((item) => {
     const skill = item.data as SkillsItem;
-    return { id: item.id, title: skill.title, icon_source: skill.icon_source };
+    return {
+      id: item.id,
+      title: skill.title,
+      icon_source: skill.icon_source,
+      // Optional dark-theme override (Icons v1.6); undefined falls back to
+      // icon_source in every renderer.
+      icon_source_dark: skill.icon_source_dark,
+    };
   });
 
   return (

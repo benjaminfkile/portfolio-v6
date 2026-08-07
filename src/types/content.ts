@@ -79,7 +79,15 @@ export interface TimelineItem {
 export interface SkillsItem {
   title: string;
   description: string;
+  /** Default (light-theme) icon URL — required. Source-agnostic plain URL. */
   icon_source: string;
+  /**
+   * Optional dark-theme icon override (Icons v1.6). A plain URL like
+   * {@link icon_source}; every renderer falls back to `icon_source` when it is
+   * absent. Lets a skill ship a dark-optimised glyph (e.g. a white wordmark)
+   * without changing the light-theme icon.
+   */
+  icon_source_dark?: string;
 }
 
 /** `portfolio` item. */
