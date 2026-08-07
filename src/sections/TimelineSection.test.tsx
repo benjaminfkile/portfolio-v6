@@ -33,7 +33,7 @@ describe('TimelineSection (DESIGN.md §5)', () => {
               },
             },
           ],
-          { title: 'Experience' },
+          { heading: 'Experience' },
         )}
         media={{}}
       />,

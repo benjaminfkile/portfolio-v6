@@ -8,13 +8,21 @@ function contactSection(data: Record<string, unknown>): Section {
 }
 
 describe('ContactSection (DESIGN.md §5)', () => {
-  it('renders the heading, body, and an email mailto LinkButton', () => {
+  it('renders the heading, body, and a mailto LinkButton from links', () => {
+    // Email is not a schema field (contactData = heading/body/links) — an
+    // email contact is expressed as a mailto: link in the ordered Link[].
     render(
       <ContactSection
         section={contactSection({
-          title: 'Get in touch',
+          heading: 'Get in touch',
           body: 'Reach out any time.',
-          email: 'hello@benkile.com',
+          links: [
+            {
+              type: 'other',
+              label: 'hello@benkile.com',
+              url: 'mailto:hello@benkile.com',
+            },
+          ],
         })}
         media={{}}
       />,
@@ -37,7 +45,7 @@ describe('ContactSection (DESIGN.md §5)', () => {
 
     render(
       <ContactSection
-        section={contactSection({ title: 'Contact', links })}
+        section={contactSection({ heading: 'Contact', links })}
         media={{}}
       />,
     );

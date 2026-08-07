@@ -21,7 +21,7 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
       id: 'sec-about',
       type: 'about',
       data: {
-        title: 'About me',
+        heading: 'About me',
         body: 'First paragraph of the bio.\n\nSecond paragraph of the bio.',
       },
       items: [],
@@ -29,7 +29,7 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
     {
       id: 'sec-timeline',
       type: 'timeline',
-      data: { title: 'Experience' },
+      data: { heading: 'Experience' },
       items: [
         {
           id: 'tl-1',
@@ -53,7 +53,7 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
     {
       id: 'sec-skills',
       type: 'skills',
-      data: { title: 'Skills', sphere_detail: 1 },
+      data: { heading: 'Skills', sphere_detail: 1 },
       items: [
         {
           id: 'sk-1',
@@ -76,7 +76,7 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
     {
       id: 'sec-portfolio',
       type: 'portfolio',
-      data: { title: 'Projects' },
+      data: { heading: 'Projects' },
       items: [
         {
           id: 'pf-1',
@@ -130,9 +130,15 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
       id: 'sec-contact',
       type: 'contact',
       data: {
-        title: 'Get in touch',
+        heading: 'Get in touch',
         body: 'Reach out any time.',
-        email: 'hello@benkile.com',
+        links: [
+          {
+            type: 'other',
+            label: 'hello@benkile.com',
+            url: 'mailto:hello@benkile.com',
+          },
+        ],
       },
       items: [],
     },

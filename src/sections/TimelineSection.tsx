@@ -14,8 +14,7 @@ import styles from './TimelineSection.module.css';
  * `media_id` (or when unmatched) and hidden on cramped phones via CSS (§5).
  */
 interface TimelineData {
-  title?: string;
-  eyebrow?: string;
+  heading?: string;
   intro?: string;
 }
 
@@ -24,8 +23,7 @@ export default function TimelineSection({ section, media }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.title ?? 'Timeline'}
-      eyebrow={data.eyebrow}
+      title={data.heading ?? 'Timeline'}
       intro={data.intro}
       className={styles.timeline}
     >

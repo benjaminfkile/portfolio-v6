@@ -19,8 +19,7 @@ import styles from './PortfolioSection.module.css';
  * carrying each link's own label (§3.4).
  */
 interface PortfolioData {
-  title?: string;
-  eyebrow?: string;
+  heading?: string;
   intro?: string;
 }
 
@@ -83,8 +82,7 @@ export default function PortfolioSection({ section, media }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.title ?? 'Portfolio'}
-      eyebrow={data.eyebrow}
+      title={data.heading ?? 'Portfolio'}
       intro={data.intro}
       className={styles.portfolio}
     >

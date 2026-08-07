@@ -12,7 +12,7 @@ describe('AboutSection (DESIGN.md §5)', () => {
     render(
       <AboutSection
         section={aboutSection({
-          title: 'About me',
+          heading: 'About me',
           body: 'First paragraph of the bio.\n\nSecond paragraph of the bio.',
         })}
         media={{}}
@@ -34,14 +34,18 @@ describe('AboutSection (DESIGN.md §5)', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders an optional eyebrow', () => {
+  it('ignores unknown legacy keys and still renders the heading', () => {
+    // The API's strict schemas never store an eyebrow for about; the renderer
+    // must not depend on one.
     render(
       <AboutSection
-        section={aboutSection({ title: 'About me', eyebrow: '// about' })}
+        section={aboutSection({ heading: 'About me', body: 'Bio.' })}
         media={{}}
       />,
     );
 
-    expect(screen.getByText('// about')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'About me' }),
+    ).toBeInTheDocument();
   });
 });

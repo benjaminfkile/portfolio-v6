@@ -15,8 +15,7 @@ import styles from './SkillsSection.module.css';
  * {@link SectionShell} — the eyebrow in mono per §5.
  */
 interface SkillsData {
-  title?: string;
-  eyebrow?: string;
+  heading?: string;
   intro?: string;
   /** three.js `IcosahedronGeometry` detail (0–4); absent = auto-fit (§3.4, v1.5). */
   sphere_detail?: number;
@@ -32,8 +31,7 @@ export default function SkillsSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.title ?? 'Skills'}
-      eyebrow={data.eyebrow}
+      title={data.heading ?? 'Skills'}
       intro={data.intro}
       className={styles.skills}
     >
