@@ -249,13 +249,16 @@ interface FacePlacement {
 /**
  * Face tiles for `count` skills spread evenly across the geometry's faces.
  * Each selected triangle (read off the non-indexed position attribute) yields a
- * placement lying FLAT on the face: positioned at the centroid nudged just
+ * placement lying FLAT on the face: positioned at the INCENTER nudged just
  * above the face plane (no z-fighting with the wireframe), carrying the
  * outward face normal (the tile's per-frame roll around it keeps the glyph
- * screen-upright), and sized to the triangle's incircle — the circular backing
- * chip fills the face without spilling over the edges. Skills are sampled across
- * the whole face list — `floor(i·faces/count)` — so N skills on a denser
- * sphere don't clump at one pole.
+ * screen-upright), and sized to the triangle's incircle. Incenter, not
+ * centroid: subdivided icosahedron triangles are not equilateral, so the two
+ * differ — an incircle-sized disc anchored at the centroid pokes past the
+ * nearest edge line, while at the incenter (the incircle's own centre, by
+ * definition the deepest point of the triangle) it can never cross an edge.
+ * Skills are sampled across the whole face list — `floor(i·faces/count)` — so
+ * N skills on a denser sphere don't clump at one pole.
  */
 function facePlacements(
   geometry: THREE.BufferGeometry,
@@ -271,25 +274,34 @@ function facePlacements(
     b.fromBufferAttribute(pos, i + 1);
     c.fromBufferAttribute(pos, i + 2);
 
-    const centroid = new THREE.Vector3().add(a).add(b).add(c).divideScalar(3);
     const normal = new THREE.Vector3()
       .crossVectors(b.clone().sub(a), c.clone().sub(a))
       .normalize();
-    // The winding should already point outward; guard against the opposite.
-    if (normal.dot(centroid) < 0) normal.negate();
 
-    // Incircle radius r = area / semiperimeter — the largest disc that fits.
-    const ea = b.distanceTo(c);
-    const eb = c.distanceTo(a);
-    const ec = a.distanceTo(b);
-    const semi = (ea + eb + ec) / 2;
+    // Incircle radius r = area / semiperimeter — the largest disc that fits —
+    // and the incenter, the edge-length-weighted vertex mean that centres it.
+    const ea = b.distanceTo(c); // opposite A
+    const eb = c.distanceTo(a); // opposite B
+    const ec = a.distanceTo(b); // opposite C
+    const perimeter = ea + eb + ec;
+    const semi = perimeter / 2;
     const area =
       new THREE.Vector3()
         .crossVectors(b.clone().sub(a), c.clone().sub(a))
         .length() / 2;
     const inradius = semi > 0 ? area / semi : 0;
+    const incenter =
+      perimeter > 0
+        ? new THREE.Vector3()
+            .addScaledVector(a, ea / perimeter)
+            .addScaledVector(b, eb / perimeter)
+            .addScaledVector(c, ec / perimeter)
+        : a.clone();
 
-    const lifted = centroid.clone().addScaledVector(normal, 0.01);
+    // The winding should already point outward; guard against the opposite.
+    if (normal.dot(incenter) < 0) normal.negate();
+
+    const lifted = incenter.clone().addScaledVector(normal, 0.01);
     faces.push({
       position: [lifted.x, lifted.y, lifted.z],
       normal: [normal.x, normal.y, normal.z],
