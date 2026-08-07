@@ -274,7 +274,7 @@ doesn't recognize degrades rather than crashes.
 | `hero` | no | — (static; see below) |
 | `about` | no | — |
 | `timeline` | yes | `{ date_range, title, description, media_id? }` |
-| `skills` | yes | `{ title, description, icon_source, proficiency }` |
+| `skills` | yes | `{ title, description, icon_source }` (v1.5: `proficiency` removed) |
 | `portfolio` | yes | `{ title, intro, description, media_id, playback_rate?, transform_value?, tech_icons[], links: Link[] }` |
 | `status` | no | — (live; config only) |
 | `blog` | no | — (live; config only) |
@@ -283,6 +283,14 @@ doesn't recognize degrades rather than crashes.
 | `github` | no | — (live; config only, v1.2) |
 | `ops` | no | — (live; config only, v1.3) |
 | `contact` | no | — |
+
+**Skills sphere (v1.5).** `proficiency` is removed from the `skills` item shape —
+the public renderer is a geodesic sphere of icons, not proficiency meters
+(DESIGN.md §5). The `skills` section's *data* gains an optional `sphere_detail`:
+an integer 0–4 = the three.js `IcosahedronGeometry` detail parameter, where the
+face count is `20·(detail+1)²` (0→20, 1→80, 2→180, 3→320, 4→500). Absent =
+auto-fit: the renderer picks the smallest detail whose face count is at least the
+number of skill items (clamped to 4).
 
 #### The `Link` type
 

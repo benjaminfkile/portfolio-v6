@@ -1,48 +1,16 @@
-/* Skills — a grid of icon + name + Meter rows: one column on phones, two from
-   900px up (DESIGN.md §5). Mobile-first, tokens only. */
+/* Skills — a geodesic SkillSphere on a Control Room panel surface (DESIGN.md §5).
+   One column across the range; the sphere gets a sane max size so it never
+   overwhelms the column from 320px through desktop. Mobile-first, tokens only. */
 
 .skills {
   padding-block: var(--space-6);
 }
 
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-5);
-}
-
-@media (min-width: 900px) {
-  .list {
-    grid-template-columns: 1fr 1fr;
-    column-gap: var(--space-6);
-  }
-}
-
-.skill {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.icon {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
-
-.name {
-  font-family: var(--font-sans);
-  font-size: var(--fs-body);
-  font-weight: var(--fw-medium);
-  color: var(--text-bright);
+/* The panel surface the sphere sits on. The SkillSphere primitive draws its own
+   canvas panel when WebGL is up; this stage bounds the width so both the canvas
+   and the chip fallback stay a single, centered column. */
+.stage {
+  width: 100%;
+  max-width: 460px;
+  margin-inline: auto;
 }

@@ -72,12 +72,14 @@ export interface TimelineItem {
   media_id?: string;
 }
 
-/** `skills` item. */
+/**
+ * `skills` item (spec §3.4, v1.5). The v5 skill rating was removed in v1.5 — the
+ * public renderer is now a geodesic sphere of icons, not per-skill meters.
+ */
 export interface SkillsItem {
   title: string;
   description: string;
   icon_source: string;
-  proficiency: number;
 }
 
 /** `portfolio` item. */
@@ -90,6 +92,24 @@ export interface PortfolioItem {
   transform_value?: string;
   tech_icons: string[];
   links: Link[];
+}
+
+/* ---- Static-section config shapes (spec §3.4) ----------------------------- */
+
+/**
+ * The `skills` section's published config (spec §3.4, v1.5). Optional `heading` /
+ * `intro` override the section header copy.
+ *
+ * `sphere_detail` is the three.js `IcosahedronGeometry` detail parameter for the
+ * geodesic skill sphere — an integer 0–4, where the face count is
+ * `20·(detail+1)²` (0→20, 1→80, 2→180, 3→320, 4→500). When absent/undefined the
+ * renderer AUTO-fits: it picks the smallest detail whose face count covers the
+ * number of skill items (clamped to 4).
+ */
+export interface SkillsSectionData {
+  heading?: string;
+  intro?: string;
+  sphere_detail?: number;
 }
 
 /* ---- Live-section config shapes (spec §3.5) ------------------------------- */
