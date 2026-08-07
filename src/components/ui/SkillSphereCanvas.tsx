@@ -69,14 +69,19 @@ function parseRgba(value: string): { color: string; alpha: number } {
  *  follows the theme by itself via var(); only what is baked into WebGL
  *  materials and rasterized textures needs to be read — and re-read. */
 function readSceneTokens() {
+  const panel = cssToken('--panel-2', '#171c28');
+  const c = new THREE.Color(panel);
   return {
     /** letter-fallback glyph colour */
     amber: cssToken('--amber', '#e8a33d'),
     /** the shared albedo: sphere faces AND icon backing discs — one material
      *  colour under one light rig, so the discs vanish into their faces */
-    panel: cssToken('--panel-2', '#171c28'),
+    panel,
     /** wireframe edges — the same colour as the page's plotting grid (§2.4) */
     grid: parseRgba(cssToken('--grid', 'rgba(120, 140, 175, 0.07)')),
+    /** relative luminance of the albedo — the light rig's exposure is tuned
+     *  per theme (a near-white albedo clamps where a near-black one starves) */
+    lightTheme: 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.5,
   };
 }
 
@@ -478,13 +483,21 @@ function Scene({
           direction is what makes the facet gradient read as one form — a
           second fill light put glints in unrelated places, and high ambient
           flattened the falloff so away-facing triangles never darkened.
-          Peak irradiance (ambient + key) is deliberately ~1.2 so a fully-lit
-          facet renders at roughly its own albedo — the page's --panel-2 —
-          instead of a washed-out multiple of it, and the unlit-looking icon
-          textures stay in range. Intensities are for three's physical
-          lighting mode (r155+). */}
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[2.5, 3, 4]} intensity={0.85} />
+          Exposure is tuned per theme off the albedo's luminance, and measured
+          empirically (headless screenshot + pixel sampling): three's physical
+          lighting mode (r155+) needs intensity ≈ π × the target irradiance,
+          so numbers here are larger than the naive 0..1 reasoning suggests.
+          Light theme: ambient 2.36 ≈ 0.75π keeps EVERY facet ≥ ~87% of the
+          near-white albedo — the sphere hugs the paper page, shading stays a
+          delicate gradient — while ambient+key ≈ 1.05π peaks just shy of
+          clamping (blown flat-white facets, washed icons). Dark theme: the
+          approved look — effective irradiance ~0.11..0.38, a deep sphere
+          with a 3.4:1 lit:shadow sweep. */}
+      <ambientLight intensity={tokens.lightTheme ? 2.36 : 0.35} />
+      <directionalLight
+        position={[2.5, 3, 4]}
+        intensity={tokens.lightTheme ? 0.94 : 0.85}
+      />
       <group ref={groupRef}>
         {/* Opaque faceted surface — the sphere is a solid lit object, not a
             cage: it occludes the far hemisphere's lines. Matte (high
