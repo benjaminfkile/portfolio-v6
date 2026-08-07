@@ -21,6 +21,20 @@ export interface AreaChartProps {
   summary: string;
   /** Formats the min/max readout labels. Defaults to `String(v)`. */
   format?: (value: number) => string;
+  /**
+   * Optional time domain `[tMin, tMax]` (same units as `point.t`). When set, x is
+   * mapped by *time* rather than by sample index — so a fixed-grid day plots on a
+   * true time axis and missing samples read as gaps, not compressed spacing.
+   * Absent → the default even-by-index spacing (§4).
+   */
+  domain?: [number, number];
+  /**
+   * Optional playhead cursor (§5, v1.7). Draws a vertical rule at time `t`
+   * (positioned via `domain`) and, when `v` is non-null, an emphasised dot at the
+   * reading there. When set it replaces the "latest" dot — the emphasis follows
+   * the scrubber, not the newest sample.
+   */
+  cursor?: { t: number; v: number | null };
   className?: string;
 }
 
@@ -40,6 +54,14 @@ function xFor(i: number, n: number): number {
   return PAD_X + (i / (n - 1)) * (VB_W - 2 * PAD_X);
 }
 
+/** X for a time `t` mapped across a `[tMin, tMax]` domain, clamped to the plot. */
+function xForTime(t: number, tMin: number, tMax: number): number {
+  const span = tMax - tMin;
+  const frac = span === 0 ? 1 : (t - tMin) / span;
+  const clamped = Math.max(0, Math.min(1, frac));
+  return PAD_X + clamped * (VB_W - 2 * PAD_X);
+}
+
 /** Y for value `v` within `[min, max]`; a flat series rides the vertical middle. */
 function yFor(v: number, min: number, max: number): number {
   const span = max - min;
@@ -47,13 +69,18 @@ function yFor(v: number, min: number, max: number): number {
   return PAD_Y + (1 - frac) * (VB_H - 2 * PAD_Y);
 }
 
-/** `M x y L x y …` through every sample. */
-function linePath(pts: AreaPoint[], min: number, max: number): string {
+/** `M x y L x y …` through every sample, with a caller-supplied x-accessor. */
+function linePath(
+  pts: AreaPoint[],
+  min: number,
+  max: number,
+  x: (i: number, p: AreaPoint) => number,
+): string {
   return pts
     .map((p, i) => {
-      const x = xFor(i, pts.length).toFixed(2);
+      const px = x(i, p).toFixed(2);
       const y = yFor(p.v, min, max).toFixed(2);
-      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+      return `${i === 0 ? 'M' : 'L'} ${px} ${y}`;
     })
     .join(' ');
 }
@@ -72,6 +99,8 @@ export default function AreaChart({
   series,
   summary,
   format = String,
+  domain,
+  cursor,
   className,
 }: AreaChartProps) {
   const classes = [styles.chart, className].filter(Boolean).join(' ');
@@ -89,19 +118,34 @@ export default function AreaChart({
   const min = hasData ? Math.min(...allValues) : 0;
   const max = hasData ? Math.max(...allValues) : 0;
 
-  const primaryLine = points.length >= 2 ? linePath(points, min, max) : '';
+  // X-accessor: by *time* across `domain` when given (true time axis, gaps show
+  // as gaps), else the default even-by-index spacing.
+  const xAt = (n: number): ((i: number, p: AreaPoint) => number) =>
+    domain ? (_i, p) => xForTime(p.t, domain[0], domain[1]) : (i) => xFor(i, n);
+
+  const primaryLine =
+    points.length >= 2 ? linePath(points, min, max, xAt(points.length)) : '';
   const overlayLines = overlays
     .filter((o) => o.length >= 2)
-    .map((o) => linePath(o, min, max));
+    .map((o) => linePath(o, min, max, xAt(o.length)));
 
   // Area fill closes the primary line down to the baseline and back.
   const baseline = VB_H - PAD_Y;
+  const firstX = domain
+    ? xForTime(points[0]?.t ?? domain[0], domain[0], domain[1])
+    : xFor(0, points.length);
+  const lastX = domain
+    ? xForTime(points[points.length - 1]?.t ?? domain[1], domain[0], domain[1])
+    : xFor(points.length - 1, points.length);
   const areaPath =
     points.length >= 2
-      ? `${primaryLine} L ${xFor(points.length - 1, points.length).toFixed(2)} ${baseline} L ${xFor(0, points.length).toFixed(2)} ${baseline} Z`
+      ? `${primaryLine} L ${lastX.toFixed(2)} ${baseline} L ${firstX.toFixed(2)} ${baseline} Z`
       : '';
 
-  const latest = points.length > 0 ? points[points.length - 1] : null;
+  // The "latest" dot yields to the playhead when a cursor is present.
+  const latest = !cursor && points.length > 0 ? points[points.length - 1] : null;
+  const cursorX =
+    cursor && domain ? xForTime(cursor.t, domain[0], domain[1]) : null;
 
   return (
     <div className={classes}>
@@ -158,8 +202,28 @@ export default function AreaChart({
           <circle
             className={styles.dot}
             data-role="dot"
-            cx={xFor(points.length - 1, points.length).toFixed(2)}
+            cx={lastX.toFixed(2)}
             cy={yFor(latest.v, min, max).toFixed(2)}
+            r={1.6}
+          />
+        )}
+        {cursorX !== null && (
+          <line
+            className={styles.cursor}
+            data-role="cursor"
+            x1={cursorX.toFixed(2)}
+            y1={PAD_Y}
+            x2={cursorX.toFixed(2)}
+            y2={baseline}
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+        {cursorX !== null && cursor?.v != null && (
+          <circle
+            className={styles.dot}
+            data-role="cursor-dot"
+            cx={cursorX.toFixed(2)}
+            cy={yFor(cursor.v, min, max).toFixed(2)}
             r={1.6}
           />
         )}

@@ -53,6 +53,13 @@
   vector-effect: non-scaling-stroke;
 }
 
+/* Playhead cursor — a faint vertical rule marking the scrubbed moment (§5). */
+.cursor {
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
 /* Min/max readouts — small mono labels, no axis clutter (DESIGN.md §4). */
 .axisLabel {
   position: absolute;

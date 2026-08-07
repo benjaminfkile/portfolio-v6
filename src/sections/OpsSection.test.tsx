@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import OpsSection from './OpsSection';
 import { SECTION_REGISTRY } from '../registry';
-import { fixtureOpsDocument } from '../test/fixtures';
+import { fixtureOpsDocument, fixtureOpsReport } from '../test/fixtures';
 import type { Section } from '../types/content';
-import type { OpsResponse } from '../lib/api';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -19,64 +18,20 @@ function opsSection(data: Record<string, unknown>): Section {
   return { id: 'sec-ops', type: 'ops', data, items: [] } as Section;
 }
 
-function renderOps(data: Record<string, unknown>) {
+function renderOps(data: Record<string, unknown> = { heading: 'Ops' }) {
   return render(<OpsSection section={opsSection(data)} media={{}} />);
 }
-
-/** Force `document.visibilityState`/`hidden` and fire the change event. */
-function setVisibility(value: 'visible' | 'hidden') {
-  Object.defineProperty(document, 'visibilityState', {
-    value,
-    configurable: true,
-  });
-  Object.defineProperty(document, 'hidden', {
-    value: value === 'hidden',
-    configurable: true,
-  });
-  document.dispatchEvent(new Event('visibilitychange'));
-}
-
-const points = (vals: number[]) =>
-  vals.map((v, i) => ({ t: 1_690_000_000 + i * 300, v }));
-
-const available: OpsResponse = {
-  available: true,
-  window_hours: 3,
-  widgets: [
-    {
-      title: 'CPU Utilization',
-      kind: 'gauge',
-      unit: '%',
-      latest: 42,
-      series: [{ label: null, points: points([40, 41, 42]) }],
-    },
-    {
-      title: 'ALB Request Count',
-      kind: 'chart',
-      unit: 'req/s',
-      latest: 128,
-      series: [
-        { label: '2xx', points: points([100, 120, 128]) },
-        { label: '5xx', points: points([1, 0, 2]) },
-      ],
-    },
-  ],
-};
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  vi.useRealTimers();
-  setVisibility('visible');
 });
 
-describe('OpsSection (spec §3.5, DESIGN.md §5, v1.3)', () => {
-  it('renders a Gauge for kind "gauge" and an AreaChart + latest readout for kind "chart"', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(available)));
+describe('OpsSection replay (spec §3.5, DESIGN.md §5, v1.7)', () => {
+  it('renders full-day widgets, a playhead scrubber, and an honest UTC-day label', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(fixtureOpsReport)));
+    renderOps();
 
-    const { container } = renderOps({ window_hours: 3 });
-
-    // Both widget titles surface as mono panel titles.
     expect(
       await screen.findByRole('heading', { name: 'CPU Utilization' }),
     ).toBeInTheDocument();
@@ -84,67 +39,58 @@ describe('OpsSection (spec §3.5, DESIGN.md §5, v1.3)', () => {
       screen.getByRole('heading', { name: 'ALB Request Count' }),
     ).toBeInTheDocument();
 
-    // Gauge summary carries the reading (label + value + unit) to assistive tech.
+    // Honest window label + the report identity in the mono voice.
+    expect(screen.getByText(/^24h ending /)).toBeInTheDocument();
+    expect(screen.getByText(/2026-08-06/)).toBeInTheDocument();
+    expect(screen.getByText(/GEN .*UTC/)).toBeInTheDocument();
+
+    // The playhead is an ARIA slider spanning the day's 288 slots, defaulted to
+    // the last real reading (slot 287 = 23:55Z).
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('aria-valuemax', '287');
+    expect(slider).toHaveAttribute('aria-valuenow', '287');
+  });
+
+  it('drives the readouts from the value at the playhead moment', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(fixtureOpsReport)));
+    renderOps();
+
+    const slider = await screen.findByRole('slider');
+
+    // Default (slot 287): CPU 42%, 2xx 128, 5xx 2.
     expect(screen.getByText('CPU Utilization 42%')).toBeInTheDocument();
+    expect(screen.getByText('128req/s')).toBeInTheDocument();
 
-    // The multi-series chart widget shows PER-SERIES latests in the legend — a
-    // single "Latest" readout would silently mean "first series only".
-    expect(screen.getAllByText('128req/s').length).toBeGreaterThan(0);
-    expect(screen.getByText('2xx')).toBeInTheDocument();
-    expect(screen.getByText('5xx')).toBeInTheDocument();
-    expect(screen.queryByText('Latest')).not.toBeInTheDocument();
-
-    // Two widgets → two Panels in the grid.
-    expect(container.querySelectorAll('li').length).toBeGreaterThanOrEqual(2);
+    // Scrub back to slot 6 (00:30Z): CPU 55%, 2xx 210, 5xx 7.
+    fireEvent.keyDown(slider, { key: 'Home' }); // → slot 0
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    expect(slider).toHaveAttribute('aria-valuenow', '6');
+    expect(screen.getByText('CPU Utilization 55%')).toBeInTheDocument();
+    expect(screen.getByText('210req/s')).toBeInTheDocument();
+    expect(screen.getByText('7req/s')).toBeInTheDocument();
   });
 
-  it('formats readouts unit-aware: unitless counts as whole numbers, % to 1dp', async () => {
-    const payload: OpsResponse = {
-      available: true,
-      window_hours: 3,
-      widgets: [
-        {
-          title: 'Database Connections',
-          kind: 'chart',
-          unit: null, // unitless = a count; a 5-min Average like 12.4 shows as "12"
-          latest: 12.4,
-          series: [{ label: null, points: points([11.8, 12.1, 12.4]) }],
-        },
-        {
-          title: 'CPU Utilization',
-          kind: 'gauge',
-          unit: '%',
-          latest: 4.13,
-          series: [{ label: null, points: points([4.1, 4.2, 4.13]) }],
-        },
-      ],
-    };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(payload)));
-    renderOps({ window_hours: 3 });
+  it('shows a gap (—) at a slot with no datapoint, never a zero', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(fixtureOpsReport)));
+    renderOps();
 
-    // Readout and axis-max label both format to a whole "12" — never "12.4".
-    expect((await screen.findAllByText('12')).length).toBeGreaterThan(0);
-    expect(screen.queryByText('12.4')).not.toBeInTheDocument();
-    expect(screen.getByText('CPU Utilization 4.1%')).toBeInTheDocument();
+    const slider = await screen.findByRole('slider');
+    // Slot 3 (00:15Z) has no sample in either series.
+    fireEvent.keyDown(slider, { key: 'Home' });
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    expect(slider).toHaveAttribute('aria-valuenow', '3');
+
+    // The gauge reads "—" (via its hidden summary) and no false 0%.
+    expect(screen.getByText('CPU Utilization —')).toBeInTheDocument();
+    expect(screen.queryByText('CPU Utilization 0%')).not.toBeInTheDocument();
+    // The multi-series legend shows "—" for the gap.
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThan(0);
   });
 
-  it('renders series labels only when non-null (scrubbed labels are omitted, §3.5)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(available)));
-
-    renderOps({ window_hours: 3 });
-
-    // The chart widget's two explicit labels render.
-    expect(await screen.findByText('2xx')).toBeInTheDocument();
-    expect(screen.getByText('5xx')).toBeInTheDocument();
-
-    // The gauge widget's single series has a null label — nothing is rendered for it.
-    // (No legend entry exists that isn't one of the two explicit chart labels.)
-  });
-
-  it('hides every widget SVG and exposes a visually-hidden summary (a11y, §7)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(available)));
-
-    const { container } = renderOps({ window_hours: 3 });
+  it('marks every widget SVG decorative and draws a playhead cursor on charts (§7)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(fixtureOpsReport)));
+    const { container } = renderOps();
 
     await screen.findByRole('heading', { name: 'CPU Utilization' });
 
@@ -152,128 +98,55 @@ describe('OpsSection (spec §3.5, DESIGN.md §5, v1.3)', () => {
     expect(svgs.length).toBeGreaterThan(0);
     svgs.forEach((svg) => expect(svg).toHaveAttribute('aria-hidden', 'true'));
 
-    // The chart's summary sentence stands in for the decorative SVG — for a
-    // multi-series widget it enumerates every series' latest reading.
+    // The chart draws a vertical playhead cursor line.
     expect(
-      screen.getByText('ALB Request Count: 2xx 128req/s, 5xx 2req/s'),
+      container.querySelector('[data-role="cursor"]'),
     ).toBeInTheDocument();
   });
 
-  it('passes window_hours as the query param and shows it in the strip', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(available));
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderOps({ window_hours: 6 });
-
-    // The window label is derived from the config (LAST 6H).
-    expect(await screen.findByText('LAST 6H')).toBeInTheDocument();
-
-    // The request forwarded the configured lookback as ?window_hours=.
-    expect(String(fetchMock.mock.calls[0][0])).toContain(
-      '/api/ops?window_hours=6',
-    );
-  });
-
-  it('clamps an out-of-range window_hours to 1–24 (default 3 when absent)', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(available));
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderOps({ window_hours: 99 });
-
-    expect(await screen.findByText('LAST 24H')).toBeInTheDocument();
-    expect(String(fetchMock.mock.calls[0][0])).toContain('window_hours=24');
-  });
-
-  it('shows a StatusDot that reads OK while fetches succeed', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(available)));
-
-    renderOps({ window_hours: 3 });
-
-    const dot = await screen.findByRole('img', { name: 'Live data up to date' });
-    expect(dot).toBeInTheDocument();
-  });
-
-  it('degrades to nothing on an { available: false } payload (§3.5)', async () => {
+  it('renders a calm placeholder (not nothing) when no report exists yet (404)', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ available: false })),
+      vi.fn().mockResolvedValue(jsonResponse({}, { ok: false, status: 404 })),
     );
+    renderOps({ heading: 'Ops' });
 
-    const { container } = renderOps({ window_hours: 3 });
-
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    // The section still renders — a placeholder panel, no thrown error.
+    expect(await screen.findByText('NO REPORT YET')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ops' })).toBeInTheDocument();
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('degrades to nothing (never errors) when the fetch fails', async () => {
+  it('degrades to the calm placeholder on a transport failure (never errors)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({}, { ok: false, status: 500 })),
     );
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderOps({ heading: 'Ops' });
 
-    const { container } = renderOps({ window_hours: 3 });
-
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(await screen.findByText('NO REPORT YET')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('refetches every ~60s while visible and pauses when the tab is hidden (§3.5)', async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(available));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const opsCalls = () =>
-      fetchMock.mock.calls.filter((call) =>
-        String(call[0]).startsWith('/api/ops'),
-      ).length;
-
-    renderOps({ window_hours: 3 });
-
-    // Initial fetch on mount.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(opsCalls()).toBe(1);
-
-    // Visible: a 60s tick refetches.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
-    });
-    expect(opsCalls()).toBe(2);
-
-    // Hidden: ticks are no-ops — a backgrounded tab must not poll (§3.5).
-    await act(async () => {
-      setVisibility('hidden');
-      await vi.advanceTimersByTimeAsync(180_000);
-    });
-    expect(opsCalls()).toBe(2);
-
-    // Returning to the foreground refetches immediately, then resumes polling.
-    await act(async () => {
-      setVisibility('visible');
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(opsCalls()).toBe(3);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
-    });
-    expect(opsCalls()).toBe(4);
+  it('renders nothing while the first fetch is in flight', () => {
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+    const { container } = renderOps();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('renders the ops section through SECTION_REGISTRY from a fixture', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(available)));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(fixtureOpsReport)));
 
     const section = fixtureOpsDocument.pages[0].sections[0];
     const OpsFromRegistry = SECTION_REGISTRY[section.type];
     render(createElement(OpsFromRegistry, { section, media: {} }));
 
-    // The fixture's window_hours (6) drives the strip label, proving the
-    // registry-resolved component received the fixture's config.
-    expect(await screen.findByText('LAST 6H')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'CPU Utilization' }),
+      await screen.findByRole('heading', { name: 'CPU Utilization' }),
     ).toBeInTheDocument();
+    // The fixture's intro copy renders through the shell.
+    expect(screen.getByText('Yesterday, on the record.')).toBeInTheDocument();
   });
 });

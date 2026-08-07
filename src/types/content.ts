@@ -159,21 +159,17 @@ export interface GithubSectionData {
 }
 
 /**
- * The `ops` section's published config (spec §3.5, DESIGN.md §5, v1.3). The
- * section's *config* is snapshotted; its *data* (the CloudWatch dashboard's
- * curated gauge/chart widgets) is fetched at runtime from
- * `GET /api/ops?window_hours=<window_hours>`.
+ * The `ops` section's published config (spec §3.5, DESIGN.md §5, v1.7). The
+ * section's *config* is snapshotted; its *data* is the immutable daily ops report
+ * fetched at runtime from `GET /api/ops` and replayed client-side.
  *
- * `window_hours` is the metric lookback in hours, validated 1–24 (default 3) and
- * forwarded as the `?window_hours=` query param; the renderer also derives the
- * strip's window label ("LAST 3H") from it. Optional `heading` / `eyebrow` /
- * `intro` override the section header copy.
+ * As of the v1.7 replay rework the lookback is no longer configurable — a report
+ * always covers one full UTC day — so `window_hours` is removed; only the header
+ * copy (`heading` / `intro`) is snapshotted.
  */
 export interface OpsSectionData {
   heading?: string;
-  eyebrow?: string;
   intro?: string;
-  window_hours?: number;
 }
 
 /**

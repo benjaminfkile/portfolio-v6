@@ -222,11 +222,16 @@ export function getGithub(init?: RequestInit): Promise<GithubResponse> {
   return apiFetch<GithubResponse>('/api/github', init);
 }
 
-/* ---- Live section: ops (spec §3.5, v1.3) ---------------------------------- */
+/* ---- Ops replay (spec §3.5, DESIGN.md §5, v1.7) --------------------------- */
 
-/** One time-series sample in an ops widget: `t` epoch seconds, `v` the value. */
+/**
+ * One time-series sample in an ops widget: `t` the sample time, `v` the value.
+ * `t` is tolerant of the wire spellings a curated CloudWatch payload can carry —
+ * an ISO-8601 string (what the report builder emits) or an epoch number (seconds
+ * or milliseconds); {@link ../lib/opsReplay.pointTimeMs} normalizes it to ms.
+ */
 export interface OpsPoint {
-  t: number;
+  t: number | string;
   v: number;
 }
 
@@ -257,29 +262,42 @@ export interface OpsWidget {
 }
 
 /**
- * `GET /api/ops?window_hours=<n>` — the owner's CloudWatch dashboard rendered as
- * a public page (spec §3.5, v1.3). The API reads the dashboard, scrubs every
- * account/resource identifier, and returns this curated shape; on *any* failure
- * (missing secret, IAM denied, throttling, malformed dashboard) or locally with
- * no AWS it returns `{ available: false }`, so the section degrades to nothing
- * rather than erroring (§3.5).
+ * A single immutable daily ops report (spec §3.5, v1.7) — one per UTC day, built
+ * once from the curated CloudWatch dashboard and replayed client-side. Every
+ * series covers the FULL UTC day at a fixed 5-minute grain (288 points); the
+ * widget shape is exactly the live v1.3 shape. `available_dates` lists the stored
+ * reports (newest-inclusive) so the UI can offer day navigation. NO infra
+ * identifier ever appears — the same allowlist stance as the live path (§3.5).
  */
-export type OpsResponse =
-  | { available: true; window_hours: number; widgets: OpsWidget[] }
-  | { available: false };
+export interface OpsReport {
+  /** The UTC day this report covers (`YYYY-MM-DD`). */
+  report_date: string;
+  /** When the report was built (ISO-8601). */
+  generated_at: string;
+  /** The fixed sample grain in minutes (5). */
+  grain_minutes: number;
+  widgets: OpsWidget[];
+  /** Every stored report's `report_date`, for day navigation. */
+  available_dates: string[];
+}
 
 /**
- * `GET /api/ops` — see {@link OpsResponse}. `windowHours` is the metric lookback
- * (validated 1–24 server-side) forwarded as the `?window_hours=` query param.
+ * `GET /api/ops` — the latest stored daily report (usually yesterday, UTC), or a
+ * specific stored day via `?date=YYYY-MM-DD` (spec §3.5, v1.7). Resolves to the
+ * {@link OpsReport}, or `null` when no report exists yet (a 404 — before the
+ * first day's report is built, or an out-of-range `date`). Any *other* failure
+ * rejects, so the caller can distinguish "no report yet" (a calm placeholder)
+ * from a transport error.
  */
 export function getOps(
-  windowHours: number,
+  date?: string,
   init?: RequestInit,
-): Promise<OpsResponse> {
-  return apiFetch<OpsResponse>(
-    `/api/ops?window_hours=${encodeURIComponent(String(windowHours))}`,
-    init,
-  );
+): Promise<OpsReport | null> {
+  const query = date ? `?date=${encodeURIComponent(date)}` : '';
+  return apiFetch<OpsReport>(`/api/ops${query}`, init).catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  });
 }
 
 /* ---- Preview (spec §7) ---------------------------------------------------- */

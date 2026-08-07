@@ -1,56 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SectionProps } from './types';
 import type { OpsSectionData } from '../types/content';
 import { getOps } from '../lib/api';
-import type { OpsResponse, OpsSeries, OpsWidget } from '../lib/api';
+import type { OpsReport, OpsSeries, OpsWidget } from '../lib/api';
+import {
+  DAY_SLOTS,
+  dayEndMs,
+  dayStartMs,
+  formatGeneratedAt,
+  formatLocalDateTime,
+  formatWindowLabel,
+  indexBySlot,
+  latestSlot,
+  normalizePoints,
+  slotTimeMs,
+  valueAtSlot,
+} from '../lib/opsReplay';
 import SectionShell from '../components/ui/SectionShell';
 import Panel from '../components/ui/Panel';
 import StatusDot from '../components/ui/StatusDot';
 import Gauge from '../components/ui/Gauge';
 import AreaChart from '../components/ui/AreaChart';
 import StatBlock from '../components/ui/StatBlock';
+import Scrubber from '../components/ui/Scrubber';
 import styles from './OpsSection.module.css';
 
 /**
- * The live `ops` section (spec §3.5, DESIGN.md §5, v1.3) — the owner's CloudWatch
- * dashboard rendered through the site's own instruments: a responsive grid of
- * `Panel`s (1-col → 2-col ≥900 → 3-col ≥1200), each a mono widget title above a
- * `Gauge` (kind `gauge`) or an `AreaChart` + `StatBlock` readout (kind `chart`),
- * with the `latest` value shown prominently either way. A mono strip above the
- * grid carries the window label ("LAST 3H", from `window_hours`), the last-
- * refresh time (mono `tabular-nums`), and a `StatusDot`.
+ * The `ops` section (spec §3.5, DESIGN.md §5, v1.7) — a DAILY REPLAY of the
+ * owner's curated CloudWatch dashboard. `GET /api/ops` returns one immutable
+ * report per UTC day (built once, server-side, from the curated public
+ * dashboard); the section replays it entirely client-side. There is no live
+ * feedback loop and no polling — the report is fetched once.
  *
- * Its *config* is published (`window_hours`, header copy); its *data* is fetched
- * at runtime from `GET /api/ops?window_hours=<n>`. Like the other live sections
- * it refetches on a ~60s interval, but only while the tab is visible — a hidden
- * tab must not poll (§3.5) — and refetches immediately on returning to the
- * foreground. The `StatusDot` reads `ok` while fetches succeed and flips to
- * `warn` when a later poll degrades (keeping the last good reading rather than
- * blanking the grid).
+ * Every series covers the FULL UTC day at a fixed 5-minute grain. A draggable
+ * playhead (`Scrubber`, mouse + touch + keyboard) selects a moment within the
+ * day; the instrument readouts (`Gauge`s / `StatBlock`s) show the value at that
+ * moment and the `AreaChart`s draw a cursor line there. Times along the scrubber
+ * and readouts are shown in the VIEWER'S local zone, and the header labels the
+ * window honestly ("24h ending <local datetime of 00:00 UTC>") — a UTC-day report
+ * spans two local calendar days for most viewers.
  *
- * Standard degrade rules: an `{ available: false }` payload or a failed *first*
- * fetch renders **nothing** (§3.5); while the first fetch is in flight the
- * section renders nothing too (a quiet placeholder, matching the degrade path so
- * an unavailable dashboard never flashes a shell). Each instrument's SVG is
- * decorative (`aria-hidden`) with a visually-hidden summary carrying the reading
- * to assistive tech (§7).
+ * States: while the first fetch is in flight the section renders nothing; a 404
+ * (no report built yet) or absent report renders a calm placeholder panel rather
+ * than vanishing; a transport failure degrades the same way. Missing datapoints
+ * within the day render as gaps (fewer samples), never zeros. Each instrument's
+ * SVG is decorative (`aria-hidden`) with a visually-hidden summary (§7).
  */
-/** Re-poll to match the endpoint's ~5m cache without going stale (DESIGN.md §5). */
-const POLL_INTERVAL_MS = 60_000;
-const DEFAULT_WINDOW_HOURS = 3;
 
-type ReadyData = Extract<OpsResponse, { available: true }>;
+const EYEBROW = '// daily replay';
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'unavailable' }
-  | { status: 'ready'; data: ReadyData; refreshedAt: number; healthy: boolean };
-
-/** Clamp the configured lookback to the endpoint's validated 1–24h range. */
-function clampWindowHours(hours: number | undefined): number {
-  if (hours == null || !Number.isFinite(hours)) return DEFAULT_WINDOW_HOURS;
-  return Math.min(24, Math.max(1, Math.trunc(hours)));
-}
+  | { status: 'empty' }
+  | { status: 'ready'; report: OpsReport };
 
 /**
  * Compact, unit-aware number formatting for readouts and axis labels.
@@ -66,70 +68,77 @@ function formatValue(value: number, unit: string | null): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: digits });
 }
 
-/** `HH:MM:SS` local time for the last-refresh readout. */
-function formatRefresh(epochMs: number): string {
-  return new Date(epochMs).toLocaleTimeString('en-US', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
 /** Series carrying at least one point, in payload order (primary first). */
 function withPoints(widget: OpsWidget): OpsSeries[] {
   return widget.series.filter((s) => s.points.length > 0);
 }
 
-function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
-  const unit = widget.unit ?? undefined;
+/** The value of a series at the playhead slot, or `null` (a gap at that moment). */
+function seriesValueAtSlot(
+  series: OpsSeries,
+  dayStart: number,
+  slot: number,
+): number | null {
+  return valueAtSlot(indexBySlot(normalizePoints(series.points), dayStart), slot);
+}
+
+interface WidgetProps {
+  widget: OpsWidget;
+  dayStart: number;
+  dayEnd: number;
+  slot: number;
+}
+
+function OpsWidgetPanel({ widget, dayStart, dayEnd, slot }: WidgetProps) {
   const unitText = widget.unit ?? '';
+  const domain: [number, number] = [dayStart, dayEnd];
+  const cursorTime = slotTimeMs(dayStart, slot);
 
   if (widget.kind === 'gauge') {
-    // Gauge carries the latest reading big-and-centred; the mono title is the
-    // gauge label, which also feeds its visually-hidden summary (§7).
+    // Gauge shows the reading at the playhead; a gap there reads as "—" (never a
+    // fabricated zero). The format closure detects the gap since the arc value
+    // itself falls back to 0 only to keep the geometry valid.
+    const value = seriesValueAtSlot(widget.series[0] ?? { label: null, points: [] }, dayStart, slot);
     return (
       <Panel as="li" className={styles.widget}>
         <h3 className={styles.title}>{widget.title}</h3>
         <Gauge
-          value={widget.latest ?? 0}
-          unit={unit}
+          value={value ?? 0}
+          unit={value == null ? undefined : (widget.unit ?? undefined)}
           label={widget.title}
-          format={(v) => formatValue(v, widget.unit)}
+          format={() => (value == null ? '—' : formatValue(value, widget.unit))}
         />
       </Panel>
     );
   }
 
-  // Chart. Single-series: the latest value is emphasised as a StatBlock
-  // readout. Multi-series: a single "Latest" is MISLEADING — the payload's
-  // `latest` is only the first series, and on a widget like CPU credits
-  // (SurplusCharged≈0, Usage≈0, Balance=500+) it reads as the wrong line — so
-  // each series gets its own latest in the legend instead.
+  // Chart. Single-series: the playhead value is emphasised as a StatBlock
+  // readout. Multi-series: a single readout is MISLEADING (it would silently be
+  // the first series), so each series gets its own playhead value in the legend.
   const series = withPoints(widget);
-  const primary = series[0]?.points ?? [];
-  const overlays = series.slice(1).map((s) => s.points);
+  const primaryNorm = normalizePoints(series[0]?.points ?? []);
+  const overlays = series.slice(1).map((s) => normalizePoints(s.points));
   const multi = series.length > 1;
 
-  const seriesLatest = (s: OpsSeries): number | null =>
-    s.points.length > 0 ? s.points[s.points.length - 1].v : null;
+  const valueAt = (s: OpsSeries): number | null =>
+    seriesValueAtSlot(s, dayStart, slot);
 
-  const latestText =
-    widget.latest != null
-      ? `${formatValue(widget.latest, widget.unit)}${unitText}`
+  const primaryValue = series.length > 0 ? valueAt(series[0]) : null;
+
+  const readoutText =
+    primaryValue != null
+      ? `${formatValue(primaryValue, widget.unit)}${unitText}`
       : 'no data';
   const summary = multi
     ? `${widget.title}: ${series
-        .map(
-          (s, i) =>
-            `${s.label ?? `series ${i + 1}`} ${
-              seriesLatest(s) != null
-                ? `${formatValue(seriesLatest(s)!, widget.unit)}${unitText}`
-                : 'no data'
-            }`,
-        )
+        .map((s, i) => {
+          const v = valueAt(s);
+          return `${s.label ?? `series ${i + 1}`} ${
+            v != null ? `${formatValue(v, widget.unit)}${unitText}` : 'no data'
+          }`;
+        })
         .join(', ')}`
-    : `${widget.title}: latest ${latestText}`;
+    : `${widget.title}: ${readoutText}`;
 
   return (
     <Panel as="li" className={styles.widget}>
@@ -138,33 +147,35 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
         {!multi && (
           <StatBlock
             className={styles.readout}
-            value={widget.latest != null ? formatValue(widget.latest, widget.unit) : '—'}
-            unit={widget.latest != null ? unit : undefined}
-            label="Latest"
+            value={primaryValue != null ? formatValue(primaryValue, widget.unit) : '—'}
+            unit={primaryValue != null ? (widget.unit ?? undefined) : undefined}
+            label="At playhead"
           />
         )}
         <AreaChart
           className={styles.chart}
-          points={primary}
+          points={primaryNorm}
           series={overlays.length > 0 ? overlays : undefined}
           summary={summary}
           format={(v) => formatValue(v, widget.unit)}
+          domain={domain}
+          cursor={{ t: cursorTime, v: primaryValue }}
         />
-        {/* Multi-series: per-series latest readouts (labels fall back to the
-            metric name server-side; scrubbed identifier labels arrive null and
-            render as "series N"). */}
+        {/* Multi-series: per-series playhead readouts (scrubbed identifier labels
+            arrive null and render as "series N"). */}
         {multi && (
           <ul className={styles.legend}>
-            {series.map((s, i) => (
-              <li key={i} className={styles.legendItem} data-series={i}>
-                {s.label ?? `series ${i + 1}`}{' '}
-                <span className={styles.legendValue}>
-                  {seriesLatest(s) != null
-                    ? `${formatValue(seriesLatest(s)!, widget.unit)}${unitText}`
-                    : '—'}
-                </span>
-              </li>
-            ))}
+            {series.map((s, i) => {
+              const v = valueAt(s);
+              return (
+                <li key={i} className={styles.legendItem} data-series={i}>
+                  {s.label ?? `series ${i + 1}`}{' '}
+                  <span className={styles.legendValue}>
+                    {v != null ? `${formatValue(v, widget.unit)}${unitText}` : '—'}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -174,88 +185,118 @@ function OpsWidgetPanel({ widget }: { widget: OpsWidget }) {
 
 export default function OpsSection({ section }: SectionProps) {
   const config = section.data as OpsSectionData;
-  const windowHours = clampWindowHours(config.window_hours);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+
+  // The viewer's own IANA zone — the scrubber, readouts and window label all read
+  // in local time (the helpers stay tz-injectable for tests).
+  const timeZone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
-
-    const load = () => {
-      getOps(windowHours)
-        .then((data) => {
-          if (cancelled) return;
-          if (data.available) {
-            setState({
-              status: 'ready',
-              data,
-              refreshedAt: Date.now(),
-              healthy: true,
-            });
-          } else {
-            degrade();
-          }
-        })
-        .catch((error: unknown) => {
-          if (cancelled) return;
-          degrade();
-          console.error('Failed to load ops telemetry', error);
-        });
-    };
-
-    // Degrade: nothing before the first good reading; a later poll failure keeps
-    // the last data and flips the StatusDot rather than blanking the grid (§3.5).
-    const degrade = () => {
-      setState((prev) =>
-        prev.status === 'ready'
-          ? { ...prev, healthy: false }
-          : { status: 'unavailable' },
-      );
-    };
-
-    load(); // initial fetch on mount
-
-    // Poll on the interval, but each tick only fetches while the tab is visible;
-    // a hidden tab's ticks are no-ops, so a backgrounded tab never polls (§3.5).
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') load();
-    }, POLL_INTERVAL_MS);
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') load();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
+    getOps()
+      .then((report) => {
+        if (cancelled) return;
+        setState(report ? { status: 'ready', report } : { status: 'empty' });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        // A transport failure degrades the same calm way as "no report yet".
+        setState({ status: 'empty' });
+        console.error('Failed to load ops report', error);
+      });
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [windowHours]);
+  }, []);
 
-  // Degrade to nothing: an unavailable dashboard (or the pre-first-fetch state)
-  // removes the section entirely rather than showing a shell (§3.5).
-  if (state.status !== 'ready') return null;
+  if (state.status === 'loading') return null;
 
-  const { data, refreshedAt, healthy } = state;
+  if (state.status === 'empty') {
+    return (
+      <SectionShell
+        title={config.heading ?? 'Ops'}
+        eyebrow={EYEBROW}
+        intro={config.intro}
+        className={styles.ops}
+      >
+        <Panel className={styles.placeholder}>
+          <p className={styles.signal} aria-hidden="true">
+            NO REPORT YET
+          </p>
+          <p className={styles.placeholderText}>
+            The daily flight recorder builds one report per UTC day, shortly after
+            midnight UTC. Check back once the first day is on the record.
+          </p>
+        </Panel>
+      </SectionShell>
+    );
+  }
+
+  return <OpsReplay report={state.report} config={config} timeZone={timeZone} />;
+}
+
+interface ReplayProps {
+  report: OpsReport;
+  config: OpsSectionData;
+  timeZone: string;
+}
+
+function OpsReplay({ report, config, timeZone }: ReplayProps) {
+  const dayStart = dayStartMs(report.report_date);
+  const dayEnd = dayEndMs(report.report_date);
+
+  // The playhead defaults to the day's last real reading (mirroring the old
+  // "latest") and is re-seeded if a different report loads.
+  const [slot, setSlot] = useState(() => latestSlot(report.widgets, dayStart));
+  useEffect(() => {
+    setSlot(latestSlot(report.widgets, dayStart));
+  }, [report, dayStart]);
+
+  const playheadTime = slotTimeMs(dayStart, slot);
+  const playheadLabel = formatLocalDateTime(playheadTime, timeZone);
 
   return (
     <SectionShell
       title={config.heading ?? 'Ops'}
-      eyebrow={config.eyebrow ?? '// live telemetry'}
+      eyebrow={EYEBROW}
       intro={config.intro}
       className={styles.ops}
     >
       <div className={styles.strip}>
-        <span className={styles.window}>LAST {windowHours}H</span>
-        <span className={styles.refresh}>{formatRefresh(refreshedAt)}</span>
-        <StatusDot
-          variant={healthy ? 'ok' : 'warn'}
-          label={healthy ? 'Live data up to date' : 'Live data stale'}
+        <span className={styles.window}>{formatWindowLabel(report.report_date, timeZone)}</span>
+        <span className={styles.meta}>
+          {report.report_date} · GEN {formatGeneratedAt(report.generated_at)} UTC
+        </span>
+        <StatusDot variant="ok" label="Report on the record" />
+      </div>
+
+      <div className={styles.scrub}>
+        <span className={styles.playheadLabel} aria-live="polite">
+          {playheadLabel}
+        </span>
+        <Scrubber
+          min={0}
+          max={DAY_SLOTS - 1}
+          value={slot}
+          onChange={setSlot}
+          pageStep={12 /* one hour */}
+          label="Playhead — scrub the day's telemetry"
+          valueText={playheadLabel}
         />
       </div>
+
       <ul className={styles.grid}>
-        {data.widgets.map((widget, i) => (
-          <OpsWidgetPanel key={i} widget={widget} />
+        {report.widgets.map((widget, i) => (
+          <OpsWidgetPanel
+            key={i}
+            widget={widget}
+            dayStart={dayStart}
+            dayEnd={dayEnd}
+            slot={slot}
+          />
         ))}
       </ul>
     </SectionShell>
