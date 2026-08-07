@@ -34,22 +34,138 @@ function cssToken(name: string, fallback: string): string {
   return value || fallback;
 }
 
+/** Fixed power-of-two texture size. Icons are rasterized at this size so a
+ *  size-less SVG (devicon icons carry a `viewBox` but no width/height) still
+ *  uploads a real, non-empty texture to the GPU. */
+export const TEX_SIZE = 128;
+
+/**
+ * Draw the legibility backing chip: a filled `--panel-2` disc with a 1px
+ * `--line` stroke, transparent outside the circle. Several devicon glyphs are
+ * solid black (express, the aws/vercel wordmarks) and would be invisible on the
+ * dark panel without it. Shared by the icon and the letter-fallback pipelines.
+ */
+function drawBackingChip(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  panel: string,
+  line: string,
+): void {
+  const r = size / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(r, r, r - 1, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fillStyle = panel;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = line;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Wrap a finished 2D canvas as a sprite texture in the sRGB working space so
+ *  the panel/icon colours are not washed out on upload. */
+function canvasToTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Rasterize an icon URL to an offscreen 2D canvas at {@link TEX_SIZE}px.
+ *
+ * `TextureLoader` uploads the decoded <img> straight to the GPU, and a devicon
+ * SVG has a `viewBox` but no intrinsic width/height, so that upload is blank —
+ * yet the load event still succeeds, so an error-only fallback never fires.
+ * Here we instead draw the image with an EXPLICIT destination size
+ * (`drawImage(img, dx, dy, dw, dh)`), which rasterizes size-less SVGs correctly
+ * cross-browser. We never trust `naturalWidth` for the draw (Firefox reports 0
+ * for these), only as an optional aspect-ratio hint for contain-fitting wide
+ * wordmark icons inside the square.
+ *
+ * Resolves with the finished canvas (backing chip + contained icon); rejects on
+ * image error, a missing 2D context, or a drawImage/zero-area failure — the
+ * caller then routes through the letter-texture fallback.
+ */
+export function rasterizeIcon(
+  url: string,
+  panel: string,
+  line: string,
+): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEX_SIZE;
+    canvas.height = TEX_SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      reject(new Error('SkillSphere: 2D canvas context unavailable'));
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        drawBackingChip(ctx, TEX_SIZE, panel, line);
+
+        // Contain-fit inside a padded square. dw/dh are always explicit so the
+        // draw does not depend on the SVG's (often absent) intrinsic size.
+        const pad = TEX_SIZE * 0.18;
+        const box = TEX_SIZE - pad * 2;
+        let dw = box;
+        let dh = box;
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        if (iw > 0 && ih > 0) {
+          const ar = iw / ih;
+          if (ar >= 1) {
+            dh = box / ar; // wide wordmark → shorter
+          } else {
+            dw = box * ar; // tall glyph → narrower
+          }
+        }
+        if (dw <= 0 || dh <= 0) {
+          reject(new Error('SkillSphere: zero-area icon decode'));
+          return;
+        }
+        const dx = (TEX_SIZE - dw) / 2;
+        const dy = (TEX_SIZE - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        resolve(canvas);
+      } catch (err) {
+        // drawImage can throw on a zero-area/broken decode in some browsers.
+        reject(err instanceof Error ? err : new Error('SkillSphere: drawImage failed'));
+      }
+    };
+    img.onerror = () => reject(new Error(`SkillSphere: icon load failed (${url})`));
+    img.src = url;
+  });
+}
+
 /** A canvas-drawn initial-letter texture — the per-skill degrade path when an
- *  icon fails to load, so one broken URL never blanks the sphere or throws. */
-function letterTexture(title: string, color: string): THREE.Texture {
-  const size = 64;
+ *  icon fails to load, so one broken URL never blanks the sphere or throws. It
+ *  shares the backing-chip pipeline so the letter gets the same legibility disc
+ *  as a real icon. */
+export function letterTexture(
+  title: string,
+  color: string,
+  panel: string,
+  line: string,
+): THREE.Texture {
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = TEX_SIZE;
+  canvas.height = TEX_SIZE;
   const ctx = canvas.getContext('2d');
   if (ctx) {
+    drawBackingChip(ctx, TEX_SIZE, panel, line);
     ctx.fillStyle = color;
-    ctx.font = `600 ${size * 0.7}px 'IBM Plex Mono', ui-monospace, monospace`;
+    ctx.font = `600 ${TEX_SIZE * 0.5}px 'IBM Plex Mono', ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText((title.trim()[0] ?? '?').toUpperCase(), size / 2, size / 2);
+    ctx.fillText((title.trim()[0] ?? '?').toUpperCase(), TEX_SIZE / 2, TEX_SIZE / 2);
   }
-  return new THREE.CanvasTexture(canvas);
+  return canvasToTexture(canvas);
 }
 
 /**
@@ -88,12 +204,16 @@ function SkillSprite({
   skill,
   position,
   color,
+  panel,
+  line,
   onHover,
   invalidate,
 }: {
   skill: SkillSphereSkill;
   position: [number, number, number];
   color: string;
+  panel: string;
+  line: string;
   onHover: (title: string | null) => void;
   invalidate: () => void;
 }) {
@@ -101,26 +221,21 @@ function SkillSprite({
 
   useEffect(() => {
     let cancelled = false;
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin('anonymous');
-    loader.load(
-      skill.icon_source,
-      (tex) => {
+    rasterizeIcon(skill.icon_source, panel, line)
+      .then((canvas) => {
         if (cancelled) return;
-        setMap(tex);
+        setMap(canvasToTexture(canvas));
         invalidate();
-      },
-      undefined,
-      () => {
+      })
+      .catch(() => {
         if (cancelled) return;
-        setMap(letterTexture(skill.title, color));
+        setMap(letterTexture(skill.title, color, panel, line));
         invalidate();
-      },
-    );
+      });
     return () => {
       cancelled = true;
     };
-  }, [skill.icon_source, skill.title, color, invalidate]);
+  }, [skill.icon_source, skill.title, color, panel, line, invalidate]);
 
   // Free the GPU texture when it is replaced or the sprite unmounts.
   useEffect(() => () => map?.dispose(), [map]);
@@ -154,6 +269,8 @@ function Scene({
   skills,
   detail,
   color,
+  panel,
+  line,
   reduced,
   stateRef,
   invalidateRef,
@@ -162,6 +279,8 @@ function Scene({
   skills: SkillSphereSkill[];
   detail: number;
   color: string;
+  panel: string;
+  line: string;
   reduced: boolean;
   stateRef: React.MutableRefObject<DragState>;
   invalidateRef: React.MutableRefObject<(() => void) | null>;
@@ -222,6 +341,8 @@ function Scene({
           skill={skill}
           position={placements[i]}
           color={color}
+          panel={panel}
+          line={line}
           onHover={onHover}
           invalidate={invalidate}
         />
@@ -255,6 +376,10 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
   const invalidateRef = useRef<(() => void) | null>(null);
 
   const amber = useMemo(() => cssToken('--amber', '#e8a33d'), []);
+  // Backing-chip colours, read once from the design tokens (§2.1) so the icon
+  // discs never hardcode a fresh colour.
+  const panel = useMemo(() => cssToken('--panel-2', '#171c28'), []);
+  const line = useMemo(() => cssToken('--line', '#1e2532'), []);
 
   // Pause the render loop when the sphere is off-screen (borrows the site's
   // reveal-on-view pattern, but toggles both ways). No observer → stay active.
@@ -321,6 +446,8 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
           skills={skills}
           detail={detail}
           color={amber}
+          panel={panel}
+          line={line}
           reduced={reduced}
           stateRef={stateRef}
           invalidateRef={invalidateRef}
