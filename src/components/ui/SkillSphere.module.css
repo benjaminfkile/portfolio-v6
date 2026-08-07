@@ -1,0 +1,94 @@
+/* SkillSphere — a 3D geodesic wireframe of skill icons (DESIGN.md §2, §5).
+   Tokens only; the amber wireframe + sprite tint are read from --amber in JS,
+   the panel background is set here. Mobile-first. */
+
+.root {
+  position: relative;
+  width: 100%;
+}
+
+/* The canvas lives on a dark instrument panel, --r-m rounded (§2.4). It is
+   decorative (aria-hidden on the wrapper); the reading lives in .srOnly. */
+.canvasWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 420px;
+  margin-inline: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  overflow: hidden;
+  touch-action: none; /* pointer-drag rotates instead of scrolling the page */
+  cursor: grab;
+}
+
+.canvasWrap:active {
+  cursor: grabbing;
+}
+
+/* Hovered/tapped skill title — the instrument-voice overlay (§2.3 mono). */
+.tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  padding: var(--space-1) var(--space-2);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Fallback / Suspense path: a plain chip grid of icon + name. Used when WebGL
+   is unavailable (also the jsdom/test path) and while three lazy-loads. */
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  color: var(--text-bright);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-medium);
+}
+
+.chipIcon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+/* Visually-hidden list of skill titles for assistive tech (Chart rules, §7) —
+   always rendered alongside the decorative canvas. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
