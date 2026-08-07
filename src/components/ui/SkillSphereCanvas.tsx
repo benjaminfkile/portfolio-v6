@@ -168,41 +168,98 @@ export function letterTexture(
   return canvasToTexture(canvas);
 }
 
+/** A skill's face-tile transform: where the tile sits, how it is oriented to
+ *  lie in the face plane, and how big it is (the face's incircle diameter). */
+interface FacePlacement {
+  position: [number, number, number];
+  quaternion: [number, number, number, number];
+  size: number;
+}
+
 /**
- * Anchor points for `count` skills spread evenly across the geometry's faces.
- * Face centroids are computed from the (non-indexed) position attribute, pushed
- * just outside the unit sphere so the sprites float above the surface. Skills
- * are sampled across the whole face list — `floor(i·faces/count)` — so N skills
- * on a denser sphere don't clump at one pole.
+ * Face tiles for `count` skills spread evenly across the geometry's faces.
+ * Each selected triangle (read off the non-indexed position attribute) yields a
+ * placement lying FLAT on the face: positioned at the centroid nudged just
+ * above the face plane (no z-fighting with the wireframe), oriented so the
+ * tile's +Z is the outward face normal with its +Y as upright as the plane
+ * allows, and sized to the triangle's incircle — the circular backing chip
+ * fills the face without spilling over the edges. Skills are sampled across
+ * the whole face list — `floor(i·faces/count)` — so N skills on a denser
+ * sphere don't clump at one pole.
  */
 function facePlacements(
   geometry: THREE.BufferGeometry,
   count: number,
-): [number, number, number][] {
+): FacePlacement[] {
   const pos = geometry.getAttribute('position');
-  const faces: [number, number, number][] = [];
+  const faces: FacePlacement[] = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
   for (let i = 0; i < pos.count; i += 3) {
-    const cx = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3;
-    const cy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
-    const cz = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3;
-    const len = Math.hypot(cx, cy, cz) || 1;
-    const k = 1.06 / len; // just proud of the unit-radius surface
-    faces.push([cx * k, cy * k, cz * k]);
+    a.fromBufferAttribute(pos, i);
+    b.fromBufferAttribute(pos, i + 1);
+    c.fromBufferAttribute(pos, i + 2);
+
+    const centroid = new THREE.Vector3().add(a).add(b).add(c).divideScalar(3);
+    const normal = new THREE.Vector3()
+      .crossVectors(b.clone().sub(a), c.clone().sub(a))
+      .normalize();
+    // The winding should already point outward; guard against the opposite.
+    if (normal.dot(centroid) < 0) normal.negate();
+
+    // Incircle radius r = area / semiperimeter — the largest disc that fits.
+    const ea = b.distanceTo(c);
+    const eb = c.distanceTo(a);
+    const ec = a.distanceTo(b);
+    const semi = (ea + eb + ec) / 2;
+    const area =
+      new THREE.Vector3()
+        .crossVectors(b.clone().sub(a), c.clone().sub(a))
+        .length() / 2;
+    const inradius = semi > 0 ? area / semi : 0;
+
+    // Basis: +Z out of the face, +Y the most-upright in-plane direction (a
+    // near-polar face falls back to +X as the reference to avoid a degenerate
+    // cross product).
+    const ref =
+      Math.abs(normal.y) > 0.99
+        ? new THREE.Vector3(1, 0, 0)
+        : new THREE.Vector3(0, 1, 0);
+    const xAxis = new THREE.Vector3().crossVectors(ref, normal).normalize();
+    const yAxis = new THREE.Vector3().crossVectors(normal, xAxis);
+    const q = new THREE.Quaternion().setFromRotationMatrix(
+      new THREE.Matrix4().makeBasis(xAxis, yAxis, normal),
+    );
+
+    const lifted = centroid.clone().addScaledVector(normal, 0.01);
+    faces.push({
+      position: [lifted.x, lifted.y, lifted.z],
+      quaternion: [q.x, q.y, q.z, q.w],
+      size: inradius * 2 * 0.96,
+    });
   }
 
   const n = faces.length;
-  const out: [number, number, number][] = [];
+  const fallback: FacePlacement = {
+    position: [0, 0, 1.01],
+    quaternion: [0, 0, 0, 1],
+    size: 0.3,
+  };
+  const out: FacePlacement[] = [];
   for (let i = 0; i < count; i += 1) {
-    out.push(n === 0 ? [0, 0, 1.06] : faces[Math.floor((i * n) / count) % n]);
+    out.push(n === 0 ? fallback : faces[Math.floor((i * n) / count) % n]);
   }
   return out;
 }
 
-/** One billboarded skill icon. Loads its texture cross-origin and degrades to
- *  an initial-letter texture on error — never crashing the canvas. */
-function SkillSprite({
+/** One skill tile lying flat on its sphere face. Loads its texture
+ *  cross-origin and degrades to an initial-letter texture on error — never
+ *  crashing the canvas. Front-side only: a tile on the far hemisphere faces
+ *  away and is culled, as on a solid object. */
+function SkillFace({
   skill,
-  position,
+  placement,
   color,
   panel,
   line,
@@ -210,7 +267,7 @@ function SkillSprite({
   invalidate,
 }: {
   skill: SkillSphereSkill;
-  position: [number, number, number];
+  placement: FacePlacement;
   color: string;
   panel: string;
   line: string;
@@ -243,26 +300,25 @@ function SkillSprite({
   if (!map) return null;
 
   return (
-    <sprite
-      position={position}
-      scale={[0.34, 0.34, 0.34]}
+    <mesh
+      position={placement.position}
+      quaternion={placement.quaternion}
+      scale={[placement.size, placement.size, 1]}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
         onHover(skill.title);
       }}
       onPointerOut={() => onHover(null)}
     >
-      <spriteMaterial
-        map={map}
-        transparent
-        depthTest={false}
-        depthWrite={false}
-      />
-    </sprite>
+      <planeGeometry args={[1, 1]} />
+      {/* FrontSide (the default) is load-bearing: it culls far-hemisphere
+          tiles so icons never show through the wireframe mirrored. */}
+      <meshBasicMaterial map={map} transparent depthWrite={false} />
+    </mesh>
   );
 }
 
-/** The rotating group: an amber wireframe icosahedron plus one sprite per
+/** The rotating group: an amber wireframe icosahedron plus one face tile per
  *  skill. Auto-rotates via the render loop unless reduced-motion or a drag is
  *  in progress; drag rotation is read from the shared `stateRef`. */
 function Scene({
@@ -332,14 +388,26 @@ function Scene({
 
   return (
     <group ref={groupRef}>
+      {/* Opaque faceted surface — the sphere is a solid object, not a cage:
+          it occludes the far hemisphere's lines. --panel-2 on the --panel
+          canvas per the elevation convention (§2.4). polygonOffset pushes the
+          fill back in depth so the coincident wireframe lines win cleanly. */}
+      <mesh geometry={geometry}>
+        <meshBasicMaterial
+          color={panel}
+          polygonOffset
+          polygonOffsetFactor={1}
+          polygonOffsetUnits={1}
+        />
+      </mesh>
       <lineSegments geometry={wireframe}>
         <lineBasicMaterial color={threeColor} transparent opacity={0.55} />
       </lineSegments>
       {skills.map((skill, i) => (
-        <SkillSprite
+        <SkillFace
           key={skill.id}
           skill={skill}
-          position={placements[i]}
+          placement={placements[i]}
           color={color}
           panel={panel}
           line={line}

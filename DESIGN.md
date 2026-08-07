@@ -130,9 +130,12 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 - **about** — prose panel, 62ch measure; optional inline mono annotations.
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).
-- **skills** (v1.5) — a 3D geodesic sphere: an amber `IcosahedronGeometry`
-  wireframe (three.js / react-three-fiber) with one skill icon sprite billboarded
-  per face, on a `--panel` Control Room surface. Slow auto-rotate; pointer-drag
+- **skills** (v1.5) — a 3D geodesic sphere (three.js / react-three-fiber): a
+  solid `--panel-2` faceted `IcosahedronGeometry` surface (opaque — the far
+  hemisphere is occluded, not see-through) with amber wireframe edges showing
+  the triangle intersections, and one skill icon lying flat on a triangular
+  face (incircle-sized tile, oriented to the face normal; far-side tiles are
+  back-face culled), on a `--panel` Control Room surface. Slow auto-rotate; pointer-drag
   spins it; hovering a face shows its skill title in the mono instrument voice.
   Sphere density comes from the section's `sphere_detail` config (0–4); absent =
   auto-fit to the icon count. `prefers-reduced-motion` renders it static, and
