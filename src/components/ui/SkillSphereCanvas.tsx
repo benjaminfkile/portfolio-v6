@@ -37,6 +37,8 @@ interface CanvasProps {
   detail: number;
 }
 
+type SceneTokens = ReturnType<typeof readSceneTokens>;
+
 /** Read a design token off :root, falling back to its DESIGN.md §2.1 value so
  *  the scene never hardcodes a fresh colour. */
 function cssToken(name: string, fallback: string): string {
@@ -49,33 +51,82 @@ function cssToken(name: string, fallback: string): string {
   return value || fallback;
 }
 
+/** Split a CSS `rgba()` token into a three.js-parseable `rgb()` colour and its
+ *  alpha (as material opacity — THREE.Color has no alpha channel and warns on
+ *  rgba strings). Hex/named colours pass through with alpha 1. */
+function parseRgba(value: string): { color: string; alpha: number } {
+  const m = value.match(/rgba?\(([^)]+)\)/);
+  if (!m) return { color: value, alpha: 1 };
+  const parts = m[1].split(',').map((p) => p.trim());
+  const alpha = parts.length > 3 ? Number(parts[3]) : 1;
+  return {
+    color: `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})`,
+    alpha: Number.isFinite(alpha) ? alpha : 1,
+  };
+}
+
+/** The canvas-side token values. Everything CSS-rendered (tooltip, chips)
+ *  follows the theme by itself via var(); only what is baked into WebGL
+ *  materials and rasterized textures needs to be read — and re-read. */
+function readSceneTokens() {
+  return {
+    /** letter-fallback glyph colour */
+    amber: cssToken('--amber', '#e8a33d'),
+    /** the shared albedo: sphere faces AND icon backing discs — one material
+     *  colour under one light rig, so the discs vanish into their faces */
+    panel: cssToken('--panel-2', '#171c28'),
+    /** wireframe edges — the same colour as the page's plotting grid (§2.4) */
+    grid: parseRgba(cssToken('--grid', 'rgba(120, 140, 175, 0.07)')),
+  };
+}
+
+/**
+ * Token values that follow the theme. `ThemeToggle` stamps `data-theme` on
+ * `<html>`; a MutationObserver on that attribute re-reads the tokens so the
+ * sphere restyles live on toggle instead of keeping mount-time colours.
+ * Downstream, material props update declaratively and the texture-rasterize
+ * effects re-run off the changed values.
+ */
+function useSceneTokens() {
+  const [tokens, setTokens] = useState(readSceneTokens);
+  useEffect(() => {
+    if (typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(() => setTokens(readSceneTokens()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return tokens;
+}
+
 /** Fixed power-of-two texture size. Icons are rasterized at this size so a
  *  size-less SVG (devicon icons carry a `viewBox` but no width/height) still
  *  uploads a real, non-empty texture to the GPU. */
 export const TEX_SIZE = 128;
 
 /**
- * Draw the legibility backing chip: a filled `--panel-2` disc with a 1px
- * `--line` stroke, transparent outside the circle. Several devicon glyphs are
- * solid black (express, the aws/vercel wordmarks) and would be invisible on the
- * dark panel without it. Shared by the icon and the letter-fallback pipelines.
+ * Fill the tile's incircle disc with the face albedo, transparent outside the
+ * circle. The disc is the glyph's ground and must be the SAME colour as the
+ * sphere faces (and rendered by the same lit material), so it disappears into
+ * its facet — no visible ring. It stays a disc, not a full square: the square
+ * tile's corners poke past the triangle's incircle, and opaque corners would
+ * smear onto neighbouring (differently shaded) faces and the edge lines.
+ * Shared by the icon and the letter-fallback pipelines.
  */
-function drawBackingChip(
+function fillDisc(
   ctx: CanvasRenderingContext2D,
   size: number,
-  panel: string,
-  line: string,
+  fill: string,
 ): void {
   const r = size / 2;
   ctx.save();
   ctx.beginPath();
   ctx.arc(r, r, r - 1, 0, Math.PI * 2);
   ctx.closePath();
-  ctx.fillStyle = panel;
+  ctx.fillStyle = fill;
   ctx.fill();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = line;
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -105,8 +156,7 @@ function canvasToTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
  */
 export function rasterizeIcon(
   url: string,
-  panel: string,
-  line: string,
+  fill: string,
 ): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
@@ -122,7 +172,7 @@ export function rasterizeIcon(
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        drawBackingChip(ctx, TEX_SIZE, panel, line);
+        fillDisc(ctx, TEX_SIZE, fill);
 
         // Contain-fit inside a padded square. dw/dh are always explicit so the
         // draw does not depend on the SVG's (often absent) intrinsic size.
@@ -160,20 +210,19 @@ export function rasterizeIcon(
 
 /** A canvas-drawn initial-letter texture — the per-skill degrade path when an
  *  icon fails to load, so one broken URL never blanks the sphere or throws. It
- *  shares the backing-chip pipeline so the letter gets the same legibility disc
+ *  shares the disc pipeline so the letter sits on the same face-albedo ground
  *  as a real icon. */
 export function letterTexture(
   title: string,
   color: string,
-  panel: string,
-  line: string,
+  fill: string,
 ): THREE.Texture {
   const canvas = document.createElement('canvas');
   canvas.width = TEX_SIZE;
   canvas.height = TEX_SIZE;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    drawBackingChip(ctx, TEX_SIZE, panel, line);
+    fillDisc(ctx, TEX_SIZE, fill);
     ctx.fillStyle = color;
     ctx.font = `600 ${TEX_SIZE * 0.5}px 'IBM Plex Mono', ui-monospace, monospace`;
     ctx.textAlign = 'center';
@@ -264,16 +313,14 @@ function SkillFace({
   skill,
   placement,
   color,
-  panel,
-  line,
+  fill,
   onHover,
   invalidate,
 }: {
   skill: SkillSphereSkill;
   placement: FacePlacement;
   color: string;
-  panel: string;
-  line: string;
+  fill: string;
   onHover: (title: string | null) => void;
   invalidate: () => void;
 }) {
@@ -309,7 +356,7 @@ function SkillFace({
 
   useEffect(() => {
     let cancelled = false;
-    rasterizeIcon(skill.icon_source, panel, line)
+    rasterizeIcon(skill.icon_source, fill)
       .then((canvas) => {
         if (cancelled) return;
         setMap(canvasToTexture(canvas));
@@ -317,13 +364,13 @@ function SkillFace({
       })
       .catch(() => {
         if (cancelled) return;
-        setMap(letterTexture(skill.title, color, panel, line));
+        setMap(letterTexture(skill.title, color, fill));
         invalidate();
       });
     return () => {
       cancelled = true;
     };
-  }, [skill.icon_source, skill.title, color, panel, line, invalidate]);
+  }, [skill.icon_source, skill.title, color, fill, invalidate]);
 
   // Free the GPU texture when it is replaced or the sprite unmounts.
   useEffect(() => () => map?.dispose(), [map]);
@@ -342,22 +389,30 @@ function SkillFace({
       onPointerOut={() => onHover(null)}
     >
       <planeGeometry args={[1, 1]} />
-      {/* FrontSide (the default) is load-bearing: it culls far-hemisphere
-          tiles so icons never show through the wireframe mirrored. */}
-      <meshBasicMaterial map={map} transparent depthWrite={false} />
+      {/* Lit with the SAME material params as the sphere fill so the tile's
+          albedo-coloured disc renders pixel-identical to the facet under it —
+          discs vanish, icons shade with the sphere. FrontSide (the default) is
+          load-bearing: it culls far-hemisphere tiles so icons never show
+          through the wireframe mirrored. */}
+      <meshStandardMaterial
+        map={map}
+        transparent
+        depthWrite={false}
+        roughness={0.85}
+        metalness={0}
+      />
     </mesh>
   );
 }
 
-/** The rotating group: an amber wireframe icosahedron plus one face tile per
- *  skill. Auto-rotates via the render loop unless reduced-motion or a drag is
- *  in progress; drag rotation is read from the shared `stateRef`. */
+/** The rotating group: a solid icosahedron with grid-coloured edge lines plus
+ *  one face tile per skill. Auto-rotates via the render loop unless
+ *  reduced-motion or a drag is in progress; drag rotation is read from the
+ *  shared `stateRef`. */
 function Scene({
   skills,
   detail,
-  color,
-  panel,
-  line,
+  tokens,
   reduced,
   stateRef,
   invalidateRef,
@@ -365,9 +420,7 @@ function Scene({
 }: {
   skills: SkillSphereSkill[];
   detail: number;
-  color: string;
-  panel: string;
-  line: string;
+  tokens: SceneTokens;
   reduced: boolean;
   stateRef: React.MutableRefObject<DragState>;
   invalidateRef: React.MutableRefObject<(() => void) | null>;
@@ -404,7 +457,7 @@ function Scene({
     () => facePlacements(geometry, skills.length),
     [geometry, skills.length],
   );
-  const threeColor = useMemo(() => new THREE.Color(color), [color]);
+
 
   useFrame((_, delta) => {
     const group = groupRef.current;
@@ -419,35 +472,65 @@ function Scene({
   });
 
   return (
-    <group ref={groupRef}>
-      {/* Opaque faceted surface — the sphere is a solid object, not a cage:
-          it occludes the far hemisphere's lines. --panel-2 on the --panel
-          canvas per the elevation convention (§2.4). polygonOffset pushes the
-          fill back in depth so the coincident wireframe lines win cleanly. */}
-      <mesh geometry={geometry}>
-        <meshBasicMaterial
-          color={panel}
-          polygonOffset
-          polygonOffsetFactor={1}
-          polygonOffsetUnits={1}
-        />
-      </mesh>
-      <lineSegments geometry={wireframe}>
-        <lineBasicMaterial color={threeColor} transparent opacity={0.55} />
-      </lineSegments>
-      {skills.map((skill, i) => (
-        <SkillFace
-          key={skill.id}
-          skill={skill}
-          placement={placements[i]}
-          color={color}
-          panel={panel}
-          line={line}
-          onHover={onHover}
-          invalidate={invalidate}
-        />
-      ))}
-    </group>
+    <>
+      {/* ONE key light + low ambient, outside the rotating group so shading
+          sweeps across facets as the sphere turns. A single dominant light
+          direction is what makes the facet gradient read as one form — a
+          second fill light put glints in unrelated places, and high ambient
+          flattened the falloff so away-facing triangles never darkened.
+          Peak irradiance (ambient + key) is deliberately ~1.2 so a fully-lit
+          facet renders at roughly its own albedo — the page's --panel-2 —
+          instead of a washed-out multiple of it, and the unlit-looking icon
+          textures stay in range. Intensities are for three's physical
+          lighting mode (r155+). */}
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[2.5, 3, 4]} intensity={0.85} />
+      <group ref={groupRef}>
+        {/* Opaque faceted surface — the sphere is a solid lit object, not a
+            cage: it occludes the far hemisphere's lines. Matte (high
+            roughness): low roughness gave narrow specular lobes, so facets
+            were either blazing or black — patchy, jagged. Smoothness instead
+            comes from diffuse falloff off ONE key light. The albedo is
+            --panel-2 verbatim — the page's own elevation colour, shared with
+            the icon discs — with the light rig scaled (see above) so the lit
+            side renders at that colour rather than a brightened stranger of
+            it. flatShading keeps one uniform shade per triangle.
+            polygonOffset pushes the fill back in depth so the coincident
+            wireframe lines win cleanly. */}
+        <mesh geometry={geometry}>
+          <meshStandardMaterial
+            color={tokens.panel}
+            flatShading
+            roughness={0.85}
+            metalness={0}
+            polygonOffset
+            polygonOffsetFactor={1}
+            polygonOffsetUnits={1}
+          />
+        </mesh>
+        {/* Edge lines in the page's plotting-grid colour (--grid), alpha
+            carried as opacity — the sphere reads as part of the same
+            instrument surface rather than an amber cage. */}
+        <lineSegments geometry={wireframe}>
+          <lineBasicMaterial
+            color={tokens.grid.color}
+            transparent
+            opacity={tokens.grid.alpha}
+          />
+        </lineSegments>
+        {skills.map((skill, i) => (
+          <SkillFace
+            key={skill.id}
+            skill={skill}
+            placement={placements[i]}
+            color={tokens.amber}
+            fill={tokens.panel}
+            onHover={onHover}
+            invalidate={invalidate}
+          />
+        ))}
+      </group>
+    </>
   );
 }
 
@@ -475,11 +558,7 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
   });
   const invalidateRef = useRef<(() => void) | null>(null);
 
-  const amber = useMemo(() => cssToken('--amber', '#e8a33d'), []);
-  // Backing-chip colours, read once from the design tokens (§2.1) so the icon
-  // discs never hardcode a fresh colour.
-  const panel = useMemo(() => cssToken('--panel-2', '#171c28'), []);
-  const line = useMemo(() => cssToken('--line', '#1e2532'), []);
+  const tokens = useSceneTokens();
 
   // Pause the render loop when the sphere is off-screen (borrows the site's
   // reveal-on-view pattern, but toggles both ways). No observer → stay active.
@@ -547,13 +626,15 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
         frameloop={frameloop}
         camera={{ position: [0, 0, 3], fov: 45 }}
         gl={{ alpha: true, antialias: true }}
+        /* No tone mapping: fiber defaults to filmic ACES, which crushes the
+           near-black facet shading this scene depends on and shifts the
+           token-matched icon/line colours. */
+        flat
       >
         <Scene
           skills={skills}
           detail={detail}
-          color={amber}
-          panel={panel}
-          line={line}
+          tokens={tokens}
           reduced={reduced}
           stateRef={stateRef}
           invalidateRef={invalidateRef}

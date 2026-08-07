@@ -131,12 +131,21 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).
 - **skills** (v1.5) — a 3D geodesic sphere (three.js / react-three-fiber): a
-  solid `--panel-2` faceted `IcosahedronGeometry` surface (opaque — the far
-  hemisphere is occluded, not see-through) with amber wireframe edges showing
+  solid faceted `IcosahedronGeometry` surface with a `--panel-2` albedo,
+  flat-shaded matte under one fixed key light + low ambient (peak irradiance
+  ~1.2, so a fully-lit facet renders at its own `--panel-2` colour) — every
+  triangle catches its own shade and the shading sweeps across facets as the
+  sphere turns (opaque — the far hemisphere is occluded, not see-through) with
+  wireframe edges in the page's
+  plotting-grid colour (`--grid`, its alpha carried as material opacity) showing
   the triangle intersections, and one skill icon lying flat on a triangular
-  face (incircle-sized tile, oriented to the face normal; far-side tiles are
+  face (incircle-sized tile on an albedo-matched, same-material lit disc so the
+  icon ground is indistinguishable from its facet; oriented to the face
+  normal; far-side tiles are
   back-face culled; each tile rolls around its normal per-frame so the glyph
-  stays screen-upright and readable), on a `--panel` Control Room surface.
+  stays screen-upright and readable), floating on a transparent stage directly
+  over the page's `--ground` + grid (no panel card — the facets must read as
+  the page background itself).
   Slow auto-rotate; pointer-drag tumbles it freely (quaternion trackball, no
   clamps); hovering a face shows its skill title in the mono instrument voice.
   Sphere density comes from the section's `sphere_detail` config (0–4); absent =

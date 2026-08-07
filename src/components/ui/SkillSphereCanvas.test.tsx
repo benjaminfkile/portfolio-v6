@@ -90,20 +90,20 @@ afterEach(() => {
 });
 
 describe('rasterizeIcon', () => {
-  it('draws the backing chip and a contain-fit icon on success', async () => {
+  it('fills the face-albedo disc and draws a contain-fit icon on success', async () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
-    const canvas = await rasterizeIcon('https://cdn/react.svg', '#111', '#222');
+    const canvas = await rasterizeIcon('https://cdn/react.svg', '#111');
 
     expect(canvas).toBeInstanceOf(HTMLCanvasElement);
     expect(canvas.width).toBe(TEX_SIZE);
     expect(canvas.height).toBe(TEX_SIZE);
-    // Backing chip: filled disc + 1px stroke.
+    // Albedo disc: filled circle, NO stroke — the disc must be
+    // indistinguishable from the facet it sits on.
     expect(ctx.arc).toHaveBeenCalled();
     expect(ctx.fill).toHaveBeenCalled();
-    expect(ctx.stroke).toHaveBeenCalled();
-    expect(ctx.lineWidth).toBe(1);
+    expect(ctx.stroke).not.toHaveBeenCalled();
     // Icon drawn with an EXPLICIT destination size (the load-bearing fix).
     expect(ctx.drawImage).toHaveBeenCalledTimes(1);
     const [, , , dw, dh] = ctx.drawImage.mock.calls[0];
@@ -119,7 +119,7 @@ describe('rasterizeIcon', () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
-    await rasterizeIcon('https://cdn/aws.svg', '#111', '#222');
+    await rasterizeIcon('https://cdn/aws.svg', '#111');
 
     const [, , , dw, dh] = ctx.drawImage.mock.calls[0];
     expect(dw).toBeGreaterThan(dh);
@@ -132,7 +132,7 @@ describe('rasterizeIcon', () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
-    await rasterizeIcon('https://cdn/express.svg', '#111', '#222');
+    await rasterizeIcon('https://cdn/express.svg', '#111');
 
     // No intrinsic size → fall back to a square draw with an explicit size,
     // never a zero-area upload.
@@ -146,7 +146,7 @@ describe('rasterizeIcon', () => {
     ctxFactory = () => makeCtx();
 
     await expect(
-      rasterizeIcon('https://cdn/broken.svg', '#111', '#222'),
+      rasterizeIcon('https://cdn/broken.svg', '#111'),
     ).rejects.toThrow(/icon load failed/);
   });
 
@@ -154,7 +154,7 @@ describe('rasterizeIcon', () => {
     ctxFactory = () => null;
 
     await expect(
-      rasterizeIcon('https://cdn/react.svg', '#111', '#222'),
+      rasterizeIcon('https://cdn/react.svg', '#111'),
     ).rejects.toThrow(/context unavailable/);
   });
 
@@ -166,22 +166,22 @@ describe('rasterizeIcon', () => {
     ctxFactory = () => ctx;
 
     await expect(
-      rasterizeIcon('https://cdn/react.svg', '#111', '#222'),
+      rasterizeIcon('https://cdn/react.svg', '#111'),
     ).rejects.toThrow();
   });
 });
 
-describe('letterTexture (shared backing-chip fallback)', () => {
-  it('draws the backing chip and the initial, tagged sRGB', () => {
+describe('letterTexture (shared albedo-disc fallback)', () => {
+  it('fills the albedo disc and draws the initial, tagged sRGB', () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
-    const tex = letterTexture('React', '#fff', '#111', '#222');
+    const tex = letterTexture('React', '#fff', '#111');
 
-    // Same disc pipeline as a real icon.
+    // Same disc pipeline as a real icon — fill only, no stroke.
     expect(ctx.arc).toHaveBeenCalled();
     expect(ctx.fill).toHaveBeenCalled();
-    expect(ctx.stroke).toHaveBeenCalled();
+    expect(ctx.stroke).not.toHaveBeenCalled();
     // The uppercased initial, centred.
     expect(ctx.fillText).toHaveBeenCalledWith('R', TEX_SIZE / 2, TEX_SIZE / 2);
     expect(tex).toBeInstanceOf(THREE.CanvasTexture);
@@ -193,7 +193,7 @@ describe('letterTexture (shared backing-chip fallback)', () => {
     const ctx = makeCtx();
     ctxFactory = () => ctx;
 
-    const tex = letterTexture('   ', '#fff', '#111', '#222');
+    const tex = letterTexture('   ', '#fff', '#111');
 
     expect(ctx.fillText).toHaveBeenCalledWith('?', TEX_SIZE / 2, TEX_SIZE / 2);
     tex.dispose();

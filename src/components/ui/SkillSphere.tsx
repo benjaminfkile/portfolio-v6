@@ -88,7 +88,8 @@ const SkillSphereCanvas = lazy(() => import('./SkillSphereCanvas'));
 
 /**
  * SkillSphere — a geodesic wireframe sphere (three.js `IcosahedronGeometry`)
- * with one skill icon lying flat on a face, in the Control Room amber on the
+ * with one skill icon lying flat on a face, edge lines in the plotting-grid
+ * colour on the
  * dark panel (DESIGN.md §2, §5). Auto-rotates slowly, pointer-drag spins it,
  * and it honours `prefers-reduced-motion` and pauses off-screen.
  *
