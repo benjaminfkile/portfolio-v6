@@ -108,7 +108,7 @@ Each = one component + one CSS Module, tokens only, zero dependencies:
 | `Panel` | bordered `--panel` surface, `--r-m`; `raised` variant |
 | `Instrument` | small labeled readout (mono label + value line) — the signature element; used by status, now-playing, hero strip |
 | `StatusDot` | 7px dot + soft glow; `ok/warn/err` variants; pulse animation (2s) honoring reduced-motion |
-| `Meter` | 4px track + amber fill; used by skills proficiency; animates width on first reveal |
+| `Meter` | 4px track + amber fill; used by the now-playing progress bar; animates width on first reveal |
 | `TagChip` | mono, bordered, `--r-s`; tech tags and links |
 | `LinkButton` | text link and button-shaped variants; amber; visible `:focus-visible` ring (`2px` amber outline, offset 2) |
 | `MediaFrame` | image/video wrapper: border, radius, `aspect-ratio` box, lazy loading, `object-fit: cover` |
@@ -130,7 +130,15 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 - **about** — prose panel, 62ch measure; optional inline mono annotations.
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).
-- **skills** — grid of `Meter` rows (2-col ≥900px); icon + name + meter; group
+- **skills** (v1.5) — a 3D geodesic sphere: an amber `IcosahedronGeometry`
+  wireframe (three.js / react-three-fiber) with one skill icon sprite billboarded
+  per face, on a `--panel` Control Room surface. Slow auto-rotate; pointer-drag
+  spins it; hovering a face shows its skill title in the mono instrument voice.
+  Sphere density comes from the section's `sphere_detail` config (0–4); absent =
+  auto-fit to the icon count. `prefers-reduced-motion` renders it static, and
+  where WebGL is unavailable (older browsers, the jsdom test path) it degrades to
+  a plain grid of icon + name chips. The canvas is decorative (`aria-hidden`) with
+  a visually-hidden list of skill titles alongside for assistive tech. Group
   labels in mono.
 - **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop ONLY
   if reduced-motion off; tap-to-play on touch), title, intro, `TagChip` tech

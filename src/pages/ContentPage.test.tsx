@@ -157,10 +157,10 @@ describe('ContentPage', () => {
     expect(screen.getByText('2019 – 2022')).toBeInTheDocument();
     expect(screen.getByAltText('Acme Corp logo')).toBeInTheDocument();
 
-    // skills — proficiency renders as a <meter>.
-    const meters = screen.getAllByRole('meter');
-    expect(meters).toHaveLength(2);
-    expect(meters[0]).toHaveAttribute('aria-label', 'TypeScript proficiency');
+    // skills — the geodesic SkillSphere (v1.5). jsdom has no WebGL, so it takes
+    // the chip fallback: one icon+name chip per skill, no meters.
+    expect(screen.getByText('TypeScript')).toBeInTheDocument();
+    expect(screen.getByText('PostgreSQL')).toBeInTheDocument();
 
     // portfolio — project title, resolved media, and its links.
     expect(

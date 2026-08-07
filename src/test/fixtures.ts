@@ -53,7 +53,7 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
     {
       id: 'sec-skills',
       type: 'skills',
-      data: { title: 'Skills' },
+      data: { title: 'Skills', sphere_detail: 1 },
       items: [
         {
           id: 'sk-1',
@@ -61,7 +61,6 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
             title: 'TypeScript',
             description: 'Daily driver.',
             icon_source: 'https://cdn.example.com/icons/ts.svg',
-            proficiency: 95,
           },
         },
         {
@@ -70,7 +69,6 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
             title: 'PostgreSQL',
             description: 'Comfortable with query tuning.',
             icon_source: 'https://cdn.example.com/icons/pg.svg',
-            proficiency: 80,
           },
         },
       ],
