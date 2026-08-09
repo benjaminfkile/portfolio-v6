@@ -22,10 +22,13 @@
  * there is a single source of truth for the API origin.
  */
 
-import { resolveBlogHtml, BLOG_MATCHER } from './src/lib/ogMiddleware';
+import { resolveBlogHtml } from './src/lib/ogMiddleware';
 
 export const config = {
-  matcher: BLOG_MATCHER,
+  // Must be an inline literal: Vercel resolves `config` by static AST analysis
+  // and rejects identifiers (even imported constants). Kept in sync with
+  // BLOG_MATCHER in src/lib/ogMiddleware.ts, which pins the value in tests.
+  matcher: '/blog/:slug*',
   // runtime: 'nodejs',  // default is 'edge'; either works for a single fetch.
 };
 
