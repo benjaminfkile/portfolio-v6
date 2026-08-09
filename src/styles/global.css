@@ -152,3 +152,36 @@ main {
 a {
   color: var(--amber);
 }
+
+/* ---- Scrollbars — instrument-thin, token-coloured ------------------------- */
+/*
+ * Native scrollbars (notably in the skills console's list/detail panels and
+ * code blocks) render bright OS chrome that glares on the dark theme. Thin
+ * them and colour them from the tokens so every scroll container reads as part
+ * of the console. `scrollbar-color` covers Firefox + Chromium 121+ (where it
+ * intentionally supersedes the ::-webkit-* pseudos); the ::-webkit-* rules
+ * remain for Safari, which lacks `scrollbar-color`. Both properties go on `*`
+ * because `scrollbar-width` does not inherit.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
