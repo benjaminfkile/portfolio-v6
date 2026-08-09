@@ -85,10 +85,9 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
             intro: 'A content-managed portfolio.',
             description: 'Vite + React public site driven by a section registry.',
             media_id: 'media-project',
-            tech_icons: [
-              'https://cdn.example.com/icons/react.svg',
-              'https://cdn.example.com/icons/vite.svg',
-            ],
+            // Skill Refs v1.8: reference skills items by id (here the two `skills`
+            // items on this same page) instead of a bare tech-icon URL array.
+            skill_refs: ['sk-1', 'sk-2'],
             links: [
               {
                 type: 'repo',
@@ -205,6 +204,100 @@ export const fixtureDocument: ContentDocument = {
           type: 'hero',
           data: { title: 'Secret page' },
           items: [],
+        },
+      ],
+    },
+  ],
+};
+
+/**
+ * A document that exercises Skill Refs v1.8 cross-page resolution. Its `skills`
+ * items are split across TWO pages — a light-only skill and a dark-override skill
+ * on `home`, and a third skill on a second page — and its portfolio item (also on
+ * `home`) references all three by id plus one deliberately-unresolvable id. Used
+ * to drive `buildSkillsIndex` (whole-document span) and the portfolio's ref
+ * resolution, theme-aware icon choice, and skip-on-unresolvable behaviour.
+ */
+export const fixtureSkillRefsDocument: ContentDocument = {
+  version: 44,
+  published_at: '2026-08-08T12:00:00Z',
+  media: {},
+  pages: [
+    {
+      id: 'page-home',
+      slug: 'home',
+      title: 'Ben Kile',
+      nav_label: 'Home',
+      nav_position: 0,
+      sections: [
+        {
+          id: 'sec-skills-home',
+          type: 'skills',
+          data: { heading: 'Skills' },
+          items: [
+            {
+              id: 'sk-ts',
+              data: {
+                title: 'TypeScript',
+                description: '',
+                icon_source: 'https://cdn.example.com/icons/ts.svg',
+              },
+            },
+            {
+              id: 'sk-vercel',
+              data: {
+                title: 'Vercel',
+                description: '',
+                icon_source: 'https://cdn.example.com/icons/vercel-light.svg',
+                icon_source_dark:
+                  'https://cdn.example.com/icons/vercel-dark.svg',
+              },
+            },
+          ],
+        },
+        {
+          id: 'sec-portfolio-home',
+          type: 'portfolio',
+          data: { heading: 'Projects' },
+          items: [
+            {
+              id: 'pf-refs',
+              data: {
+                title: 'Cross-page project',
+                intro: '',
+                description: '',
+                media_id: '',
+                // Two same-page refs, one ref to a skill on the `tools` page, and
+                // one id that resolves to nothing (must be skipped silently).
+                skill_refs: ['sk-ts', 'sk-vercel', 'sk-docker', 'sk-missing'],
+                links: [],
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'page-tools',
+      slug: 'tools',
+      title: 'Tools',
+      nav_label: 'Tools',
+      nav_position: 1,
+      sections: [
+        {
+          id: 'sec-skills-tools',
+          type: 'skills',
+          data: { heading: 'Tooling' },
+          items: [
+            {
+              id: 'sk-docker',
+              data: {
+                title: 'Docker',
+                description: '',
+                icon_source: 'https://cdn.example.com/icons/docker.svg',
+              },
+            },
+          ],
         },
       ],
     },

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { SECTION_REGISTRY } from '../registry';
 import type { SectionProps } from '../sections/types';
 import { useContentDocument } from '../lib/useContentDocument';
+import { buildSkillsIndex } from '../lib/skillsIndex';
 import { useDocumentTitle, pageTitle } from '../lib/useDocumentTitle';
 import PreviewIndicator from '../components/PreviewIndicator';
 import EmptyState from '../components/EmptyState';
@@ -94,6 +95,9 @@ export default function ContentPage() {
   }
 
   const sections = page.sections ?? [];
+  // Portfolio items reference skills by id across pages (Skill Refs v1.8), so the
+  // index spans the whole document (live and preview alike, both `state.document`).
+  const skillsById = buildSkillsIndex(state.document);
 
   return (
     <main id="main-content" className={styles.page}>
@@ -112,6 +116,7 @@ export default function ContentPage() {
             section={section}
             media={media}
             documentVersion={state.document.version}
+            skillsById={skillsById}
           />
         );
       })}

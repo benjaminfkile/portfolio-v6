@@ -1,9 +1,11 @@
 import type { SectionProps } from './types';
-import type { MediaRef, PortfolioItem } from '../types/content';
+import type { MediaRef, PortfolioItem, SkillsItem } from '../types/content';
 import SectionShell from '../components/ui/SectionShell';
 import Panel from '../components/ui/Panel';
 import MediaFrame from '../components/ui/MediaFrame';
 import TagChip from '../components/ui/TagChip';
+import SkillIcon from '../components/ui/SkillIcon';
+import type { SkillsById } from '../lib/skillsIndex';
 import { sendEvent } from '../lib/beacon';
 import styles from './PortfolioSection.module.css';
 
@@ -14,9 +16,12 @@ import styles from './PortfolioSection.module.css';
  * resolves its `media_id` through the document media map (§6.8); an item
  * carrying a `playback_rate` is a looping demo clip and renders as a video,
  * everything else as a lazy image — the {@link MediaFrame} owns the
- * autoplay-vs-poster motion rules (§6). Tech marks render as small
- * {@link TagChip} image chips, and the ordered `Link[]` renders as a chip row
- * carrying each link's own label (§3.4).
+ * autoplay-vs-poster motion rules (§6). Tech marks reference skills items by id
+ * (`skill_refs`, Skill Refs v1.8) and render as small {@link TagChip}s carrying
+ * each referenced skill's THEME-AWARE icon + title, so portfolio marks and the
+ * skills sphere never diverge; pre-v1.8 documents fall back to the legacy
+ * `tech_icons` URL array. The ordered `Link[]` renders as a chip row carrying
+ * each link's own label (§3.4).
  */
 interface PortfolioData {
   heading?: string;
@@ -24,13 +29,39 @@ interface PortfolioData {
 }
 
 /**
- * Derive an accessible name for a tech-stack icon from its URL. `tech_icons` is
- * just a list of image URLs (§6.8) with no companion label, so the icon image
- * would otherwise be the sole — and unannounced — carrier of the technology
- * name (a11y sweep, §7). The filename stem is the name in practice
- * (`.../icons/react.svg` → "React"), so we humanise it: drop the path and
- * extension, turn separators into spaces. Falls back to a generic label if the
- * URL has no usable stem.
+ * Resolve an item's `skill_refs` (Skill Refs v1.8) to the skills items they name,
+ * in order, dropping any that don't resolve. Publish guarantees every entry
+ * resolves to a visible skills item in the same document, but we skip an
+ * unresolvable ref defensively (console.warn at most, no warning UI) so a stale
+ * or malformed ref never breaks the render.
+ */
+function resolveSkillRefs(
+  refs: string[],
+  skillsById: SkillsById,
+): Array<{ id: string; skill: SkillsItem }> {
+  const resolved: Array<{ id: string; skill: SkillsItem }> = [];
+  for (const id of refs) {
+    const skill = skillsById[id];
+    if (!skill) {
+      console.warn(
+        `portfolio skill_ref "${id}" resolves to no skills item — skipping (Skill Refs v1.8).`,
+      );
+      continue;
+    }
+    resolved.push({ id, skill });
+  }
+  return resolved;
+}
+
+/**
+ * LEGACY (pre-v1.8): derive an accessible name for a bare tech-icon URL from its
+ * filename. `tech_icons` is just a list of image URLs (§6.8) with no companion
+ * label, so the icon image would otherwise be the sole — and unannounced —
+ * carrier of the technology name (a11y sweep, §7). The filename stem is the name
+ * in practice (`.../icons/react.svg` → "React"), so we humanise it: drop the path
+ * and extension, turn separators into spaces. Falls back to a generic label if
+ * the URL has no usable stem. Used only on the legacy `tech_icons` path; v1.8
+ * items take their accessible name from the resolved skill's title instead.
  */
 export function techNameFromIcon(url: string): string {
   const stem = url
@@ -77,8 +108,13 @@ function ProjectMedia({
   );
 }
 
-export default function PortfolioSection({ section, media }: SectionProps) {
+export default function PortfolioSection({
+  section,
+  media,
+  skillsById,
+}: SectionProps) {
   const data = section.data as PortfolioData;
+  const skills = skillsById ?? {};
 
   return (
     <SectionShell
@@ -90,7 +126,15 @@ export default function PortfolioSection({ section, media }: SectionProps) {
         {section.items.map((item, index) => {
           const project = item.data as PortfolioItem;
           const asset = project.media_id ? media[project.media_id] : undefined;
-          const techIcons = project.tech_icons ?? [];
+          // v1.8 items carry `skill_refs` (an array, possibly empty); pre-v1.8
+          // documents carry `tech_icons` instead and have no `skill_refs`. The
+          // presence of `skill_refs` is the discriminator — a v1.8 item never
+          // falls back to `tech_icons`.
+          const isSkillRefs = Array.isArray(project.skill_refs);
+          const resolvedSkills = isSkillRefs
+            ? resolveSkillRefs(project.skill_refs, skills)
+            : [];
+          const legacyIcons = isSkillRefs ? [] : project.tech_icons ?? [];
           const links = project.links ?? [];
           // From 900px up the media/text split alternates side per item (§5).
           const reversed = index % 2 === 1;
@@ -114,9 +158,27 @@ export default function PortfolioSection({ section, media }: SectionProps) {
                   {project.intro && (
                     <p className={styles.intro}>{project.intro}</p>
                   )}
-                  {techIcons.length > 0 && (
+                  {/* v1.8: one chip per resolved skill_ref, theme-aware icon +
+                      title as the accessible name. */}
+                  {resolvedSkills.length > 0 && (
                     <ul className={styles.techIcons}>
-                      {techIcons.map((icon, i) => (
+                      {resolvedSkills.map(({ id, skill }, i) => (
+                        <li key={`${id}-${i}`}>
+                          <TagChip className={styles.techChip}>
+                            <SkillIcon
+                              className={styles.techIcon}
+                              skill={skill}
+                              alt={skill.title}
+                            />
+                          </TagChip>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {/* LEGACY (pre-v1.8): raw tech_icons URLs, filename-stem name. */}
+                  {legacyIcons.length > 0 && (
+                    <ul className={styles.techIcons}>
+                      {legacyIcons.map((icon, i) => (
                         <li key={`${icon}-${i}`}>
                           <TagChip className={styles.techChip}>
                             <img

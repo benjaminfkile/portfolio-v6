@@ -275,7 +275,7 @@ doesn't recognize degrades rather than crashes.
 | `about` | no | — |
 | `timeline` | yes | `{ date_range, title, description, media_id? }` |
 | `skills` | yes | `{ title, description, icon_source }` (v1.5: `proficiency` removed) |
-| `portfolio` | yes | `{ title, intro, description, media_id, playback_rate?, transform_value?, tech_icons[], links: Link[] }` |
+| `portfolio` | yes | `{ title, intro, description, media_id, playback_rate?, transform_value?, skill_refs[], links: Link[] }` (v1.8: `tech_icons[]` → `skill_refs[]`; legacy fallback below) |
 | `status` | no | — (live; config only) |
 | `blog` | no | — (live; config only) |
 | `now_playing` | no | — (live; config only) |
@@ -291,6 +291,21 @@ an integer 0–4 = the three.js `IcosahedronGeometry` detail parameter, where th
 face count is `20·(detail+1)²` (0→20, 1→80, 2→180, 3→320, 4→500). Absent =
 auto-fit: the renderer picks the smallest detail whose face count is at least the
 number of skill items (clamped to 4).
+
+**Skill Refs (v1.8).** A portfolio item's `tech_icons[]` — a bare URL array
+rendered with no theme awareness and names guessed from filename stems — is
+**replaced** by `skill_refs[]`, an ordered array of `skills`-item ids (items of
+any `skills` section on any page of the same document; array order = render
+order, empty allowed). The portfolio renders each referenced skill's theme-aware
+icon (`icon_source_dark` on the dark theme, `icon_source` otherwise) and its
+`title` as the accessible name, so portfolio marks and the skills sphere can
+never show mismatched icons — consistency is enforced by construction, at
+publish. Publish guarantees every entry resolves to a visible skills item in the
+same published document; the renderer still skips an unresolvable ref defensively
+(console.warn at most, no warning UI). **Legacy:** documents published before
+v1.8 carry `tech_icons[]` instead and keep rendering exactly as before (raw URLs,
+filename-stem names) until republished; `tech_icons` is a render-time fallback
+only and is not part of the canonical API schema.
 
 #### The `Link` type
 
@@ -1976,6 +1991,7 @@ event and nothing in v6 blocks on one.
 | Public-site styling contained to CSS Modules + one tokens file | Makes the future restyle a mechanical leaf-file swap — markup replaced, `*.module.css` deleted, tokens mapped (§14.3). |
 | Admin is MUI, fully themed, fully built in v1 | Owner decision. Audience of one and no restyle planned — an interim plain admin would mean building it twice (§8.3, §14.4). |
 | Admin reorder is drag-and-drop | The full-array `PUT` (§4.2) was designed for it; the admin is built once, so no up/down-button interim (§14.4). |
+| v1.8 portfolio tech icons reference skills items — icon consistency enforced at publish | Portfolio marks and the skills sphere must never show mismatched icons. `skill_refs[]` makes portfolio items reference skills by id (theme-aware icon + title reused), and publish guarantees every ref resolves; pre-v1.8 `tech_icons[]` stays a render-time legacy fallback (§3.4). |
 
 ---
 

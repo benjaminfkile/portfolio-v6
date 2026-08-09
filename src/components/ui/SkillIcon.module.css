@@ -1,0 +1,32 @@
+/* Shared theme-aware skill icon (Icons v1.6 / Skill Refs v1.8). One glyph, sized
+   for a chip. When a skill ships a dark override both imgs render and CSS — not
+   JS — swaps them, so the icon follows a live theme toggle with no listener.
+   Used by the skills sphere's chip fallback and by portfolio tech chips, so the
+   two never diverge (DESIGN.md §2, §5). */
+
+.icon {
+  flex: none;
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+/* Per-theme variants: the dark glyph shows by default (dark is the native theme,
+   incl. before data-theme is stamped) and the light glyph only under the light
+   theme. */
+.iconLight {
+  display: none;
+}
+
+.iconDark {
+  display: block;
+}
+
+:root[data-theme='light'] .iconLight {
+  display: block;
+}
+
+:root[data-theme='light'] .iconDark {
+  display: none;
+}

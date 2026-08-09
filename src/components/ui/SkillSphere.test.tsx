@@ -106,8 +106,9 @@ describe('SkillSphere fallback (no WebGL — the jsdom path)', () => {
     });
     expect(dualImgs).toHaveLength(2);
     const classes = dualImgs.map((img) => img.className);
-    expect(classes.some((c) => /chipIconLight/.test(c))).toBe(true);
-    expect(classes.some((c) => /chipIconDark/.test(c))).toBe(true);
+    // The dual variants ship the shared SkillIcon swap classes (Skill Refs v1.8).
+    expect(classes.some((c) => /iconLight/.test(c))).toBe(true);
+    expect(classes.some((c) => /iconDark/.test(c))).toBe(true);
   });
 
   it('renders an empty chip grid for no skills without crashing', () => {
