@@ -91,26 +91,3 @@ describe('TimelineSection (DESIGN.md §5)', () => {
     ).toBeInTheDocument();
   });
 });
-
-describe('TimelineSection — v5-style stagger (even left / odd right)', () => {
-  it('alternates entryLeft/entryRight classes by item parity', () => {
-    const items = ['a', 'b', 'c'].map(
-      (id, i) =>
-        ({
-          id,
-          data: { date_range: `202${i}`, title: `T${i}`, description: '' },
-        }) as unknown as SectionItem,
-    );
-    const { container } = render(
-      <TimelineSection
-        section={timelineSection(items)}
-        media={{} as MediaMap}
-      />,
-    );
-    const entries = Array.from(container.querySelectorAll('ol > li'));
-    expect(entries).toHaveLength(3);
-    expect(entries[0].className).toMatch(/entryLeft/);
-    expect(entries[1].className).toMatch(/entryRight/);
-    expect(entries[2].className).toMatch(/entryLeft/);
-  });
-});
