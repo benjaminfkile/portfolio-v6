@@ -165,11 +165,12 @@ export default function PortfolioSection({
                       {resolvedSkills.map(({ id, skill }, i) => (
                         <li key={`${id}-${i}`}>
                           <TagChip className={styles.techChip}>
-                            <SkillIcon
-                              className={styles.techIcon}
-                              skill={skill}
-                              alt={skill.title}
-                            />
+                            {/* No className: SkillIcon's own .icon already sizes
+                                the glyph, and a merged class that sets `display`
+                                would defeat the CSS theme swap (it did — two
+                                Express icons side by side). `.techIcon` remains
+                                for the legacy raw-URL path only. */}
+                            <SkillIcon skill={skill} alt={skill.title} />
                           </TagChip>
                         </li>
                       ))}

@@ -14,19 +14,22 @@
 
 /* Per-theme variants: the dark glyph shows by default (dark is the native theme,
    incl. before data-theme is stamped) and the light glyph only under the light
-   theme. */
-.iconLight {
+   theme. Doubled specificity (.icon.iconLight) on purpose: callers merge their
+   own single-class styles onto these imgs, and a later-injected caller rule that
+   sets `display` at equal specificity would defeat the swap and show BOTH
+   variants (portfolio techIcon regression). */
+.icon.iconLight {
   display: none;
 }
 
-.iconDark {
+.icon.iconDark {
   display: block;
 }
 
-:root[data-theme='light'] .iconLight {
+:root[data-theme='light'] .icon.iconLight {
   display: block;
 }
 
-:root[data-theme='light'] .iconDark {
+:root[data-theme='light'] .icon.iconDark {
   display: none;
 }
