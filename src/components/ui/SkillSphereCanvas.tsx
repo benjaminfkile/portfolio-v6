@@ -15,6 +15,12 @@ interface DragState {
    *  the drag is a free trackball — no per-axis clamps, infinite tumble. */
   quat: THREE.Quaternion;
   dragging: boolean;
+  /** True once the user drags while a rotate-to-target hold is engaged: the
+   *  hold is BROKEN (the frame loop stops re-asserting the target) so the
+   *  sphere stays navigable while a skill is locked — otherwise a lock would
+   *  dead-end mobile, where the sphere is the only selector. Re-armed (false)
+   *  whenever a new focus target is set. */
+  holdBroken: boolean;
   lastX: number;
   lastY: number;
 }
@@ -556,6 +562,8 @@ function Scene({
       return;
     }
     const target = faceTargetQuaternion(placements[idx].normal);
+    // A freshly picked target re-arms the hold a drag may have broken.
+    s.holdBroken = false;
     if (reduced) {
       s.quat.copy(target);
       focusRef.current = { from: target.clone(), target, t: 1 };
@@ -570,15 +578,20 @@ function Scene({
     if (!group) return;
     const s = stateRef.current;
     const focus = focusRef.current;
-    if (focus) {
-      // Ease toward the target and hold there; a drag is disabled while focused.
+    if (focus && !s.holdBroken) {
+      // Ease toward the target and hold there. A drag breaks the hold (the
+      // selection survives; only the orientation is released) so a locked
+      // skill never dead-ends navigation — critical on mobile, where the
+      // sphere is the only selector.
       if (focus.t < 1) {
         focus.t = Math.min(1, focus.t + delta / FOCUS_DURATION);
         s.quat.copy(focus.from).slerp(focus.target, easeInOutCubic(focus.t));
         invalidate(); // keep frames coming through the tween in demand mode
       }
-    } else if (!reduced && !s.dragging) {
-      // Slow auto-spin about the screen-vertical axis.
+    } else if (!focus && !reduced && !s.dragging) {
+      // Slow auto-spin about the screen-vertical axis. Deliberately NOT while a
+      // broken-hold focus target exists: the sphere stays where the user left
+      // it, so the next tap is aimed at a stationary target.
       s.quat.premultiply(TMP_STEP_Q.setFromAxisAngle(Y_AXIS, delta * 0.25));
     }
     // Renormalize: thousands of premultiplied small steps drift numerically.
@@ -692,14 +705,11 @@ export default function SkillSphereCanvas({
   const hoveredTitle = hoveredId
     ? (skills.find((s) => s.id === hoveredId)?.title ?? null)
     : null;
-  // A held focus target owns the orientation; let it be, don't let a stray drag
-  // fight the slerp (simplest of the task's two options).
-  const focusActive = focusSkillId != null;
-
   const stateRef = useRef<DragState>({
     // Start with the same gentle downward tilt the sphere always had.
     quat: new THREE.Quaternion().setFromAxisAngle(X_AXIS, 0.32),
     dragging: false,
+    holdBroken: false,
     lastX: 0,
     lastY: 0,
   });
@@ -727,8 +737,11 @@ export default function SkillSphereCanvas({
       : 'always';
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (focusActive) return; // a rotate-to-target hold owns the orientation
     const s = stateRef.current;
+    // Dragging BREAKS an engaged rotate-to-target hold (the lock itself
+    // survives — only the orientation is released). Without this a locked
+    // skill dead-ends navigation on mobile, where the sphere is the selector.
+    s.holdBroken = true;
     s.dragging = true;
     s.lastX = e.clientX;
     s.lastY = e.clientY;
