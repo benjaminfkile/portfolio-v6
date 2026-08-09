@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import PortfolioSection from './PortfolioSection';
 import styles from './PortfolioSection.module.css';
-import type { MediaMap, Section, SectionItem } from '../types/content';
+import type { MediaMap, Section, SectionItem, SkillsItem } from '../types/content';
+import type { SkillsById } from '../lib/skillsIndex';
+import { buildSkillsIndex } from '../lib/skillsIndex';
+import { fixtureSkillRefsDocument } from '../test/fixtures';
 
 function portfolioSection(
   items: SectionItem[],
@@ -81,7 +84,9 @@ describe('PortfolioSection (DESIGN.md §5)', () => {
     expect(screen.getByRole('link', { name: 'Live site' })).toBeInTheDocument();
   });
 
-  it('renders tech marks as small image chips', () => {
+  it('renders LEGACY tech_icons as small image chips, unchanged (pre-v1.8)', () => {
+    // A pre-v1.8 item carries `tech_icons` and NO `skill_refs`, so it keeps the
+    // legacy raw-URL rendering with filename-stem names.
     const { container } = render(
       <PortfolioSection
         section={portfolioSection([
@@ -132,5 +137,153 @@ describe('PortfolioSection (DESIGN.md §5)', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: 'Portfolio' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('PortfolioSection — Skill Refs v1.8', () => {
+  const skill = (over: Partial<SkillsItem> = {}): SkillsItem => ({
+    title: 'TypeScript',
+    description: '',
+    icon_source: 'https://cdn.example.com/icons/ts.svg',
+    ...over,
+  });
+
+  const skillsById: SkillsById = {
+    'sk-ts': skill(),
+    'sk-vercel': skill({
+      title: 'Vercel',
+      icon_source: 'https://cdn.example.com/icons/vercel-light.svg',
+      icon_source_dark: 'https://cdn.example.com/icons/vercel-dark.svg',
+    }),
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('renders one chip per resolved skill_ref, in order, using the skill title as the accessible name', () => {
+    const { container } = render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', { skill_refs: ['sk-vercel', 'sk-ts'], tech_icons: [] }),
+        ])}
+        media={{}}
+        skillsById={skillsById}
+      />,
+    );
+
+    // Accessible name comes from the skill title — no filename-stem guessing.
+    // 'Vercel' carries a dark override → two imgs (CSS-swapped) share the alt.
+    expect(screen.getAllByAltText('Vercel')).toHaveLength(2);
+    expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
+
+    // Order follows skill_refs: the Vercel chip precedes the TypeScript chip.
+    const chipList = container.querySelector(`.${styles.techIcons}`)!;
+    const chipItems = chipList.querySelectorAll(':scope > li');
+    expect(chipItems).toHaveLength(2);
+    expect(chipItems[0].querySelector('img')).toHaveAttribute('alt', 'Vercel');
+    expect(chipItems[1].querySelector('img')).toHaveAttribute('alt', 'TypeScript');
+  });
+
+  it('picks the theme-aware icon: both light+dark imgs with an override, one without', () => {
+    const { container } = render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', { skill_refs: ['sk-vercel', 'sk-ts'], tech_icons: [] }),
+        ])}
+        media={{}}
+        skillsById={skillsById}
+      />,
+    );
+
+    const srcs = Array.from(container.querySelectorAll('img')).map((img) =>
+      img.getAttribute('src'),
+    );
+    // Vercel ships both variants for the CSS-driven live theme swap...
+    expect(srcs).toContain('https://cdn.example.com/icons/vercel-light.svg');
+    expect(srcs).toContain('https://cdn.example.com/icons/vercel-dark.svg');
+    // ...TypeScript has no override, so exactly one img.
+    expect(srcs).toContain('https://cdn.example.com/icons/ts.svg');
+    expect(srcs).toHaveLength(3);
+
+    // The dual variants ship the shared SkillIcon swap classes (CSS, not JS).
+    const vercelImgs = Array.from(container.querySelectorAll('img')).filter((img) =>
+      (img.getAttribute('src') ?? '').includes('vercel'),
+    );
+    const classes = vercelImgs.map((img) => img.className).join(' ');
+    expect(classes).toMatch(/iconLight/);
+    expect(classes).toMatch(/iconDark/);
+  });
+
+  it('silently skips an unresolvable ref (console.warn at most, no warning UI)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { container } = render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', {
+            skill_refs: ['sk-ts', 'sk-nope'],
+            tech_icons: [],
+          }),
+        ])}
+        media={{}}
+        skillsById={skillsById}
+      />,
+    );
+
+    // Only the resolvable ref renders a chip; the missing one is dropped.
+    expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
+    expect(container.querySelectorAll(`.${styles.techIcon}`)).toHaveLength(1);
+    // No warning UI — a console.warn is the loudest it gets.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('sk-nope'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not fall back to tech_icons when skill_refs is present (a v1.8 item ignores legacy icons)', () => {
+    render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', {
+            skill_refs: ['sk-ts'],
+            tech_icons: ['https://media.benkile.com/react.svg'],
+          }),
+        ])}
+        media={{}}
+        skillsById={skillsById}
+      />,
+    );
+
+    expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
+    // The legacy URL is not rendered — presence of skill_refs is the discriminator.
+    expect(
+      screen.queryByAltText('react logo'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders no chips (and does not crash) for an item whose skill_refs is empty', () => {
+    const { container } = render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', { skill_refs: [], tech_icons: [] }),
+        ])}
+        media={{}}
+        skillsById={skillsById}
+      />,
+    );
+
+    expect(container.querySelectorAll(`.${styles.techIcon}`)).toHaveLength(0);
+  });
+
+  it('resolves refs that point at skills on OTHER pages (whole-document index)', () => {
+    // Build the same index ContentPage threads down, from a multi-page document.
+    const index = buildSkillsIndex(fixtureSkillRefsDocument);
+    const portfolio = fixtureSkillRefsDocument.pages[0].sections.find(
+      (s) => s.type === 'portfolio',
+    )!;
+
+    render(<PortfolioSection section={portfolio} media={{}} skillsById={index} />);
+
+    // sk-ts + sk-vercel live on `home`; sk-docker lives on the `tools` page — all
+    // three resolve. sk-missing (also in skill_refs) is skipped.
+    expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
+    expect(screen.getAllByAltText('Vercel')).toHaveLength(2);
+    expect(screen.getByAltText('Docker')).toBeInTheDocument();
   });
 });

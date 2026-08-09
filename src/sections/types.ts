@@ -1,4 +1,5 @@
 import type { MediaMap, Section } from '../types/content';
+import type { SkillsById } from '../lib/skillsIndex';
 
 /**
  * The props every section component receives. `ContentPage` maps the published
@@ -20,4 +21,14 @@ export interface SectionProps {
    * without the readout rather than crashing.
    */
   documentVersion?: number;
+  /**
+   * A document-wide index of every `skills` item by id (Skill Refs v1.8), built
+   * from ALL `skills` sections on ALL pages of the document and threaded down from
+   * `ContentPage` (both the live and preview paths). The portfolio resolves each
+   * `skill_refs` id here to render the referenced skill's theme-aware icon + title
+   * so portfolio marks and the skills sphere never diverge. Optional: sections
+   * that don't reference skills ignore it, and a document that predates it renders
+   * the legacy `tech_icons` path rather than crashing.
+   */
+  skillsById?: SkillsById;
 }

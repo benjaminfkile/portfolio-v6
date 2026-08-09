@@ -98,7 +98,25 @@ export interface PortfolioItem {
   media_id: string;
   playback_rate?: number;
   transform_value?: string;
-  tech_icons: string[];
+  /**
+   * Ordered skills-item ids this project references (Skill Refs v1.8) — items of
+   * `skills`-type sections on ANY page of the same published document. Array
+   * order is render order; empty is allowed. The portfolio renders each
+   * referenced skill's THEME-AWARE icon and title, so portfolio marks and the
+   * skills sphere can never show mismatched icons — icon consistency is enforced
+   * by construction (publish guarantees every entry resolves; the renderer still
+   * skips an unresolvable ref defensively). Replaces v5's bare `tech_icons` URL
+   * array (§3.4).
+   */
+  skill_refs: string[];
+  /**
+   * LEGACY (pre-v1.8): a bare array of tech-icon URLs with no theme awareness or
+   * companion labels. Documents published before Skill Refs v1.8 carry this
+   * instead of {@link skill_refs} and keep rendering exactly as before until Ben
+   * republishes; v1.8 documents omit it. Not part of the canonical API schema —
+   * a render-time fallback only (§3.4).
+   */
+  tech_icons?: string[];
   links: Link[];
 }
 

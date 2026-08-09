@@ -1,5 +1,11 @@
 import { lazy, Suspense, useMemo } from 'react';
+import SkillIcon from './SkillIcon';
 import styles from './SkillSphere.module.css';
+
+// The theme-aware icon resolver now lives with the shared {@link SkillIcon}
+// component (Skill Refs v1.8) so the sphere and the portfolio share one source
+// of truth; re-exported here for the WebGL texture pipeline and existing callers.
+export { resolveSkillIconUrl } from './SkillIcon';
 
 /**
  * One skill placed on the sphere: an id, its title, and the icon URL(s).
@@ -12,21 +18,6 @@ export interface SkillSphereSkill {
   title: string;
   icon_source: string;
   icon_source_dark?: string;
-}
-
-/**
- * The effective icon URL for a skill under the current theme (Icons v1.6). Dark
- * theme prefers `icon_source_dark` and falls back to `icon_source` when it is
- * absent; light theme always uses `icon_source`. Both the WebGL texture
- * pipeline (via the scene's `lightTheme` token) and any JS-driven path resolve
- * through here so the two never diverge.
- */
-export function resolveSkillIconUrl(
-  skill: Pick<SkillSphereSkill, 'icon_source' | 'icon_source_dark'>,
-  lightTheme: boolean,
-): string {
-  if (lightTheme) return skill.icon_source;
-  return skill.icon_source_dark ?? skill.icon_source;
 }
 
 export interface SkillSphereProps {
@@ -96,51 +87,13 @@ function Chips({ skills }: { skills: SkillSphereSkill[] }) {
 }
 
 /**
- * A chip's icon. When a skill carries a dark-theme override (Icons v1.6) we
- * render BOTH `<img>`s and swap them with CSS only — the dark variant shows by
- * default (dark is the native theme, incl. before `data-theme` is stamped) and
- * is hidden under `:root[data-theme='light']`, where the light variant shows.
- * The fallback path stays JS-listener-free so it costs nothing on the WebGL
- * path it stands in for. A single-URL skill renders one img, as before.
- *
- * Every img requests in CORS mode (crossOrigin="anonymous"): the CDN serves
- * ACAO only when the request carries an Origin header and sends no
- * `Vary: Origin`, so a plain no-cors <img> load poisons the browser cache with
- * a header-less response that then fails the sphere's crossOrigin texture
- * fetch of the SAME URL. Keeping every request CORS-mode keeps every cache
- * entry texture-compatible.
+ * A chip's icon — the shared theme-aware {@link SkillIcon} (Skill Refs v1.8),
+ * decorative here (`alt=""`) because the chip's own `<span>` carries the name.
+ * Its dual-img CSS swap follows a live theme toggle with no JS listener, so the
+ * fallback path costs nothing on the WebGL path it stands in for.
  */
 function ChipIcon({ skill }: { skill: SkillSphereSkill }) {
-  if (!skill.icon_source) return null;
-  if (skill.icon_source_dark) {
-    return (
-      <>
-        <img
-          className={`${styles.chipIcon} ${styles.chipIconLight}`}
-          src={skill.icon_source}
-          alt=""
-          aria-hidden="true"
-          crossOrigin="anonymous"
-        />
-        <img
-          className={`${styles.chipIcon} ${styles.chipIconDark}`}
-          src={skill.icon_source_dark}
-          alt=""
-          aria-hidden="true"
-          crossOrigin="anonymous"
-        />
-      </>
-    );
-  }
-  return (
-    <img
-      className={styles.chipIcon}
-      src={skill.icon_source}
-      alt=""
-      aria-hidden="true"
-      crossOrigin="anonymous"
-    />
-  );
+  return <SkillIcon skill={skill} alt="" />;
 }
 
 // Lazily loaded so the three.js payload is code-split out of the entry chunk
