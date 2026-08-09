@@ -102,6 +102,13 @@ function Chips({ skills }: { skills: SkillSphereSkill[] }) {
  * is hidden under `:root[data-theme='light']`, where the light variant shows.
  * The fallback path stays JS-listener-free so it costs nothing on the WebGL
  * path it stands in for. A single-URL skill renders one img, as before.
+ *
+ * Every img requests in CORS mode (crossOrigin="anonymous"): the CDN serves
+ * ACAO only when the request carries an Origin header and sends no
+ * `Vary: Origin`, so a plain no-cors <img> load poisons the browser cache with
+ * a header-less response that then fails the sphere's crossOrigin texture
+ * fetch of the SAME URL. Keeping every request CORS-mode keeps every cache
+ * entry texture-compatible.
  */
 function ChipIcon({ skill }: { skill: SkillSphereSkill }) {
   if (!skill.icon_source) return null;
@@ -113,12 +120,14 @@ function ChipIcon({ skill }: { skill: SkillSphereSkill }) {
           src={skill.icon_source}
           alt=""
           aria-hidden="true"
+          crossOrigin="anonymous"
         />
         <img
           className={`${styles.chipIcon} ${styles.chipIconDark}`}
           src={skill.icon_source_dark}
           alt=""
           aria-hidden="true"
+          crossOrigin="anonymous"
         />
       </>
     );
@@ -129,6 +138,7 @@ function ChipIcon({ skill }: { skill: SkillSphereSkill }) {
       src={skill.icon_source}
       alt=""
       aria-hidden="true"
+      crossOrigin="anonymous"
     />
   );
 }
