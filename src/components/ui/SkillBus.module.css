@@ -1,0 +1,93 @@
+/* SkillBus — the console's connective "pipe" (Skills Console v1.9, DESIGN.md §5).
+   A thin bus line + connection nodes behind/between the three panels, with a
+   one-shot amber packet on each preview/lock change. ≥900px only; decorative
+   (aria-hidden). Tokens only. */
+
+.bus {
+  display: none;
+}
+
+/* The bus is a ≥900px-only console flourish; it sits behind the panels (which
+   are opaque), so it reads in the gaps between columns. */
+@media (min-width: 900px) {
+  .bus {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    pointer-events: none;
+    overflow: hidden;
+  }
+}
+
+/* The base bus line, centred vertically across the whole console width. */
+.line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--line);
+}
+
+/* Three connection nodes: one at each end and one in the centre gap. */
+.nodes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+/* The data packet: a short amber dash that travels the line once and stops.
+   Remounted (via React key) on every trigger, so this animation always plays
+   from the top — no looping, no queue. */
+.packet {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 64px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, var(--amber));
+  will-change: left, opacity;
+  animation: busPulse 700ms ease-in-out 1 forwards;
+}
+
+@keyframes busPulse {
+  from {
+    left: 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  to {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: the packet is not rendered at all (gated in JS); the line
+   stays as static decoration (§6). This guard covers any residual selector. */
+@media (prefers-reduced-motion: reduce) {
+  .packet {
+    animation: none;
+    display: none;
+  }
+}

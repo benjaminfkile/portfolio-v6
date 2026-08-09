@@ -1,0 +1,75 @@
+/* SkillList — the console's left panel (Skills Console v1.9, DESIGN.md §5).
+   Instrument rows: mono voice, tokens only. The list scrolls inside the shared
+   console height; the section sets overflow-y on the panel wrapper. */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* One skill row: a full-width button, icon + title, an amber latch when locked.
+   Resets native button chrome into the instrument surface. */
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-s);
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+
+.item:hover {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* Previewed / locked (the focus target): the row the console is reading. */
+.active {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* Latched selection — engaged treatment that survives mouse-out (that is the
+   point: it lets the detail text be scrolled). aria-pressed carries it to AT. */
+.item[aria-pressed='true'] {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--text-bright);
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The lock latch dot, pushed to the row's trailing edge. */
+.latch {
+  flex: none;
+  margin-left: auto;
+}

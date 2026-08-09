@@ -28,6 +28,19 @@ export interface SkillSphereProps {
    * {@link pickDetail}.
    */
   detail?: number;
+  /**
+   * Skills Console v1.9: the skill to rotate front-and-centre and hold (the
+   * previewed skill, else the locked one). On the WebGL path it drives the
+   * rotate-to-target slerp; on the chip fallback it highlights the matching
+   * chip. `null` resumes auto-spin / clears the highlight.
+   */
+  focusSkillId?: string | null;
+  /** The locked skill id — reflected as `aria-pressed` on the fallback chips. */
+  lockedId?: string | null;
+  /** Hover/focus of a tile or chip previews that skill; leaving clears it. */
+  onPreview?: (id: string | null) => void;
+  /** Click of a tile or chip toggles that skill's lock. */
+  onLock?: (id: string) => void;
 }
 
 /**
@@ -72,16 +85,65 @@ function webglAvailable(): boolean {
  * fallback and the Suspense placeholder while the three.js chunk loads. Pure
  * DOM: it imports no three.js, so the fallback path keeps that payload out of
  * the bundle entirely.
+ *
+ * When the console wires interactions (Skills Console v1.9), each chip is a
+ * button: hover/focus previews the skill, click toggles its lock, and the
+ * focused (previewed/locked) chip gets the highlighted state — so the fallback
+ * keeps the list/detail flow working with no rotation. Absent handlers (the
+ * bare Suspense placeholder) render inert chips.
  */
-function Chips({ skills }: { skills: SkillSphereSkill[] }) {
+function Chips({
+  skills,
+  focusSkillId,
+  lockedId,
+  onPreview,
+  onLock,
+}: {
+  skills: SkillSphereSkill[];
+  focusSkillId?: string | null;
+  lockedId?: string | null;
+  onPreview?: (id: string | null) => void;
+  onLock?: (id: string) => void;
+}) {
+  const interactive = Boolean(onPreview || onLock);
   return (
     <ul className={styles.chips}>
-      {skills.map((skill) => (
-        <li key={skill.id} className={styles.chip}>
-          <ChipIcon skill={skill} />
-          <span>{skill.title}</span>
-        </li>
-      ))}
+      {skills.map((skill) => {
+        const active = skill.id === focusSkillId;
+        const locked = skill.id === lockedId;
+        const className = [
+          styles.chip,
+          interactive && styles.chipButton,
+          active && styles.chipActive,
+        ]
+          .filter(Boolean)
+          .join(' ');
+        if (!interactive) {
+          return (
+            <li key={skill.id} className={styles.chip}>
+              <ChipIcon skill={skill} />
+              <span>{skill.title}</span>
+            </li>
+          );
+        }
+        return (
+          <li key={skill.id}>
+            <button
+              type="button"
+              className={className}
+              aria-pressed={locked}
+              onMouseEnter={() => onPreview?.(skill.id)}
+              onMouseLeave={() => onPreview?.(null)}
+              onFocus={() => onPreview?.(skill.id)}
+              onBlur={() => onPreview?.(null)}
+              onClick={() => onLock?.(skill.id)}
+            >
+              <ChipIcon skill={skill} />
+              <span>{skill.title}</span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -114,7 +176,14 @@ const SkillSphereCanvas = lazy(() => import('./SkillSphereCanvas'));
  * canvas itself is `aria-hidden` (Chart rules, §7). three.js is loaded lazily,
  * so the fallback path never pulls it in.
  */
-export default function SkillSphere({ skills, detail }: SkillSphereProps) {
+export default function SkillSphere({
+  skills,
+  detail,
+  focusSkillId = null,
+  lockedId = null,
+  onPreview,
+  onLock,
+}: SkillSphereProps) {
   const resolvedDetail = detail ?? pickDetail(skills.length);
   // Decided once at mount — the context probe is cheap but not free, and the
   // answer does not change over the component's life.
@@ -123,15 +192,29 @@ export default function SkillSphere({ skills, detail }: SkillSphereProps) {
   if (!canUseWebGL || skills.length === 0) {
     return (
       <div className={styles.root}>
-        <Chips skills={skills} />
+        <Chips
+          skills={skills}
+          focusSkillId={focusSkillId}
+          lockedId={lockedId}
+          onPreview={onPreview}
+          onLock={onLock}
+        />
       </div>
     );
   }
 
   return (
     <div className={styles.root}>
+      {/* The Suspense placeholder is the inert chip grid (no handlers) — three
+          is still loading, so there is nothing to preview yet. */}
       <Suspense fallback={<Chips skills={skills} />}>
-        <SkillSphereCanvas skills={skills} detail={resolvedDetail} />
+        <SkillSphereCanvas
+          skills={skills}
+          detail={resolvedDetail}
+          focusSkillId={focusSkillId}
+          onPreview={onPreview}
+          onLock={onLock}
+        />
       </Suspense>
       {/* Screen-reader equivalent of the decorative canvas (§7). */}
       <ul className={styles.srOnly}>

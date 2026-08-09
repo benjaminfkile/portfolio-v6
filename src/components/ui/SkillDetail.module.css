@@ -1,0 +1,54 @@
+/* SkillDetail — the console's right panel (Skills Console v1.9, DESIGN.md §5).
+   Mono instrument header over body prose; scrolls inside the shared console
+   height. Tokens only. */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+}
+
+.detail:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: var(--r-s);
+}
+
+/* Icon + title, mono instrument voice. */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  color: var(--text-bright);
+}
+
+/* The description prose — sans body, comfortable measure. */
+.body {
+  margin: 0;
+  color: var(--text-dim);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body-s);
+  line-height: 1.5;
+}
+
+/* STANDBY / NO SIGNAL empty state — mono, dim (§5 empty states). */
+.empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+}

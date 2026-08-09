@@ -157,10 +157,12 @@ describe('ContentPage', () => {
     expect(screen.getByText('2019 – 2022')).toBeInTheDocument();
     expect(screen.getByAltText('Acme Corp logo')).toBeInTheDocument();
 
-    // skills — the geodesic SkillSphere (v1.5). jsdom has no WebGL, so it takes
-    // the chip fallback: one icon+name chip per skill, no meters.
-    expect(screen.getByText('TypeScript')).toBeInTheDocument();
-    expect(screen.getByText('PostgreSQL')).toBeInTheDocument();
+    // skills — the Skills Console (v1.9): a skill list + the geodesic
+    // SkillSphere (jsdom has no WebGL, so the sphere takes its chip fallback).
+    // Each skill therefore appears in both the list and the sphere fallback, so
+    // assert presence with getAllByText rather than a single-match query.
+    expect(screen.getAllByText('TypeScript').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('PostgreSQL').length).toBeGreaterThan(0);
 
     // portfolio — project title, resolved media, and its links.
     expect(

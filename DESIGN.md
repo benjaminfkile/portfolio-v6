@@ -130,33 +130,62 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 - **about** — prose panel, 62ch measure; optional inline mono annotations.
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).
-- **skills** (v1.5) — a 3D geodesic sphere (three.js / react-three-fiber): a
-  solid faceted `IcosahedronGeometry` surface with a `--panel-2` albedo,
-  flat-shaded matte under one fixed key light + low ambient (peak irradiance
-  ~1.2, so a fully-lit facet renders at its own `--panel-2` colour) — every
-  triangle catches its own shade and the shading sweeps across facets as the
-  sphere turns (opaque — the far hemisphere is occluded, not see-through) with
-  wireframe edges in the page's
-  plotting-grid colour (`--grid`, its alpha carried as material opacity) showing
-  the triangle intersections, and one skill icon lying flat on a triangular
-  face (incircle-sized tile on an albedo-matched, same-material lit disc so the
-  icon ground is indistinguishable from its facet; oriented to the face
-  normal; far-side tiles are
-  back-face culled; each tile rolls around its normal per-frame so the glyph
-  stays screen-upright and readable), on a bordered `--panel` instrument card
-  (`--r-m` rounded).
-  Slow auto-rotate; pointer-drag tumbles it freely (quaternion trackball, no
-  clamps); hovering a face shows its skill title in the mono instrument voice.
-  Sphere density comes from the section's `sphere_detail` config (0–4); absent =
-  auto-fit to the icon count. `prefers-reduced-motion` renders it static, and
-  where WebGL is unavailable (older browsers, the jsdom test path) it degrades to
-  a plain grid of icon + name chips. The canvas is decorative (`aria-hidden`) with
-  a visually-hidden list of skill titles alongside for assistive tech. Group
-  labels in mono. Icons are theme-aware (Icons v1.6): a skill may ship an optional
-  `icon_source_dark` override alongside the default `icon_source` — the dark theme
-  uses it (falling back to `icon_source` when absent), the light theme always uses
-  `icon_source`. The sphere re-rasterizes the tile texture on theme toggle via the
-  existing token observer; the chip fallback swaps variants with CSS only.
+- **skills** (v1.9, the **Skills Console**) — a three-panel Control Room
+  instrument: a skill **list** (left), the geodesic **sphere** (centre), and a
+  **detail** readout (right), joined by a connective **bus**. At ≥900px it is a
+  CSS grid — list (~240px) | sphere (flexible) | detail (~320px) — stretched to
+  EQUAL HEIGHT (the sphere drives the row, `min-height` ~480px; the list and
+  detail take `overflow-y: auto` inside so equal height always holds). Below
+  900px the panels stack sphere → list → detail (the list wraps chip-style;
+  tap = lock toggle) and the bus is not drawn.
+  - **List** — one instrument-styled button per skill (`SkillIcon` + title, mono,
+    section item order) in a `<ul>`. Hover/focus PREVIEWS the skill; click /
+    Enter / Space LOCKS it (a latched, checkable selection — `aria-pressed`, amber
+    `StatusDot`). Exactly one skill locks at a time (locking another moves the
+    lock; clicking the locked one unlocks); the lock survives mouse-out so the
+    detail text can be scrolled. Visible focus rings; the list scrolls inside the
+    shared height.
+  - **Sphere** — the v1.5 geodesic sphere unchanged in look: a solid faceted
+    `IcosahedronGeometry` with a `--panel-2` albedo, flat-shaded matte under one
+    fixed key light + low ambient (a fully-lit facet renders at its own
+    `--panel-2` colour), opaque (the far hemisphere is occluded), wireframe edges
+    in the plotting-grid colour (`--grid`, alpha as material opacity), one skill
+    icon lying flat on a triangular face (incircle-sized tile on an
+    albedo-matched, same-material lit disc; oriented to the face normal;
+    far-side tiles back-face culled; each rolls around its normal per-frame so the
+    glyph stays screen-upright), on a bordered `--panel` card (`--r-m`). Slow
+    auto-rotate and free quaternion-trackball drag as before, PLUS
+    rotate-to-target: a `focusSkillId` (the previewed skill, else the locked one)
+    slerps the group (~600ms, eased) so that tile faces the camera (+Z) and HOLDS
+    it there (auto-spin + drag paused) until the focus clears, then auto-spin
+    resumes from the current orientation. Tile hover previews / tile click locks
+    (synced with the list + detail); a hovered tile still shows its title tooltip
+    in the mono voice. Sphere density comes from `sphere_detail` (0–4); absent =
+    auto-fit. The canvas is decorative (`aria-hidden`) with a visually-hidden
+    title list alongside. Where WebGL is unavailable (older browsers, jsdom) it
+    degrades to the interactive chip grid — no rotation, but hover previews, click
+    locks, and the previewed/locked chip gets a highlighted state.
+  - **Detail** — the previewed skill, else the locked skill, else an
+    instrument-voice empty state (`STANDBY — hover or lock a skill`, the NO SIGNAL
+    family). A mono `SkillIcon` + title header over the skill `description` as
+    body prose; `aria-live="polite"` so screen readers hear preview changes
+    without spam; `overflow-y: auto` inside the shared height with the scroll
+    region keyboard-focusable (visible ring) so a locked skill's long description
+    is reachable by keyboard.
+  - **Bus** — a thin connective line with connection nodes linking the three
+    panels, drawn with tokens (`--line` base, amber pulse); ≥900px only. On every
+    preview-target change and lock toggle one short packet travels left → centre →
+    right once (~700ms, eased, amber) and stops — never looping; rapid
+    re-triggers restart it cleanly (the packet remounts, no queue). Decorative
+    (`aria-hidden`, never a focus stop).
+  - **Motion / a11y** — `prefers-reduced-motion`: the sphere snaps to the focus
+    target with no tween (the `demand` frameloop honored), the bus fires no packet
+    (the line stays static decoration), and the auto-spin stays off. Icons are
+    theme-aware (Icons v1.6): an optional `icon_source_dark` override is used in
+    the dark theme (falling back to `icon_source`), the light theme always uses
+    `icon_source`; the sphere re-rasterizes the tile texture on theme toggle via
+    the token observer, the CSS icons swap variants with CSS only. Group labels in
+    mono.
 - **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop ONLY
   if reduced-motion off; tap-to-play on touch), title, intro, `TagChip` tech
   icons row, links. ≥900px: media left / text right alternating; <900px stacked.

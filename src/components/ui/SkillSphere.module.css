@@ -71,6 +71,36 @@
   font-weight: var(--fw-medium);
 }
 
+/* Interactive fallback chip (Skills Console v1.9): a button that previews on
+   hover/focus and locks on click. Inherits .chip's box; resets button chrome. */
+.chipButton {
+  cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+
+.chipButton:hover,
+.chipButton:focus-visible {
+  border-color: var(--amber);
+}
+
+.chipButton:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* The previewed/locked chip — the fallback's equivalent of the sphere swinging
+   the tile front-and-centre (task: highlighted state on the chip path). */
+.chipActive {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* Locked latch: the amber accent persists via aria-pressed even off-hover. */
+.chipButton[aria-pressed='true'] {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
 /* The chip icon itself is the shared, theme-aware SkillIcon (Skill Refs v1.8);
    its sizing and the per-theme CSS swap live in SkillIcon.module.css. */
 
