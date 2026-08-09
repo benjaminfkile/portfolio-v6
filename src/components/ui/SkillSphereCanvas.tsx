@@ -588,10 +588,12 @@ function Scene({
         s.quat.copy(focus.from).slerp(focus.target, easeInOutCubic(focus.t));
         invalidate(); // keep frames coming through the tween in demand mode
       }
-    } else if (!focus && !reduced && !s.dragging) {
-      // Slow auto-spin about the screen-vertical axis. Deliberately NOT while a
-      // broken-hold focus target exists: the sphere stays where the user left
-      // it, so the next tap is aimed at a stationary target.
+    } else if (!reduced && !s.dragging) {
+      // Slow auto-spin about the screen-vertical axis — the idle state. Also
+      // reached with a BROKEN hold (the user dragged away from a locked skill
+      // and released without picking another): the sphere returns to its slow
+      // idle spin rather than freezing where the drag left it. A new pick
+      // re-arms the hold and takes the slerp branch above.
       s.quat.premultiply(TMP_STEP_Q.setFromAxisAngle(Y_AXIS, delta * 0.25));
     }
     // Renormalize: thousands of premultiplied small steps drift numerically.
