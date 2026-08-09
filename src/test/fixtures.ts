@@ -1,4 +1,5 @@
 import type { ContentDocument, Post, PostSummary } from '../types/content';
+import type { GithubDay, GithubResponse, GithubWeek } from '../lib/api';
 
 /**
  * The sections of the fixture document's `home` page — every static section type
@@ -124,7 +125,9 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
       data: { language: 'es', score_label: 'Duolingo Score 95' },
       items: [],
     },
-    { id: 'sec-github', type: 'github', data: { weeks: 52 }, items: [] },
+    // v1.10: the github config is header copy only — the calendar (and its year
+    // picker) is fetched at runtime. A stray legacy `weeks` here is ignored.
+    { id: 'sec-github', type: 'github', data: {}, items: [] },
     {
       id: 'sec-contact',
       type: 'contact',
@@ -387,6 +390,66 @@ export const fixtureOpsReport = {
         },
       ],
     },
+  ],
+};
+
+/**
+ * Build one contribution week (Sun→Sat) starting at `startISO` (`YYYY-MM-DD`)
+ * from seven daily counts; `level` is a stand-in server quantization (the count
+ * clamped to the ramp's 0–4). A real payload's `level` is quantized against the
+ * whole window, but a per-count clamp is enough to drive the renderer in tests.
+ */
+function ghWeek(startISO: string, counts: number[]): GithubWeek {
+  const start = new Date(`${startISO}T00:00:00Z`);
+  const days: GithubDay[] = counts.map((count, i) => {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    return {
+      date: d.toISOString().slice(0, 10),
+      count,
+      level: Math.min(4, Math.max(0, count)),
+    };
+  });
+  return { days };
+}
+
+/**
+ * A `GET /api/github` payload in the v1.10 browsable-calendar shape (spec §3.5):
+ * the trailing-12-months window trimmed to a handful of weeks that straddle a
+ * month boundary (July → August 2026) so tests can assert month-label derivation
+ * and the amber ramp. `years` is newest-first (it drives the window picker), and
+ * `from`/`to` are the window's inclusive `YYYY-MM-DD` bounds.
+ */
+export const fixtureGithub: GithubResponse = {
+  available: true,
+  total: 2143,
+  from: '2025-08-11',
+  to: '2026-08-09',
+  years: [2026, 2025, 2024],
+  // A real payload carries ~53 weeks; this trimmed run is enough for the tests.
+  weeks: [
+    ghWeek('2026-07-12', [0, 1, 2, 0, 3, 4, 2]),
+    ghWeek('2026-07-19', [1, 0, 2, 5, 3, 0, 1]),
+    ghWeek('2026-07-26', [0, 2, 1, 3, 0, 4, 2]),
+    ghWeek('2026-08-02', [2, 0, 4, 2, 1, 3, 0]),
+    ghWeek('2026-08-09', [3, 0, 0, 0, 0, 0, 0]),
+  ],
+};
+
+/**
+ * A `GET /api/github?year=2025` payload — a whole-calendar-year window (spec
+ * §3.5), for driving the year-picker re-fetch: choosing a year re-fetches and
+ * re-renders with these bounds and this total.
+ */
+export const fixtureGithubYear: GithubResponse = {
+  available: true,
+  total: 1876,
+  from: '2025-01-01',
+  to: '2025-12-31',
+  years: [2026, 2025, 2024],
+  weeks: [
+    ghWeek('2025-01-05', [1, 2, 0, 3, 1, 0, 2]),
+    ghWeek('2025-01-12', [0, 1, 4, 2, 3, 1, 0]),
   ],
 };
 

@@ -195,31 +195,62 @@ export function getDuolingo(
   return apiFetch<DuolingoResponse>(`/api/duolingo${query}`, init);
 }
 
-/* ---- Live section: github (spec §3.5, v1.2) ------------------------------- */
+/* ---- Live section: github (spec §3.5, v1.10) ------------------------------ */
 
 /**
- * One column of the contribution calendar: seven daily contribution counts
- * (Sun→Sat). Weeks arrive oldest→newest (spec §3.5), so the newest weeks are at
- * the end of the array and the section slices from the tail.
+ * One day of the contribution calendar (spec §3.5, v1.10). `date` is the
+ * `YYYY-MM-DD` calendar day, `count` the contribution total for it, and `level`
+ * a server-quantized intensity step 0–4 (0 = none, 4 = the window's busiest) —
+ * the renderer maps `level` straight onto its 5-step amber ramp rather than
+ * bucketing counts itself, so the calendar's shading matches the public profile.
  */
-export interface GithubWeek {
-  days: number[];
+export interface GithubDay {
+  date: string;
+  count: number;
+  level: number;
 }
 
 /**
- * `GET /api/github` — the owner's contribution calendar and total (spec §3.5,
- * v1.2). The API proxies GitHub's GraphQL `contributionsCollection` server-side
- * with a public-scope PAT and returns `{ available: false }` on any failure, so
- * the section degrades to nothing rather than erroring. The per-day count is the
- * only signal exposed — there is no per-cell event round-trip (§3.5).
+ * One column of the contribution calendar: seven day cells (Sun→Sat). Weeks
+ * arrive oldest→newest (spec §3.5), so the newest weeks are at the end of the
+ * array and the grid scrolls to its end for the trailing-window default.
+ */
+export interface GithubWeek {
+  days: GithubDay[];
+}
+
+/**
+ * `GET /api/github` — the owner's browsable contribution calendar (spec §3.5,
+ * v1.10). The API serves the **public profile** contribution data (counts match
+ * the public profile exactly). The default response is the trailing-12-months
+ * window; `?year=YYYY` returns that whole calendar year. `total` is the window's
+ * sum, `from`/`to` are its inclusive `YYYY-MM-DD` bounds, and `years` is the list
+ * of selectable calendar years, newest-first, that drives the window picker.
+ * Any failure or absence returns `{ available: false }`, so the section degrades
+ * rather than erroring.
  */
 export type GithubResponse =
-  | { available: true; total: number; weeks: GithubWeek[] }
+  | {
+      available: true;
+      total: number;
+      from: string;
+      to: string;
+      years: number[];
+      weeks: GithubWeek[];
+    }
   | { available: false };
 
-/** `GET /api/github` — see {@link GithubResponse}. */
-export function getGithub(init?: RequestInit): Promise<GithubResponse> {
-  return apiFetch<GithubResponse>('/api/github', init);
+/**
+ * `GET /api/github` — see {@link GithubResponse}. With no `year` the API returns
+ * the trailing-12-months window; passing a calendar `year` forwards it as
+ * `?year=` so the API returns that year's calendar.
+ */
+export function getGithub(
+  year?: number,
+  init?: RequestInit,
+): Promise<GithubResponse> {
+  const query = year != null ? `?year=${encodeURIComponent(year)}` : '';
+  return apiFetch<GithubResponse>(`/api/github${query}`, init);
 }
 
 /* ---- Ops replay (spec §3.5, DESIGN.md §5, v1.7) --------------------------- */
