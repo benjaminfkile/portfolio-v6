@@ -75,3 +75,58 @@
     display: block;
   }
 }
+
+/* ---- ≥900px: v5-style alternating stagger around a CENTRE spine ----------- */
+/* Even entries sit left of the spine with their text mirrored toward it; odd
+   entries sit right, reading normally. The per-entry left border becomes one
+   shared centre spine, and each entry's node dot re-anchors onto it. --gutter
+   is the gap between an entry's spine-facing edge and the spine itself. */
+@media (min-width: 900px) {
+  .rail {
+    position: relative;
+    --gutter: var(--space-5);
+  }
+
+  .rail::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    margin-left: -0.5px;
+    background: var(--line);
+  }
+
+  .entry {
+    width: calc(50% - var(--gutter));
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .entryLeft {
+    align-self: flex-start;
+    text-align: right;
+  }
+
+  .entryRight {
+    align-self: flex-end;
+    text-align: left;
+  }
+
+  /* Node dots re-anchor onto the centre spine (9px dot => 4.5px half). */
+  .entryLeft .node {
+    left: auto;
+    right: calc(-1 * var(--gutter) - 4.5px);
+  }
+
+  .entryRight .node {
+    left: calc(-1 * var(--gutter) - 4.5px);
+    right: auto;
+  }
+
+  /* Mirrored entries hug their media to the spine-facing edge too. */
+  .entryLeft .thumb {
+    margin-left: auto;
+  }
+}

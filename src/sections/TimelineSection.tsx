@@ -28,11 +28,15 @@ export default function TimelineSection({ section, media }: SectionProps) {
       className={styles.timeline}
     >
       <ol className={styles.rail}>
-        {section.items.map((item) => {
+        {section.items.map((item, index) => {
           const entry = item.data as TimelineItem;
           const asset = entry.media_id ? media[entry.media_id] : undefined;
+          // v5-style stagger (≥900px): even entries sit LEFT of the centre
+          // spine (text mirrored toward it), odd entries sit RIGHT. Below
+          // 900px every entry stays on the single left rail.
+          const side = index % 2 === 0 ? styles.entryLeft : styles.entryRight;
           return (
-            <li key={item.id} className={styles.entry}>
+            <li key={item.id} className={`${styles.entry} ${side}`}>
               <span className={styles.node} aria-hidden="true" />
               <p className={styles.dateRange}>{entry.date_range}</p>
               <h3 className={styles.entryTitle}>{entry.title}</h3>
