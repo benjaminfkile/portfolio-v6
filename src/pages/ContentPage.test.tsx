@@ -9,7 +9,11 @@ import type {
   NowPlayingResponse,
   StatusResponse,
 } from '../lib/api';
-import { fixtureDocument, fixturePostSummaries } from '../test/fixtures';
+import {
+  fixtureDocument,
+  fixtureGithub,
+  fixturePostSummaries,
+} from '../test/fixtures';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -45,11 +49,7 @@ const duolingo: DuolingoResponse = {
   course: { title: 'Spanish', xp: 48210, crowns: 155 },
 };
 
-const github: GithubResponse = {
-  available: true,
-  total: 2143,
-  weeks: [{ days: [0, 1, 2, 3, 4, 5, 0] }],
-};
+const github: GithubResponse = fixtureGithub;
 
 /**
  * A URL-aware fetch mock. A content page's live sections (status, blog,
@@ -212,7 +212,9 @@ describe('ContentPage', () => {
 
     // github — the total contributions and the accessible summary sentence.
     expect(
-      screen.getByText('2,143 contributions in the last year'),
+      screen.getByText(
+        '2,143 contributions between 2025-08-11 and 2026-08-09',
+      ),
     ).toBeInTheDocument();
   });
 

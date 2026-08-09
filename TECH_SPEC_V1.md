@@ -359,7 +359,7 @@ neither can live inside the snapshot without breaking that guarantee.
 | `blog` | how many posts, tag filter | `GET /api/posts` |
 | `now_playing` | idle behavior (`hide` \| `message`), whether to show album art | `GET /api/now-playing` |
 | `duolingo` | `language` (course code, default `es`), optional manual `score_label` | `GET /api/duolingo` |
-| `github` | how many weeks of the contribution calendar to show (default 52) | `GET /api/github` |
+| `github` | header copy only (v1.10 — the v1.2 `weeks` count is gone; browsing is via the in-section year picker) | `GET /api/github` (default trailing 12 months) · `GET /api/github?year=YYYY` |
 | `ops` | `window_hours` (metric lookback, 1–24, default 3) | `GET /api/ops` |
 
 Live-section components must render a loading state and must **degrade rather than
@@ -441,25 +441,41 @@ Integrations page (§4.7). Curated shape:
 - The course is selected by the `language` config (course code, default `es`); the
   API returns the matching course from the payload.
 
-#### `github` (v1.2)
+#### `github` (v1.2, browsable calendar v1.10)
 
-Shows the owner's GitHub contribution calendar and total, fetched from
-`GET /api/github`, which proxies the GitHub GraphQL API (`contributionsCollection`)
-server-side with a PAT stored encrypted via the Integrations page (§4.7). Curated
-shape:
+Shows the owner's GitHub contribution calendar as a fully browsable, per-year
+grid, fetched from `GET /api/github`, which proxies the GitHub GraphQL API
+(`contributionsCollection`) server-side with a PAT stored encrypted via the
+Integrations page (§4.7). As of v1.10 the API serves the **public profile**
+contribution data source, so the counts match the public profile exactly. The
+default response is the trailing-12-months window; `?year=YYYY` returns that
+calendar year. Curated shape:
 
 ```jsonc
 { "available": true, "total": 2143,
-  "weeks": [ { "days": [0, 3, 1, 0, 5, 2, 0] } /* … oldest → newest */ ] }
+  "from": "2025-08-11", "to": "2026-08-09",
+  "years": [2026, 2025, 2024],           // newest-first; drives the year picker
+  "weeks": [ { "days": [ { "date": "2025-08-11", "count": 3, "level": 2 } /* … Sun→Sat */ ] }
+             /* … oldest → newest */ ] }
 // or
 { "available": false }
 ```
 
 - The PAT needs no scopes beyond public data (`read:user`); it never appears in any
   response or log. ~1h server-side cache — contribution data does not change faster.
-- The renderer maps counts to a 5-step intensity ramp of the accent color; the
-  number-per-day is intentionally NOT exposed per-cell in a tooltip API round-trip —
-  the curated shape is the calendar, not the events behind it.
+- `level` is a server-quantized intensity 0–4; the renderer maps it straight onto a
+  5-step amber ramp built from the design tokens (not GitHub green, not GitHub's
+  exact geometry — an instrument voice). Month labels run across the top edge, sparse
+  weekday labels (Mon/Wed/Fri) down the left. The grid scrolls inside its own
+  `overflow-x: auto` container (the page body never scrolls sideways, §DESIGN.md),
+  landing on the current week for the default window.
+- The window picker is an instrument-styled native `<select>` ("LAST 12 MONTHS"
+  default + one entry per `years` value); choosing re-fetches `?year=` with a loading
+  state, and a failed re-fetch degrades in place without losing the picker.
+- v1.10 drops the v1.2 `weeks` config count from the schema (an older published
+  document's stray `weeks` is ignored). The per-day count surfaces on hover/tap
+  (mono tooltip + aria-live readout), and the grid is decorative to assistive tech —
+  a visually-hidden summary sentence ("N contributions between X and Y") stands in.
 - Standard live-section rules: loading state, degrade to nothing on failure.
 
 #### `ops` (v1.3)
@@ -702,7 +718,7 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/status` | Curated service health for the `status` section (§3.5). Cached ~30s. |
 | `GET` | `/api/now-playing` | Current Spotify track for the `now_playing` section (§3.5, §4.6). Cached ~30s. |
 | `GET` | `/api/duolingo` | Streak + course progress for the `duolingo` section (§3.5, v1.2). Cached ~1h. |
-| `GET` | `/api/github` | Contribution calendar for the `github` section (§3.5, v1.2). Cached ~1h. |
+| `GET` | `/api/github` | Browsable contribution calendar for the `github` section (§3.5, v1.10). Default trailing 12 months; `?year=YYYY` for a calendar year. Public-profile data source. Cached ~1h. |
 | `GET` | `/api/ops` | Sanitized CloudWatch dashboard telemetry for the `ops` section (§3.5, v1.3). Cached ~5m. |
 | `POST` | `/api/beacon` | First-party analytics ingest (§4.8, v1.4). Always 204. |
 | `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
@@ -1992,6 +2008,7 @@ event and nothing in v6 blocks on one.
 | Admin is MUI, fully themed, fully built in v1 | Owner decision. Audience of one and no restyle planned — an interim plain admin would mean building it twice (§8.3, §14.4). |
 | Admin reorder is drag-and-drop | The full-array `PUT` (§4.2) was designed for it; the admin is built once, so no up/down-button interim (§14.4). |
 | v1.8 portfolio tech icons reference skills items — icon consistency enforced at publish | Portfolio marks and the skills sphere must never show mismatched icons. `skill_refs[]` makes portfolio items reference skills by id (theme-aware icon + title reused), and publish guarantees every ref resolves; pre-v1.8 `tech_icons[]` stays a render-time legacy fallback (§3.4). |
+| v1.10 github calendar reads the public profile data source — counts match the public profile; year browsing via `?year=` | Ben's intent is a browsable calendar whose numbers match his public profile exactly, so the API now serves public-only contribution data. `?year=YYYY` returns a calendar year (the newest-first `years` list drives an in-section picker); the default stays the trailing-12-months window. The v1.2 `weeks` config count is dropped (ignored if a legacy document carries it). The render stays an amber instrument, not a GitHub-green clone (§3.5). |
 
 ---
 

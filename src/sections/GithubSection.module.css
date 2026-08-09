@@ -1,6 +1,8 @@
-/* GitHub — a mono total Instrument above an amber contribution heat grid. The
-   5-step ramp is defined from tokens via color-mix (--panel-2 → --amber); no raw
-   hex (DESIGN.md §5). Tokens only; mobile-first. */
+/* GitHub — a browsable contribution calendar (v1.10). A window picker + mono
+   readouts above an amber day-grid: month labels across the top, sparse weekday
+   labels down the left, cells shaded by the server's 0–4 level on a 5-step ramp
+   built from the tokens via color-mix (--panel-2 → --amber); no raw hex, both
+   themes track their own tokens (DESIGN.md §5). Tokens only; mobile-first. */
 
 .github {
   padding-block: var(--space-6);
@@ -12,36 +14,173 @@
   gap: var(--space-4);
 }
 
+/* Readouts on the left, the window picker on the right; wraps on narrow. */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
 .total {
   gap: var(--space-3);
 }
 
-/* The calendar can be wider than a phone; it scrolls inside its own container so
-   the page body never scrolls sideways (DESIGN.md §3). */
+/* The active window bounds — a live readout, so tabular figures line up. */
+.range {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Instrument-styled native <select> — the most accessible range control. */
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.controlLabel {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.selectWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+  color: var(--text-bright);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
+  cursor: pointer;
+  /* A mono caret drawn from --text-dim, so the control reads as an instrument. */
+  background-image: linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--text-dim) 50%
+    ),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) center,
+    calc(100% - 10px) center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* The "…" instrument voice shown while a new window re-fetches. */
+.busyDot {
+  position: absolute;
+  right: calc(-1 * var(--space-4));
+  font-family: var(--font-mono);
+  color: var(--amber);
+}
+
+/* The hover/tap day readout — mono, tabular, the tooltip's touch-friendly twin.
+   min-height keeps a stable row so filling it never shifts the grid. */
+.dayReadout {
+  margin: 0;
+  min-height: 1.2em;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+/* The calendar: fixed weekday rail on the left, the scrollable grid on the
+   right so the labels stay put while a wide grid scrolls (DESIGN.md §3). */
+.calendar {
+  --cell: 11px;
+  --cell-gap: 3px;
+  --month-h: 1.15rem;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.weekdays {
+  display: grid;
+  grid-template-rows: var(--month-h) repeat(7, var(--cell));
+  row-gap: var(--cell-gap);
+  flex: none;
+}
+
+.weekday {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem; /* 11px — fits the cell rhythm without overflowing */
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* The grid can be wider than a phone; it scrolls inside its own container so the
+   page body never scrolls sideways (DESIGN.md §3). */
 .scroller {
   overflow-x: auto;
-  /* A little breathing room so the last column's focus/hover isn't clipped. */
+  /* A little breathing room so the last column isn't clipped. */
   padding-bottom: var(--space-1);
 }
 
-/* Weeks are columns (oldest→newest, left→right); each column is 7 day-cells. */
+/* Weeks are columns (oldest→newest, left→right); each column is 7 day-cells,
+   with a month-label row above. Fixed cell size — a real calendar keeps cell
+   size and scrolls instead of squeezing (DESIGN.md §5). */
 .grid {
-  display: flex;
-  gap: 3px;
-  /* Don't let flex squeeze the columns — a real calendar keeps cell size and
-     scrolls instead (DESIGN.md §5). */
+  display: grid;
+  grid-template-rows: var(--month-h) repeat(7, var(--cell));
+  grid-auto-columns: var(--cell);
+  grid-auto-flow: column;
+  column-gap: var(--cell-gap);
+  row-gap: var(--cell-gap);
   width: max-content;
 }
 
-.week {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* While re-fetching a new window, dim the old grid (the "…" carries the state). */
+.gridBusy {
+  opacity: 0.5;
+}
+
+.month {
+  grid-row: 1;
+  align-self: end;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem; /* 11px */
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  white-space: nowrap;
+  /* Labels are wider than one 11px column and overflow into the empty row to
+     their right — the GitHub calendar look, in the instrument voice. */
+  overflow: visible;
 }
 
 .cell {
-  width: 11px;
-  height: 11px;
+  width: var(--cell);
+  height: var(--cell);
   /* Slightly softened square — a touch under --r-s (DESIGN.md §5). */
   border-radius: 2px;
   background: var(--panel-2);
@@ -69,8 +208,17 @@
   background: var(--amber);
 }
 
-/* One accessible summary sentence stands in for 365 labelled cells (§5, §7).
-   Visually hidden but present in the accessibility tree. */
+/* Degraded-in-place note where the grid would be, when a re-fetch fails but the
+   picker is kept (§3.5). */
+.degraded {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+}
+
+/* One accessible summary sentence stands in for hundreds of labelled cells (§5,
+   §7). Visually hidden but present in the accessibility tree. */
 .summary {
   margin: 0;
   position: absolute;

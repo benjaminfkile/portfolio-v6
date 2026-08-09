@@ -161,19 +161,20 @@ export interface DuolingoSectionData {
 }
 
 /**
- * The `github` section's published config (spec §3.5, v1.2). The section's
- * *config* is snapshotted; its *data* (contribution calendar + total) is fetched
- * at runtime from `GET /api/github`.
+ * The `github` section's published config (spec §3.5, v1.10). The section's
+ * *config* is snapshotted; its *data* (the browsable contribution calendar) is
+ * fetched at runtime from `GET /api/github` (default trailing 12 months) and
+ * `GET /api/github?year=YYYY` (a chosen calendar year).
  *
- * `weeks` is how many weeks of the contribution calendar to show (default 52);
- * the renderer slices the newest N weeks from the payload's oldest→newest array.
- * Optional `heading` / `eyebrow` / `intro` override the section header copy.
+ * As of v1.10 the calendar spans a full year with an in-section year picker, so
+ * the v1.2 `weeks` count is gone from the schema; older published documents may
+ * still carry it and the renderer simply ignores it. Only the header copy
+ * (`heading` / `eyebrow` / `intro`) is snapshotted.
  */
 export interface GithubSectionData {
   heading?: string;
   eyebrow?: string;
   intro?: string;
-  weeks?: number;
 }
 
 /**
