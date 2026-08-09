@@ -17,5 +17,9 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.ts',
     css: true,
+    // Tests assume the same-origin (empty) API base; a developer's .env.local
+    // (e.g. VITE_API_BASE_URL=https://…-dev) would otherwise leak in via Vite
+    // and rewrite every fetch URL, timing out live-section suites in jsdom.
+    env: { VITE_API_BASE_URL: '' },
   },
 });
