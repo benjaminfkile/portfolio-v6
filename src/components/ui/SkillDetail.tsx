@@ -43,7 +43,7 @@ export default function SkillDetail({ skill, className }: SkillDetailProps) {
           )}
         </>
       ) : (
-        <p className={styles.empty}>STANDBY — hover or lock a skill</p>
+        <p className={styles.empty}>STANDBY — select a skill</p>
       )}
     </div>
   );

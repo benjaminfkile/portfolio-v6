@@ -44,6 +44,18 @@
   order: 2;
 }
 
+/* Mobile (<900px): NO list — the sphere IS the selector (drag to spin, tap a
+   tile to select) and the detail readout sits directly below it. The list is
+   a ≥900px instrument only; display:none also drops it from the a11y tree, and
+   the sphere keeps its own visually-hidden skill list for screen readers.
+   (max-width form, not a base rule, so jsdom — no media evaluation, 1024px —
+   keeps the list renderable for the interaction tests.) */
+@media (max-width: 899.98px) {
+  .listPanel {
+    display: none;
+  }
+}
+
 .detailPanel {
   order: 3;
 }
