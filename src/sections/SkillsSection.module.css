@@ -1,16 +1,95 @@
-/* Skills — a geodesic SkillSphere on a Control Room panel surface (DESIGN.md §5).
-   One column across the range; the sphere gets a sane max size so it never
-   overwhelms the column from 320px through desktop. Mobile-first, tokens only. */
+/* Skills Console (v1.9, DESIGN.md §5) — a three-panel Control Room instrument:
+   skill LIST | SPHERE | DETAIL, linked by a connective bus. Mobile-first, tokens
+   only. ≥900px it is a CSS grid stretched to EQUAL HEIGHT (the sphere drives the
+   row); below 900px the panels stack sphere → list → detail. */
 
 .skills {
   padding-block: var(--space-6);
 }
 
-/* The panel surface the sphere sits on. The SkillSphere primitive draws its own
-   canvas panel when WebGL is up; this stage bounds the width so both the canvas
-   and the chip fallback stay a single, centered column. */
-.stage {
-  width: 100%;
-  max-width: 460px;
-  margin-inline: auto;
+/* The console shell. Base (<900px): a stacked flex column, sphere first. The bus
+   is an absolutely-positioned ≥900px-only layer, so it sits outside the flow. */
+.console {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* A list/detail panel: the bordered --panel instrument surface (§2.4, §4). */
+.cell {
+  position: relative;
+  z-index: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow);
+}
+
+/* The scroll region inside a cell. Base: natural flow with panel padding. At the
+   ≥900px grid it becomes an absolute fill so it never expands the shared row —
+   equal height always holds and overflow scrolls instead. */
+.scroll {
+  padding: var(--space-4);
+}
+
+/* Stacked (base) order: sphere first, then list, then detail (§3 breakpoints). */
+.spherePanel {
+  order: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.listPanel {
+  order: 2;
+}
+
+.detailPanel {
+  order: 3;
+}
+
+@media (min-width: 900px) {
+  .console {
+    display: grid;
+    /* list (~240px) | sphere (flexible) | detail (~320px). */
+    grid-template-columns: 240px minmax(0, 1fr) 320px;
+    align-items: stretch;
+    gap: var(--space-5);
+  }
+
+  /* Explicit placement so the visual order is list | sphere | detail while the
+     DOM/tab order stays list → sphere → detail. */
+  .listPanel {
+    order: 0;
+    grid-column: 1;
+  }
+
+  .spherePanel {
+    order: 0;
+    grid-column: 2;
+    /* The sphere drives the row height; its card sizes by aspect ratio, this
+       min-height sets the floor the list/detail stretch to. */
+    min-height: 480px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .detailPanel {
+    order: 0;
+    grid-column: 3;
+  }
+
+  /* Absolute fill: the scroll region contributes zero intrinsic height, so only
+     the sphere sets the row; the stretched cell then bounds this region and it
+     scrolls within the shared height. */
+  .cell {
+    overflow: hidden;
+  }
+
+  .scroll {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+  }
 }

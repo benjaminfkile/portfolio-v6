@@ -24,6 +24,13 @@ interface DragState {
    and every use fully overwrites them. */
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
+/** The direction a face normal must point to sit dead-centre facing the camera.
+ *  The camera looks down -Z from (0,0,3), so a tile faces it when its outward
+ *  normal is +Z. {@link faceTargetQuaternion} rotates a normal onto this. */
+const CAMERA_FORWARD = new THREE.Vector3(0, 0, 1);
+/** Rotate-to-target duration (seconds) — the slerp that swings a hovered/locked
+ *  skill's tile front-and-centre (task: ~500–700ms, eased). */
+const FOCUS_DURATION = 0.6;
 const TMP_STEP_Q = new THREE.Quaternion();
 const TMP_PARENT_Q = new THREE.Quaternion();
 const TMP_WORLD_N = new THREE.Vector3();
@@ -36,6 +43,36 @@ const TMP_Q = new THREE.Quaternion();
 interface CanvasProps {
   skills: SkillSphereSkill[];
   detail: number;
+  /** Skills Console v1.9: the skill whose tile should rotate front-and-centre
+   *  and hold there (the previewed skill, else the locked one). `null`/absent
+   *  resumes the normal auto-spin from the current orientation. */
+  focusSkillId?: string | null;
+  /** Hover/focus of a tile previews that skill (`id`), leaving clears it
+   *  (`null`) — the parent console reflects it in the detail panel + bus. */
+  onPreview?: (id: string | null) => void;
+  /** Clicking a tile toggles that skill's lock — synced with the list + detail. */
+  onLock?: (id: string) => void;
+}
+
+/**
+ * faceTargetQuaternion — the group orientation that swings a tile's outward
+ * `normal` to face the camera (+Z), dead-centre. Pure and module-level so the
+ * rotate-to-target math is unit-testable in jsdom without a WebGL context
+ * (the `facePlacements`/`pickDetail` export pattern). The minimal rotation
+ * carrying `normal` onto `+Z`; three.js resolves the antiparallel (normal ≈ -Z)
+ * case by picking an arbitrary orthogonal axis, so it never returns NaN.
+ */
+export function faceTargetQuaternion(
+  normal: [number, number, number],
+): THREE.Quaternion {
+  const n = new THREE.Vector3(normal[0], normal[1], normal[2]).normalize();
+  return new THREE.Quaternion().setFromUnitVectors(n, CAMERA_FORWARD);
+}
+
+/** Cubic ease-in-out for the rotate-to-target slerp — matches the instrument
+ *  motion voice (settle, don't linear-ramp). */
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 type SceneTokens = ReturnType<typeof readSceneTokens>;
@@ -333,7 +370,8 @@ function SkillFace({
   placement,
   color,
   fill,
-  onHover,
+  onPreview,
+  onLock,
   invalidate,
 }: {
   skill: SkillSphereSkill;
@@ -344,7 +382,10 @@ function SkillFace({
   placement: FacePlacement;
   color: string;
   fill: string;
-  onHover: (title: string | null) => void;
+  /** Hover in/out previews this skill (`id`) / clears it (`null`). */
+  onPreview: (id: string | null) => void;
+  /** Click toggles this skill's lock. */
+  onLock: (id: string) => void;
   invalidate: () => void;
 }) {
   const [map, setMap] = useState<THREE.Texture | null>(null);
@@ -407,9 +448,13 @@ function SkillFace({
       scale={[placement.size, placement.size, 1]}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
-        onHover(skill.title);
+        onPreview(skill.id);
       }}
-      onPointerOut={() => onHover(null)}
+      onPointerOut={() => onPreview(null)}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        e.stopPropagation();
+        onLock(skill.id);
+      }}
     >
       {/* A circle, not a plane: the disc shape lives in GEOMETRY, and the
           texture is opaque edge-to-edge. Any texture alpha edge gets
@@ -440,7 +485,9 @@ function Scene({
   reduced,
   stateRef,
   invalidateRef,
-  onHover,
+  focusSkillId,
+  onPreview,
+  onLock,
 }: {
   skills: SkillSphereSkill[];
   detail: number;
@@ -448,10 +495,22 @@ function Scene({
   reduced: boolean;
   stateRef: React.MutableRefObject<DragState>;
   invalidateRef: React.MutableRefObject<(() => void) | null>;
-  onHover: (title: string | null) => void;
+  focusSkillId: string | null;
+  onPreview: (id: string | null) => void;
+  onLock: (id: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { invalidate } = useThree();
+
+  /** The in-flight rotate-to-target tween, or `null` when auto-spinning. `t`
+   *  ramps 0→1 over {@link FOCUS_DURATION}; at 1 the tile is held facing the
+   *  camera (auto-spin stays paused while a focus is set). Mutated in the frame
+   *  loop, so a ref — never re-rendering React per frame. */
+  const focusRef = useRef<{
+    from: THREE.Quaternion;
+    target: THREE.Quaternion;
+    t: number;
+  } | null>(null);
 
   // Expose invalidate() to the DOM drag handlers (they live outside <Canvas>).
   useEffect(() => {
@@ -482,12 +541,46 @@ function Scene({
     [geometry, skills.length],
   );
 
+  // Rotate-to-target: when `focusSkillId` is set, arm a slerp that swings that
+  // skill's tile to face the camera and holds it (auto-spin paused); when
+  // cleared, drop the tween so auto-spin resumes from the current orientation.
+  // Reduced-motion snaps instantly (t starts at 1 — no tween) and pokes one
+  // frame, honouring the `demand` frameloop. `skills` is memoized upstream, so
+  // this only re-runs when the focus target actually changes.
+  useEffect(() => {
+    const s = stateRef.current;
+    if (focusSkillId == null) {
+      focusRef.current = null;
+      return;
+    }
+    const idx = skills.findIndex((sk) => sk.id === focusSkillId);
+    if (idx < 0 || !placements[idx]) {
+      focusRef.current = null;
+      return;
+    }
+    const target = faceTargetQuaternion(placements[idx].normal);
+    if (reduced) {
+      s.quat.copy(target);
+      focusRef.current = { from: target.clone(), target, t: 1 };
+    } else {
+      focusRef.current = { from: s.quat.clone(), target, t: 0 };
+    }
+    invalidate();
+  }, [focusSkillId, placements, reduced, skills, stateRef, invalidate]);
 
   useFrame((_, delta) => {
     const group = groupRef.current;
     if (!group) return;
     const s = stateRef.current;
-    if (!reduced && !s.dragging) {
+    const focus = focusRef.current;
+    if (focus) {
+      // Ease toward the target and hold there; a drag is disabled while focused.
+      if (focus.t < 1) {
+        focus.t = Math.min(1, focus.t + delta / FOCUS_DURATION);
+        s.quat.copy(focus.from).slerp(focus.target, easeInOutCubic(focus.t));
+        invalidate(); // keep frames coming through the tween in demand mode
+      }
+    } else if (!reduced && !s.dragging) {
       // Slow auto-spin about the screen-vertical axis.
       s.quat.premultiply(TMP_STEP_Q.setFromAxisAngle(Y_AXIS, delta * 0.25));
     }
@@ -558,7 +651,8 @@ function Scene({
             placement={placements[i]}
             color={tokens.amber}
             fill={tokens.panel}
-            onHover={onHover}
+            onPreview={onPreview}
+            onLock={onLock}
             invalidate={invalidate}
           />
         ))}
@@ -576,11 +670,34 @@ function Scene({
  * renders (via invalidate). The wrapper is `aria-hidden`; the reading lives in
  * the visually-hidden list rendered by the parent.
  */
-export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
+export default function SkillSphereCanvas({
+  skills,
+  detail,
+  focusSkillId = null,
+  onPreview,
+  onLock,
+}: CanvasProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const reduced = usePrefersReducedMotion();
   const [inView, setInView] = useState(true);
-  const [hovered, setHovered] = useState<string | null>(null);
+  // The tile currently under the pointer — drives the mono tooltip. Kept as an
+  // id (not a title) so it stays in step with the parent console's preview.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // Hover in/out on a tile: light the local tooltip AND tell the parent console
+  // (list + detail + bus follow). Leaving a tile clears only the preview — a
+  // lock lives in the parent and survives mouse-out.
+  const handlePreview = (id: string | null) => {
+    setHoveredId(id);
+    onPreview?.(id);
+  };
+
+  const hoveredTitle = hoveredId
+    ? (skills.find((s) => s.id === hoveredId)?.title ?? null)
+    : null;
+  // A held focus target owns the orientation; let it be, don't let a stray drag
+  // fight the slerp (simplest of the task's two options).
+  const focusActive = focusSkillId != null;
 
   const stateRef = useRef<DragState>({
     // Start with the same gentle downward tilt the sphere always had.
@@ -613,6 +730,7 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
       : 'always';
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (focusActive) return; // a rotate-to-target hold owns the orientation
     const s = stateRef.current;
     s.dragging = true;
     s.lastX = e.clientX;
@@ -671,10 +789,12 @@ export default function SkillSphereCanvas({ skills, detail }: CanvasProps) {
           reduced={reduced}
           stateRef={stateRef}
           invalidateRef={invalidateRef}
-          onHover={setHovered}
+          focusSkillId={focusSkillId}
+          onPreview={handlePreview}
+          onLock={(id) => onLock?.(id)}
         />
       </Canvas>
-      {hovered && <div className={styles.tooltip}>{hovered}</div>}
+      {hoveredTitle && <div className={styles.tooltip}>{hoveredTitle}</div>}
     </div>
   );
 }

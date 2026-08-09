@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { letterTexture, rasterizeIcon, TEX_SIZE } from './SkillSphereCanvas';
+import {
+  faceTargetQuaternion,
+  letterTexture,
+  rasterizeIcon,
+  TEX_SIZE,
+} from './SkillSphereCanvas';
 
 // jsdom has no real 2D canvas, so we mock `getContext('2d')` and the global
 // `Image`. These tests exercise the pure-ish rasterize pipeline offline: no
@@ -151,6 +156,43 @@ describe('rasterizeIcon', () => {
     await expect(
       rasterizeIcon('https://cdn/react.svg', '#111'),
     ).rejects.toThrow();
+  });
+});
+
+describe('faceTargetQuaternion (Skills Console v1.9 rotate-to-target math)', () => {
+  // The pure helper the canvas slerps toward: the group orientation that swings
+  // a tile's outward normal to face the camera (+Z). Unit-tested here rather
+  // than driving WebGL in jsdom (the facePlacements/pickDetail export pattern).
+  const normals: Array<[number, number, number]> = [
+    [0, 0, 1], // already facing the camera → identity
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0.5773, 0.5773, 0.5773],
+    [-0.3, 0.7, 0.6481],
+  ];
+
+  it.each(normals)(
+    'rotates the normal (%s, %s, %s) onto +Z',
+    (x, y, z) => {
+      const q = faceTargetQuaternion([x, y, z]);
+      const v = new THREE.Vector3(x, y, z).normalize().applyQuaternion(q);
+      expect(v.x).toBeCloseTo(0, 4);
+      expect(v.y).toBeCloseTo(0, 4);
+      expect(v.z).toBeCloseTo(1, 4);
+    },
+  );
+
+  it('handles the antiparallel (-Z) normal without NaN, still landing on +Z', () => {
+    const q = faceTargetQuaternion([0, 0, -1]);
+    expect(Number.isNaN(q.x)).toBe(false);
+    expect(q.length()).toBeCloseTo(1, 5);
+    const v = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    expect(v.z).toBeCloseTo(1, 4);
+  });
+
+  it('returns a unit quaternion', () => {
+    expect(faceTargetQuaternion([1, 2, 3]).length()).toBeCloseTo(1, 5);
   });
 });
 
