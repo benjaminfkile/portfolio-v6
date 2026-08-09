@@ -47,9 +47,6 @@ interface CanvasProps {
    *  and hold there (the previewed skill, else the locked one). `null`/absent
    *  resumes the normal auto-spin from the current orientation. */
   focusSkillId?: string | null;
-  /** Hover/focus of a tile previews that skill (`id`), leaving clears it
-   *  (`null`) — the parent console reflects it in the detail panel + bus. */
-  onPreview?: (id: string | null) => void;
   /** Clicking a tile toggles that skill's lock — synced with the list + detail. */
   onLock?: (id: string) => void;
 }
@@ -370,7 +367,7 @@ function SkillFace({
   placement,
   color,
   fill,
-  onPreview,
+  onHover,
   onLock,
   invalidate,
 }: {
@@ -382,8 +379,8 @@ function SkillFace({
   placement: FacePlacement;
   color: string;
   fill: string;
-  /** Hover in/out previews this skill (`id`) / clears it (`null`). */
-  onPreview: (id: string | null) => void;
+  /** Hover in/out lights the tooltip for this skill (`id`) / clears it (`null`). */
+  onHover: (id: string | null) => void;
   /** Click toggles this skill's lock. */
   onLock: (id: string) => void;
   invalidate: () => void;
@@ -448,9 +445,9 @@ function SkillFace({
       scale={[placement.size, placement.size, 1]}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
-        onPreview(skill.id);
+        onHover(skill.id);
       }}
-      onPointerOut={() => onPreview(null)}
+      onPointerOut={() => onHover(null)}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
         onLock(skill.id);
@@ -486,7 +483,7 @@ function Scene({
   stateRef,
   invalidateRef,
   focusSkillId,
-  onPreview,
+  onHover,
   onLock,
 }: {
   skills: SkillSphereSkill[];
@@ -496,7 +493,7 @@ function Scene({
   stateRef: React.MutableRefObject<DragState>;
   invalidateRef: React.MutableRefObject<(() => void) | null>;
   focusSkillId: string | null;
-  onPreview: (id: string | null) => void;
+  onHover: (id: string | null) => void;
   onLock: (id: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -651,7 +648,7 @@ function Scene({
             placement={placements[i]}
             color={tokens.amber}
             fill={tokens.panel}
-            onPreview={onPreview}
+            onHover={onHover}
             onLock={onLock}
             invalidate={invalidate}
           />
@@ -674,7 +671,6 @@ export default function SkillSphereCanvas({
   skills,
   detail,
   focusSkillId = null,
-  onPreview,
   onLock,
 }: CanvasProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -684,12 +680,13 @@ export default function SkillSphereCanvas({
   // id (not a title) so it stays in step with the parent console's preview.
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  // Hover in/out on a tile: light the local tooltip AND tell the parent console
-  // (list + detail + bus follow). Leaving a tile clears only the preview — a
-  // lock lives in the parent and survives mouse-out.
-  const handlePreview = (id: string | null) => {
+  // Hover in/out on a tile lights ONLY the local tooltip. It deliberately does
+  // NOT report a preview to the parent console: rotate-to-target belongs to the
+  // skill LIST alone (Ben: hovering the sphere itself must not re-centre it —
+  // the sphere chasing the tile under your own pointer feels haunted). Click
+  // still locks via the parent.
+  const handleTileHover = (id: string | null) => {
     setHoveredId(id);
-    onPreview?.(id);
   };
 
   const hoveredTitle = hoveredId
@@ -790,7 +787,7 @@ export default function SkillSphereCanvas({
           stateRef={stateRef}
           invalidateRef={invalidateRef}
           focusSkillId={focusSkillId}
-          onPreview={handlePreview}
+          onHover={handleTileHover}
           onLock={(id) => onLock?.(id)}
         />
       </Canvas>

@@ -208,11 +208,13 @@ export default function SkillSphere({
       {/* The Suspense placeholder is the inert chip grid (no handlers) — three
           is still loading, so there is nothing to preview yet. */}
       <Suspense fallback={<Chips skills={skills} />}>
+        {/* No onPreview: sphere-tile hover is tooltip-only — rotate-to-target
+            belongs to the skill LIST (and the chip fallback); the sphere must
+            not chase the tile under the user's own pointer. Click still locks. */}
         <SkillSphereCanvas
           skills={skills}
           detail={resolvedDetail}
           focusSkillId={focusSkillId}
-          onPreview={onPreview}
           onLock={onLock}
         />
       </Suspense>
