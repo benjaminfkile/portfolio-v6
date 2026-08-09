@@ -229,8 +229,10 @@ describe('PortfolioSection — Skill Refs v1.8', () => {
     );
 
     // Only the resolvable ref renders a chip; the missing one is dropped.
+    // (Count imgs, not .techIcon — the skill-refs path renders bare SkillIcons;
+    // .techIcon belongs to the legacy raw-URL path only.)
     expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
-    expect(container.querySelectorAll(`.${styles.techIcon}`)).toHaveLength(1);
+    expect(container.querySelectorAll('img')).toHaveLength(1);
     // No warning UI — a console.warn is the loudest it gets.
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('sk-nope'));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
