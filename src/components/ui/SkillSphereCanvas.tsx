@@ -486,6 +486,7 @@ function Scene({
   detail,
   tokens,
   reduced,
+  inView,
   stateRef,
   invalidateRef,
   focusSkillId,
@@ -496,6 +497,10 @@ function Scene({
   detail: number;
   tokens: SceneTokens;
   reduced: boolean;
+  /** Frame-callback gate: while false the sphere mutates nothing (off-screen
+   *  thrift lives here, NOT in frameloop mode switches — see the frameloop
+   *  comment in SkillSphereCanvas). */
+  inView: boolean;
   stateRef: React.MutableRefObject<DragState>;
   invalidateRef: React.MutableRefObject<(() => void) | null>;
   focusSkillId: string | null;
@@ -588,6 +593,13 @@ function Scene({
   useFrame((_, delta) => {
     const group = groupRef.current;
     if (!group) return;
+    // Off-screen: mutate nothing (the loop itself stays alive — see the
+    // frameloop comment). The sphere resumes exactly where it paused.
+    if (!inView) return;
+    // Clamp: after a demand-mode gap or a background tab, the first frame's
+    // delta spans the whole idle period — an unclamped tween would complete in
+    // that single step (a visual snap) and the auto-spin would lurch.
+    const dt = Math.min(delta, 0.1);
     const s = stateRef.current;
     const focus = focusRef.current;
     if (focus && !s.holdBroken) {
@@ -596,7 +608,7 @@ function Scene({
       // skill never dead-ends navigation — critical on mobile, where the
       // sphere is the only selector.
       if (focus.t < 1) {
-        focus.t = Math.min(1, focus.t + delta / FOCUS_DURATION);
+        focus.t = Math.min(1, focus.t + dt / FOCUS_DURATION);
         s.quat.copy(focus.from).slerp(focus.target, easeInOutCubic(focus.t));
         invalidate(); // keep frames coming through the tween in demand mode
       }
@@ -606,7 +618,14 @@ function Scene({
       // and released without picking another): the sphere returns to its slow
       // idle spin rather than freezing where the drag left it. A new pick
       // re-arms the hold and takes the slerp branch above.
-      s.quat.premultiply(TMP_STEP_Q.setFromAxisAngle(Y_AXIS, delta * 0.25));
+      s.quat.premultiply(TMP_STEP_Q.setFromAxisAngle(Y_AXIS, dt * 0.25));
+      // Self-invalidate: measured on the deployed build, the r3f loop kept
+      // CALLING this callback at full rate while the canvas itself stopped
+      // PAINTING — the quaternion advanced, the pixels froze. An explicit
+      // invalidate() forces the paint (the tween branch always had one, which
+      // is why hovers still rendered while the idle spin sat frozen). Gated to
+      // frames that actually mutate, so reduced-motion demand mode stays idle.
+      invalidate();
     }
     // Renormalize: thousands of premultiplied small steps drift numerically.
     group.quaternion.copy(s.quat.normalize());
@@ -744,11 +763,23 @@ export default function SkillSphereCanvas({
     return () => io.disconnect();
   }, []);
 
-  const frameloop: 'always' | 'demand' | 'never' = !inView
-    ? 'never'
-    : reduced
-      ? 'demand'
-      : 'always';
+  // Kick a frame whenever the sphere scrolls back into view so the loop
+  // restarts from a clean state (see below — the loop must never be booted
+  // as 'never').
+  useEffect(() => {
+    if (inView) invalidateRef.current?.();
+  }, [inView]);
+
+  // The frameloop mode is FIXED for the session: 'demand' under reduced
+  // motion, 'always' otherwise. It must never change with visibility — r3f
+  // does not reliably carry a live loop across frameloop prop transitions
+  // (measured: the sphere mounted below the fold, the mode flipped when it
+  // scrolled into view, and the loop never ticked again — no idle spin, and
+  // hovers only moved because the tween's own invalidate() calls forced
+  // frames). Off-screen thrift is handled INSIDE the frame callback instead:
+  // Scene skips its mutations while `inView` is false, which pauses the
+  // sphere without touching the loop machinery.
+  const frameloop: 'always' | 'demand' = reduced ? 'demand' : 'always';
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     const s = stateRef.current;
@@ -811,6 +842,7 @@ export default function SkillSphereCanvas({
           detail={detail}
           tokens={tokens}
           reduced={reduced}
+          inView={inView}
           stateRef={stateRef}
           invalidateRef={invalidateRef}
           focusSkillId={focusSkillId}
