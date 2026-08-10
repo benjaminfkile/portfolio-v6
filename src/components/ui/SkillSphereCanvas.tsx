@@ -567,21 +567,9 @@ function Scene({
     if (reduced) {
       s.quat.copy(target);
       focusRef.current = { from: target.clone(), target, t: 1 };
-      // Demand-mode reliability: a single invalidate() after a snap can be
-      // dropped (observed headless: some snaps never painted, leaving the
-      // sphere on the PREVIOUS skill). Poke a short burst of frames over the
-      // next few ticks so the snap always lands on screen.
-      let pokes = 3;
-      const poke = () => {
-        invalidate();
-        if (--pokes > 0 && typeof requestAnimationFrame === 'function') {
-          requestAnimationFrame(poke);
-        }
-      };
-      poke();
-      return;
+    } else {
+      focusRef.current = { from: s.quat.clone(), target, t: 0 };
     }
-    focusRef.current = { from: s.quat.clone(), target, t: 0 };
     invalidate();
   }, [focusSkillId, placements, reduced, skills, stateRef, invalidate]);
 
