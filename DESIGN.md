@@ -125,8 +125,10 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 ## 5. Section treatments (public sections, §3.4)
 
 - **hero** — tag line in mono amber (`// software developer`), display headline,
-  short intro; below it an **instrument strip**: NOW PLAYING · API · SITE vN —
-  three `Instrument`s fed by the live endpoints + document version.
+  short intro; below it an **instrument strip**: NOW PLAYING · DUOLINGO · SITE
+  vN — three `Instrument`s fed by the live endpoints + document version. NOW
+  PLAYING shows the last-played track (`Last: …`) when idle; DUOLINGO is the
+  streak day count.
 - **about** — prose panel, 62ch measure; optional inline mono annotations.
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).

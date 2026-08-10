@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import HeroInstrumentStrip from './HeroInstrumentStrip';
-import type { NowPlayingResponse, StatusResponse } from '../lib/api';
+import type { DuolingoResponse, NowPlayingResponse } from '../lib/api';
 import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
@@ -12,18 +12,22 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
   } as unknown as Response;
 }
 
-/** A per-path fetch mock — the strip hits /api/now-playing and /api/status. */
-function stubStrip(opts: { now?: Response; status?: Response } = {}) {
+/** A per-path fetch mock — the strip hits /api/now-playing and /api/duolingo. */
+function stubStrip(opts: { now?: Response; duolingo?: Response } = {}) {
   const fetchMock = vi.fn((path: string) => {
     if (path.startsWith('/api/now-playing')) {
       return Promise.resolve(
         opts.now ?? jsonResponse({ playing: false } satisfies NowPlayingResponse),
       );
     }
-    if (path.startsWith('/api/status')) {
+    if (path.startsWith('/api/duolingo')) {
       return Promise.resolve(
-        opts.status ??
-          jsonResponse({ degraded: false, services: [] } satisfies StatusResponse),
+        opts.duolingo ??
+          jsonResponse({
+            available: true,
+            streak: 213,
+            course: { title: 'Spanish', xp: 1000, crowns: 10 },
+          } satisfies DuolingoResponse),
       );
     }
     throw new Error(`unexpected fetch: ${path}`);
@@ -76,7 +80,7 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
     ).toBeInTheDocument();
   });
 
-  it('reads "Not playing" when the endpoint reports idle', async () => {
+  it('reads "Not playing" when idle with no last-played track', async () => {
     stubStrip({ now: jsonResponse({ playing: false }) });
 
     render(<HeroInstrumentStrip siteVersion={1} />);
@@ -84,29 +88,48 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
     expect(await screen.findByText('Not playing')).toBeInTheDocument();
   });
 
-  it('reports the API as operational, with a text label beside the dot (§7)', async () => {
-    const status: StatusResponse = {
-      degraded: false,
-      services: [{ name: 'Gateway', ok: true }],
+  it('falls back to the last-played track when idle (§4.6 fallback)', async () => {
+    const now: NowPlayingResponse = {
+      playing: false,
+      last_played: {
+        track: {
+          title: 'Windowlicker',
+          artists: ['Aphex Twin'],
+          album: 'Windowlicker',
+          art_url: null,
+          url: 'https://open.spotify.com/track/xyz',
+        },
+        played_at: '2026-08-10T20:15:00.000Z',
+      },
     };
-    stubStrip({ status: jsonResponse(status) });
+    stubStrip({ now: jsonResponse(now) });
 
     render(<HeroInstrumentStrip siteVersion={1} />);
 
-    // Colour is never the only carrier — "Operational" text sits by the dot.
-    expect(await screen.findByText('Operational')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Last: Windowlicker — Aphex Twin'),
+    ).toBeInTheDocument();
   });
 
-  it('shows an honest degraded API state', async () => {
-    const status: StatusResponse = {
-      degraded: true,
-      services: [{ name: 'API', ok: false }],
-    };
-    stubStrip({ status: jsonResponse(status) });
+  it('shows the Duolingo streak as a day count', async () => {
+    stubStrip();
 
     render(<HeroInstrumentStrip siteVersion={1} />);
 
-    expect(await screen.findByText('Degraded')).toBeInTheDocument();
+    expect(screen.getByText('Duolingo')).toBeInTheDocument();
+    expect(await screen.findByText('213 days')).toBeInTheDocument();
+  });
+
+  it('degrades the Duolingo readout to a dim placeholder when unavailable', async () => {
+    stubStrip({
+      duolingo: jsonResponse({ available: false } satisfies DuolingoResponse),
+    });
+
+    render(<HeroInstrumentStrip siteVersion={1} />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1),
+    );
   });
 
   it('updates the NOW PLAYING readout live when a later poll reports a new track', async () => {
@@ -117,9 +140,13 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
       if (path.startsWith('/api/now-playing')) {
         return Promise.resolve(jsonResponse(now));
       }
-      if (path.startsWith('/api/status')) {
+      if (path.startsWith('/api/duolingo')) {
         return Promise.resolve(
-          jsonResponse({ degraded: false, services: [] } satisfies StatusResponse),
+          jsonResponse({
+            available: true,
+            streak: 213,
+            course: { title: 'Spanish', xp: 1000, crowns: 10 },
+          } satisfies DuolingoResponse),
         );
       }
       throw new Error(`unexpected fetch: ${path}`);
@@ -153,7 +180,7 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     stubStrip({
       now: jsonResponse({}, { ok: false, status: 500 }),
-      status: jsonResponse({}, { ok: false, status: 503 }),
+      duolingo: jsonResponse({}, { ok: false, status: 503 }),
     });
 
     render(<HeroInstrumentStrip siteVersion={7} />);

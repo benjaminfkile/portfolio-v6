@@ -108,6 +108,16 @@ function stubApi() {
         }),
       );
     }
+    if (path.startsWith('/api/duolingo')) {
+      // A large streak — the strip must not overflow on a wide value.
+      return Promise.resolve(
+        jsonResponse({
+          available: true,
+          streak: 1234,
+          course: { title: 'Spanish', xp: 99999, crowns: 200 },
+        }),
+      );
+    }
     if (path.startsWith('/api/posts')) {
       return Promise.resolve(
         jsonResponse({ posts: fixturePostSummaries, next_cursor: null }),

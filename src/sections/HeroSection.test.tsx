@@ -21,7 +21,7 @@ function stubStripFetch() {
       if (path.startsWith('/api/now-playing')) {
         return Promise.resolve(jsonResponse({ playing: false }));
       }
-      return Promise.resolve(jsonResponse({ degraded: false, services: [] }));
+      return Promise.resolve(jsonResponse({ available: false }));
     }),
   );
 }
@@ -65,7 +65,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     // The SITE readout is fed by the threaded document version, not a fetch.
     expect(screen.getByText('v42')).toBeInTheDocument();
     // Let the strip's live fetches settle so no state updates escape act().
-    await screen.findByText('Operational');
+    await screen.findByText('Not playing');
   });
 
   it('renders the optional background image with its media-map alt', async () => {
@@ -90,7 +90,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
 
     const img = screen.getByAltText('A wide skyline');
     expect(img).toHaveAttribute('src', 'https://media.benkile.com/hero.jpg');
-    await screen.findByText('Operational');
+    await screen.findByText('Not playing');
   });
 
   it('runs the page-load orchestration when motion is allowed', async () => {
@@ -106,7 +106,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     );
 
     expect(container.querySelector('section')).toHaveClass(heroStyles.animated);
-    await screen.findByText('Operational');
+    await screen.findByText('Not playing');
   });
 
   it('ignores an OS reduced-motion preference — orchestration still runs (owner decision)', async () => {
@@ -127,6 +127,6 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
       screen.getByRole('heading', { level: 1, name: 'Ben Kile' }),
     ).toBeInTheDocument();
     expect(container.querySelector('section')).toHaveClass(heroStyles.animated);
-    await screen.findByText('Operational');
+    await screen.findByText('Not playing');
   });
 });

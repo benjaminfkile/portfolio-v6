@@ -146,15 +146,23 @@ export interface NowPlayingTrack {
   duration_ms?: number;
 }
 
+/** The last-played track and when it finished (ISO 8601), curated by the API. */
+export interface LastPlayed {
+  track: NowPlayingTrack;
+  played_at: string;
+}
+
 /**
  * `GET /api/now-playing` — the owner's current Spotify track (spec §4.6). The
  * API proxies Spotify server-side and returns `{ playing: false }` both when
  * nothing is playing and on any upstream failure, so the browser never sees a
  * Spotify error — a broken integration simply reads as "not listening" (§3.5).
+ * When idle, `last_played` carries the most recently played track (best-effort:
+ * absent when the lookup fails or the token lacks the recently-played scope).
  */
 export type NowPlayingResponse =
   | { playing: true; track: NowPlayingTrack }
-  | { playing: false };
+  | { playing: false; last_played?: LastPlayed };
 
 /** `GET /api/now-playing` — see {@link NowPlayingResponse}. */
 export function getNowPlaying(init?: RequestInit): Promise<NowPlayingResponse> {

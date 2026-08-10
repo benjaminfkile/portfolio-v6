@@ -28,6 +28,9 @@ function stubApi(opts: { content?: (path: string) => Response } = {}) {
     if (path.startsWith('/api/now-playing')) {
       return Promise.resolve(jsonResponse({ playing: false }));
     }
+    if (path.startsWith('/api/duolingo')) {
+      return Promise.resolve(jsonResponse({ available: false }));
+    }
     if (path.startsWith('/api/posts/')) {
       return Promise.resolve(
         jsonResponse({

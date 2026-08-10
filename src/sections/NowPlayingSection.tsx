@@ -28,9 +28,12 @@ import styles from './NowPlayingSection.module.css';
  * so a track change is announced (DESIGN.md §7).
  *
  * Standard live-section rules apply: a loading state, and **degrade rather than
- * error** — any failed fetch renders as idle, never a broken section. Idle
- * itself is config, not accident: `hide` removes the section entirely; `message`
- * renders a short "not listening" line.
+ * error** — any failed fetch renders as idle, never a broken section. When idle
+ * but the payload carries `last_played`, the section renders that track as a
+ * card with a "Last played · &lt;relative time&gt;" line instead of going idle —
+ * the point of the fallback is that there is always a song to show. Only when
+ * there is no last-played track does the idle config apply: `hide` removes the
+ * section entirely; `message` renders a short "not listening" line.
  */
 interface NowPlayingData {
   idle?: 'hide' | 'message';
@@ -43,6 +46,22 @@ interface NowPlayingData {
 
 /** Local progress interpolation tick between polls. */
 const CREEP_INTERVAL_MS = 1_000;
+
+/**
+ * Coarse relative age for the last-played line ("just now", "5m ago", "2h ago",
+ * "3d ago"); `null` on an unparseable timestamp so the line degrades to the
+ * bare "Last played" label.
+ */
+export function relativeTimeSince(iso: string, now = Date.now()): string | null {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const mins = Math.floor(Math.max(0, now - t) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export default function NowPlayingSection({ section }: SectionProps) {
   const config = section.data as NowPlayingData;
@@ -101,6 +120,54 @@ export default function NowPlayingSection({ section }: SectionProps) {
     state.status === 'ready' ? state.data : { playing: false };
 
   if (!data.playing) {
+    // Idle with a known last-played track → render it as a card. This takes
+    // precedence over the idle config: the fallback exists so there is always
+    // a song to show.
+    const last = data.last_played;
+    if (last) {
+      const { track: lastTrack } = last;
+      const age = relativeTimeSince(last.played_at);
+      return (
+        <SectionShell
+          title={config.title ?? 'Now playing'}
+          eyebrow={config.eyebrow ?? '// on the decks'}
+          className={styles.nowPlaying}
+        >
+          <Panel className={styles.panel}>
+            <div className={styles.track}>
+              {config.show_album_art && lastTrack.art_url && (
+                <MediaFrame
+                  className={styles.art}
+                  src={lastTrack.art_url}
+                  alt={`${lastTrack.album} album art`}
+                  aspectRatio="1 / 1"
+                />
+              )}
+              <div className={styles.body}>
+                <div className={styles.readout} aria-live="polite">
+                  <p className={styles.muted}>
+                    {age ? `Last played · ${age}` : 'Last played'}
+                  </p>
+                  <a
+                    className={styles.trackTitle}
+                    href={lastTrack.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {lastTrack.title}
+                  </a>
+                  <p className={styles.artists}>{lastTrack.artists.join(', ')}</p>
+                  {lastTrack.album && (
+                    <p className={styles.album}>{lastTrack.album}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Panel>
+        </SectionShell>
+      );
+    }
+
     // Idle is config (§3.5): `hide` removes the section; `message` renders a line.
     if (config.idle !== 'message') return null;
     return (

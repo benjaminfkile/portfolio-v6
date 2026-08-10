@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
-import NowPlayingSection from './NowPlayingSection';
+import NowPlayingSection, { relativeTimeSince } from './NowPlayingSection';
 import type { Section } from '../types/content';
 import type { NowPlayingResponse } from '../lib/api';
 import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
@@ -87,6 +87,46 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(live).not.toBeNull();
     expect(live).toHaveTextContent('Windowlicker');
     expect(live).toHaveTextContent('Aphex Twin');
+  });
+
+  it('renders the last-played track as a card when idle (§4.6 fallback)', async () => {
+    const idleWithLast: NowPlayingResponse = {
+      playing: false,
+      last_played: {
+        track: {
+          title: 'Windowlicker',
+          artists: ['Aphex Twin'],
+          album: 'Windowlicker',
+          art_url: 'https://i.scdn.co/image/abc123',
+          url: 'https://open.spotify.com/track/xyz',
+        },
+        played_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
+      },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(idleWithLast)));
+
+    // The fallback takes precedence over idle config — even `hide` shows it.
+    renderNowPlaying({ idle: 'hide', show_album_art: true });
+
+    const link = await screen.findByRole('link', { name: 'Windowlicker' });
+    expect(link).toHaveAttribute('href', 'https://open.spotify.com/track/xyz');
+    expect(screen.getByText('Last played · 2h ago')).toBeInTheDocument();
+    expect(screen.getByText('Aphex Twin')).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute(
+      'src',
+      'https://i.scdn.co/image/abc123',
+    );
+    // No progress meter for a finished track.
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+  });
+
+  it('relativeTimeSince formats coarse ages and degrades on garbage', () => {
+    const now = Date.parse('2026-08-10T12:00:00.000Z');
+    expect(relativeTimeSince('2026-08-10T11:59:40.000Z', now)).toBe('just now');
+    expect(relativeTimeSince('2026-08-10T11:15:00.000Z', now)).toBe('45m ago');
+    expect(relativeTimeSince('2026-08-10T07:00:00.000Z', now)).toBe('5h ago');
+    expect(relativeTimeSince('2026-08-07T12:00:00.000Z', now)).toBe('3d ago');
+    expect(relativeTimeSince('not-a-date', now)).toBeNull();
   });
 
   it('honors idle = "message" when nothing is playing', async () => {
