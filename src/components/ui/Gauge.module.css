@@ -38,15 +38,6 @@
      sweep from empty to its final angle (DESIGN.md §6). */
   transition: stroke-dashoffset 1000ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .arc {
-    /* useRevealOnce resolves to revealed immediately; kill the transition so
-       nothing sweeps even if the offset changes (DESIGN.md §6). */
-    transition: none;
-  }
-}
-
 /* The value sits centred within the dial's opening. */
 .readout {
   position: absolute;

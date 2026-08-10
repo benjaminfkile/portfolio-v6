@@ -160,11 +160,3 @@
     display: none;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .mark,
-  .link,
-  .hamburger {
-    transition: none;
-  }
-}

@@ -31,10 +31,3 @@
     transform: translateX(-50%);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .track {
-    /* Static ticker: no scroll under reduced motion (DESIGN.md §6). */
-    animation: none;
-  }
-}

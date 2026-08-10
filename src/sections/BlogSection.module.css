@@ -93,10 +93,3 @@
 .more:hover {
   background: var(--amber-soft);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .card,
-  .more {
-    transition: none;
-  }
-}

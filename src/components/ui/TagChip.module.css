@@ -36,9 +36,3 @@
   outline: 2px solid var(--amber);
   outline-offset: 2px;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .link {
-    transition: none;
-  }
-}

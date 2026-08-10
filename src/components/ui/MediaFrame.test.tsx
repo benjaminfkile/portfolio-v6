@@ -52,7 +52,7 @@ describe('MediaFrame', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('shows a poster and play button (no autoplay) under reduced motion', () => {
+  it('ignores an OS reduced-motion preference — videos still autoplay (owner decision)', () => {
     restores.push(mockReducedMotion(true));
 
     const { container } = render(
@@ -64,18 +64,10 @@ describe('MediaFrame', () => {
       />,
     );
     const video = container.querySelector('video') as HTMLVideoElement;
-    expect(video.autoplay).toBe(false);
-    expect(video).toHaveAttribute('poster', 'https://media.example/poster.jpg');
-
-    const play = screen.getByRole('button', { name: 'Play video: Demo' });
-    expect(play).toBeInTheDocument();
-
-    // Explicit play dismisses the button and surfaces native controls.
-    fireEvent.click(play);
+    expect(video.autoplay).toBe(true);
     expect(
       screen.queryByRole('button', { name: /play video/i }),
     ).not.toBeInTheDocument();
-    expect(container.querySelector('video')).toHaveAttribute('controls');
   });
 
   it('fires onFirstPlay only on the first play of a video (§4.8)', () => {

@@ -59,10 +59,3 @@
 .play:hover .playIcon {
   background: var(--panel-2);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .play:hover .playIcon {
-    background: var(--panel-2);
-    transition: none;
-  }
-}

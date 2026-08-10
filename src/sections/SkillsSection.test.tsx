@@ -239,13 +239,13 @@ describe('SkillsSection console — bus pulse & reduced motion', () => {
     }
   });
 
-  it('renders NO bus packet under prefers-reduced-motion', () => {
+  it('ignores an OS reduced-motion preference — the bus packet still fires (owner decision)', () => {
     const restore = mockReducedMotion(true);
     try {
       renderConsole();
       fireEvent.mouseEnter(listButton(/TypeScript/));
       fireEvent.click(listButton(/TypeScript/));
-      expect(screen.queryByTestId('skill-bus-packet')).not.toBeInTheDocument();
+      expect(screen.getByTestId('skill-bus-packet')).toBeInTheDocument();
     } finally {
       restore();
     }

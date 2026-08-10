@@ -64,9 +64,3 @@
   display: inline;
   white-space: pre;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .copy {
-    transition: none;
-  }
-}

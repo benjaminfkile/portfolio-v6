@@ -85,9 +85,3 @@
 
 /* Reduced motion: the packet is not rendered at all (gated in JS); the line
    stays as static decoration (§6). This guard covers any residual selector. */
-@media (prefers-reduced-motion: reduce) {
-  .packet {
-    animation: none;
-    display: none;
-  }
-}

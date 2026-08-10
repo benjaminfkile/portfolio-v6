@@ -51,9 +51,3 @@
   /* Border/fill warm to an amber-soft wash; nothing moves (DESIGN.md §6). */
   background: var(--amber-soft);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .base {
-    transition: none;
-  }
-}

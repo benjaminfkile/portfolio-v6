@@ -55,11 +55,13 @@ describe('Gauge', () => {
 
     // Over max: readout pins to max and the arc fills completely (offset ~0).
     const over = render(<Gauge value={140} max={100} label="Load" unit="%" />);
+    act(() => MockIntersectionObserver.last!.triggerAll(true));
     expect(over.getByText('Load 100%')).toBeInTheDocument();
     expect(dashOffset(over.container)).toBeCloseTo(0, 2);
 
     // Below zero: readout pins to 0 and the arc is empty (offset === length).
     const under = render(<Gauge value={-30} max={100} label="Dip" unit="%" />);
+    act(() => MockIntersectionObserver.last!.triggerAll(true));
     expect(under.getByText('Dip 0%')).toBeInTheDocument();
     expect(dashOffset(under.container)).toBeCloseTo(dashArray(under.container), 2);
   });
@@ -69,6 +71,7 @@ describe('Gauge', () => {
 
     // A half-full gauge hides half the arc: offset ≈ length / 2.
     const { container } = render(<Gauge value={30} max={60} label="Half" />);
+    act(() => MockIntersectionObserver.last!.triggerAll(true));
     expect(dashOffset(container)).toBeCloseTo(dashArray(container) / 2, 2);
   });
 
@@ -84,12 +87,13 @@ describe('Gauge', () => {
     expect(dashOffset(container)).toBeCloseTo(dashArray(container) * 0.25, 2);
   });
 
-  it('renders at its final angle and static under reduced motion (no observer)', () => {
+  it('ignores an OS reduced-motion preference — the sweep still runs (owner decision)', () => {
     restores.push(mockReducedMotion(true), installIntersectionObserver());
 
     const { container } = render(<Gauge value={40} max={100} label="Mem" />);
-    // No reveal wiring runs — the arc is already at its final offset.
+    // The reveal wiring arms exactly as in the default case.
+    expect(MockIntersectionObserver.instances).toHaveLength(1);
+    act(() => MockIntersectionObserver.last!.triggerAll(true));
     expect(dashOffset(container)).toBeCloseTo(dashArray(container) * 0.6, 2);
-    expect(MockIntersectionObserver.instances).toHaveLength(0);
   });
 });

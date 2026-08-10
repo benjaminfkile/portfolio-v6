@@ -43,12 +43,14 @@ describe('Meter', () => {
     expect(fillWidth()).toBe('75%');
   });
 
-  it('renders fully filled and static under reduced motion (no observer)', () => {
+  it('ignores an OS reduced-motion preference — the fill still animates in (owner decision)', () => {
     restores.push(mockReducedMotion(true), installIntersectionObserver());
 
     render(<Meter value={60} label="Node" />);
+    // The reveal wiring arms exactly as in the default case.
+    expect(MockIntersectionObserver.instances).toHaveLength(1);
+    act(() => MockIntersectionObserver.last!.triggerAll(true));
     expect(fillWidth()).toBe('60%');
-    expect(MockIntersectionObserver.instances).toHaveLength(0);
   });
 
   it('renders a mono tabular numeric readout when asked', () => {

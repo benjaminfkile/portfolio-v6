@@ -48,11 +48,3 @@
   /* Width is set inline (0 → target%) so the reveal animates it (DESIGN.md §6). */
   transition: width 900ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .fill {
-    /* useRevealOnce resolves to filled immediately; kill the transition too so
-       nothing animates even if the width prop ever changes (DESIGN.md §6). */
-    transition: none;
-  }
-}

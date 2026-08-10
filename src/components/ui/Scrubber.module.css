@@ -55,13 +55,5 @@
   box-shadow: 0 0 0 3px var(--ground);
 }
 
-/* A hair of easing so the thumb glides between keyboard steps; motion is opt-out
-   under prefers-reduced-motion (DESIGN.md §6). */
-@media (prefers-reduced-motion: no-preference) {
-  .fill,
-  .thumb {
-    transition:
-      left 90ms ease-out,
-      width 90ms ease-out;
-  }
-}
+/* A hair of easing so the thumb glides between keyboard steps (motion runs
+   unconditionally — DESIGN.md §6 owner decision). */

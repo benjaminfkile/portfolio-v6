@@ -1,46 +1,27 @@
-import { useEffect, useState } from 'react';
-
-const QUERY = '(prefers-reduced-motion: reduce)';
-
 /**
- * A one-shot read of the user's reduced-motion preference (DESIGN.md §6). Safe
- * to call during render and in non-browser/jsdom environments: when
- * `window.matchMedia` is unavailable it reports `false` (motion allowed), which
- * is the correct default for the reveal/animation primitives that consume it.
+ * Reduced-motion is deliberately NOT honored on this site (owner decision,
+ * 2026-08-10). This is a portfolio: its motion — the skills sphere, the bus
+ * pulse, reveals, live meters — IS the work being demonstrated, and the
+ * audience (recruiters, hiring managers) will never change a browser or OS
+ * setting to see it. Windows also silently disables its Animation-effects
+ * toggle broadly enough that honoring the flag presented as breakage, not
+ * accessibility (a frozen sphere on the owner's own machine debugged for a
+ * full session before the flag was found).
+ *
+ * Both helpers keep their original signatures and simply report "motion
+ * allowed", so every consumer (MediaFrame autoplay, Gauge/Meter sweeps,
+ * reveals, the sphere, the bus) stays wired for a future reversal — restoring
+ * the real matchMedia implementation here re-enables the preference site-wide.
+ * The matching `@media (prefers-reduced-motion)` CSS blocks were removed in
+ * the same change and would need restoring alongside.
  */
+
+/** Always `false` — motion allowed (see module comment). */
 export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia(QUERY).matches
-  );
+  return false;
 }
 
-/**
- * Subscribe to the reduced-motion preference and re-render when it changes. Used
- * by primitives whose behaviour is decided in JS rather than CSS — chiefly
- * MediaFrame, which must choose autoplay vs. poster-and-play at runtime
- * (DESIGN.md §6). Purely CSS-driven motion (StatusDot, Ticker) does not need
- * this — it uses the `@media (prefers-reduced-motion)` query directly.
- */
+/** Always `false` — motion allowed (see module comment). */
 export function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(prefersReducedMotion);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-    const mq = window.matchMedia(QUERY);
-    const onChange = () => setReduced(mq.matches);
-    onChange();
-    // Older Safari only exposes the deprecated addListener/removeListener API.
-    if (typeof mq.addEventListener === 'function') {
-      mq.addEventListener('change', onChange);
-      return () => mq.removeEventListener('change', onChange);
-    }
-    mq.addListener(onChange);
-    return () => mq.removeListener(onChange);
-  }, []);
-
-  return reduced;
+  return false;
 }

@@ -48,12 +48,15 @@ describe('useRevealOnce', () => {
     expect(observer.disconnect).not.toHaveBeenCalled();
   });
 
-  it('reveals immediately under prefers-reduced-motion (no observer created)', () => {
+  it('ignores an OS reduced-motion preference — reveal still runs on view (owner decision)', () => {
     restores.push(mockReducedMotion(true), installIntersectionObserver());
 
     render(<Probe />);
+    // Motion is unconditional: the observer arms exactly as in the default case.
+    expect(revealed()).toBe('false');
+    expect(MockIntersectionObserver.instances).toHaveLength(1);
+    act(() => MockIntersectionObserver.last?.triggerAll());
     expect(revealed()).toBe('true');
-    expect(MockIntersectionObserver.instances).toHaveLength(0);
   });
 
   it('reveals immediately when IntersectionObserver is unavailable', () => {

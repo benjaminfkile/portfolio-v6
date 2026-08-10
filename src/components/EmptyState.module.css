@@ -57,9 +57,3 @@
     opacity: 0.25;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .signal::before {
-    animation: none;
-  }
-}

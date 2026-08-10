@@ -74,14 +74,6 @@
 .active {
   color: var(--amber);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .close,
-  .link {
-    transition: none;
-  }
-}
-
 /* The overlay is a phone affordance; hidden once inline links appear (§3). */
 @media (min-width: 900px) {
   .backdrop {

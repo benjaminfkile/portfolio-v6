@@ -107,13 +107,13 @@ Each = one component + one CSS Module, tokens only, zero dependencies:
 | `SectionShell` | eyebrow (mono, amber, uppercase) + heading + intro + consistent vertical rhythm; every section renders inside one |
 | `Panel` | bordered `--panel` surface, `--r-m`; `raised` variant |
 | `Instrument` | small labeled readout (mono label + value line) — the signature element; used by status, now-playing, hero strip |
-| `StatusDot` | 7px dot + soft glow; `ok/warn/err` variants; pulse animation (2s) honoring reduced-motion |
+| `StatusDot` | 7px dot + soft glow; `ok/warn/err` variants; pulse animation (2s) |
 | `Meter` | 4px track + amber fill; used by the now-playing progress bar; animates width on first reveal |
 | `TagChip` | mono, bordered, `--r-s`; tech tags and links |
 | `LinkButton` | text link and button-shaped variants; amber; visible `:focus-visible` ring (`2px` amber outline, offset 2) |
 | `MediaFrame` | image/video wrapper: border, radius, `aspect-ratio` box, lazy loading, `object-fit: cover` |
-| `Ticker` (optional) | marquee row for dense live data; paused when `prefers-reduced-motion` |
-| `Gauge` | SVG arc gauge: `--line` track, amber sweep, big tabular-nums value + unit, mono label; sweep animates on first reveal, renders static under reduced-motion |
+| `Ticker` (optional) | marquee row for dense live data |
+| `Gauge` | SVG arc gauge: `--line` track, amber sweep, big tabular-nums value + unit, mono label; sweep animates on first reveal |
 | `AreaChart` | hand-rolled SVG time series (NO chart library): amber 1.5px line + `--amber-soft` fill, faint horizontal grid (3–4 rules, `--line`), emphasized latest point (amber dot), min/max mono labels only — no axis clutter; multi-series uses amber + `--text-dim` strokes |
 | `StatBlock` | big tabular-nums value + unit + mono label, optional small delta line |
 
@@ -178,19 +178,15 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
     right once (~700ms, eased, amber) and stops — never looping; rapid
     re-triggers restart it cleanly (the packet remounts, no queue). Decorative
     (`aria-hidden`, never a focus stop).
-  - **Motion / a11y** — the sphere's own motion (idle auto-spin + rotate-to-target
-    tween) is deliberately EXEMPT from `prefers-reduced-motion` (owner decision,
-    2026-08-10): it is the site's signature element and Windows flips its
-    Animation-effects toggle silently often enough that honoring the flag here
-    read as breakage. The bus still honors the preference (no packet — the line
-    stays static decoration). Icons are
+  - **Motion / a11y** — ALL site motion runs unconditionally (owner decision,
+    2026-08-10; see §6). Icons are
     theme-aware (Icons v1.6): an optional `icon_source_dark` override is used in
     the dark theme (falling back to `icon_source`), the light theme always uses
     `icon_source`; the sphere re-rasterizes the tile texture on theme toggle via
     the token observer, the CSS icons swap variants with CSS only. Group labels in
     mono.
-- **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop ONLY
-  if reduced-motion off; tap-to-play on touch), title, intro, `TagChip` tech
+- **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop;
+  tap-to-play on touch), title, intro, `TagChip` tech
   icons row, links. ≥900px: media left / text right alternating; <900px stacked.
 - **status** — a panel of `Instrument`s with `StatusDot`s per service + response
   times in mono tabular-nums.
@@ -222,8 +218,7 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   Times along the scrubber and readouts are the VIEWER's local zone; a mono strip
   labels the window honestly ("24h ending <local datetime of 00:00 UTC>" — it
   spans two local calendar days for most viewers) alongside `report_date` +
-  `generated_at` and a `StatusDot`. No auto-play in v1 (any easing honors
-  `prefers-reduced-motion`). No report yet (API 404) → a calm placeholder panel;
+  `generated_at` and a `StatusDot`. No auto-play in v1. No report yet (API 404) → a calm placeholder panel;
   missing datapoints within the day render as gaps, never zeros.
 - **404 / empty states** — instrument voice: mono `NO SIGNAL` label + plain link home.
 
@@ -236,9 +231,15 @@ Instrument behaviors only; one orchestrated moment, everything else micro:
 - StatusDot pulse; now-playing progress creep; Meter fill on first view
   (IntersectionObserver, once).
 - Hovers: border brightens to amber-soft wash, 120ms ease-out. Nothing moves >2px.
-- `prefers-reduced-motion: reduce` disables ALL of the above (dot static, meters
-  render filled, autoplay videos become poster + play button) — with ONE
-  exception: the skills sphere's spin/tween, exempt by owner decision (§5).
+- `prefers-reduced-motion` is deliberately NOT honored anywhere on this site
+  (owner decision, 2026-08-10). This is a portfolio: the motion — sphere, bus,
+  reveals, meters, autoplay — IS the work being demonstrated, and the audience
+  (recruiters, hiring managers) cannot be asked to change a browser or OS
+  setting; Windows also flips its Animation-effects toggle silently, which made
+  the flag present as breakage. All consumers still route through
+  `src/lib/prefersReducedMotion.ts`, so the preference can be restored
+  site-wide in one file (plus the removed CSS media blocks) if the call is
+  ever revisited.
 
 ## 7. Accessibility
 

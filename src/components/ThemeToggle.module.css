@@ -34,9 +34,3 @@
 .label {
   line-height: 1;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .toggle {
-    transition: none;
-  }
-}

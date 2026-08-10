@@ -109,7 +109,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     await screen.findByText('Operational');
   });
 
-  it('renders static under prefers-reduced-motion (no orchestration class)', async () => {
+  it('ignores an OS reduced-motion preference — orchestration still runs (owner decision)', async () => {
     restores.push(mockReducedMotion(true));
     stubStripFetch();
 
@@ -121,13 +121,12 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
       />,
     );
 
-    // Content is present and the staggered-reveal class is absent — static.
+    // Content is present and the page-load orchestration class is applied
+    // exactly as in the default case.
     expect(
       screen.getByRole('heading', { level: 1, name: 'Ben Kile' }),
     ).toBeInTheDocument();
-    expect(container.querySelector('section')).not.toHaveClass(
-      heroStyles.animated,
-    );
+    expect(container.querySelector('section')).toHaveClass(heroStyles.animated);
     await screen.findByText('Operational');
   });
 });

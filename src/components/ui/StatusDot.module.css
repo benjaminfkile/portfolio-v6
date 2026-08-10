@@ -36,11 +36,3 @@
     box-shadow: 0 0 0 3px transparent;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .dot {
-    /* Static under reduced motion; the glow rests at its base ring (§6). */
-    animation: none;
-    box-shadow: 0 0 4px 0 color-mix(in srgb, currentColor 50%, transparent);
-  }
-}

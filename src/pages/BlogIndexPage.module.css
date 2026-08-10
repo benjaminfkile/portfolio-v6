@@ -167,11 +167,3 @@
   color: var(--text-dim);
   border-color: var(--line);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .filter,
-  .card,
-  .loadMore {
-    transition: none;
-  }
-}
