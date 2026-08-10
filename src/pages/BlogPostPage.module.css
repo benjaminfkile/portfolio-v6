@@ -33,6 +33,14 @@
   margin: 0;
 }
 
+/* Date + blog eyebrow share a row under the title (DESIGN.md §5). */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .date {
   font-family: var(--font-mono);
   font-size: var(--fs-label);
@@ -41,6 +49,28 @@
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
+}
+
+/* Blog name — mono 'instrument voice' (DESIGN.md §5), an amber link back to the
+   blog filtered to this blog. */
+.blog {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--amber);
+  text-decoration: none;
+}
+
+.blog:hover {
+  text-decoration: underline;
+}
+
+.blog:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  border-radius: var(--r-s);
 }
 
 .cover {

@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { getPosts } from '../lib/api';
-import type { PostSummary } from '../types/content';
+import type { Blog, PostSummary } from '../types/content';
 import Panel from '../components/ui/Panel';
 import TagChip from '../components/ui/TagChip';
 import styles from './BlogIndexPage.module.css';
 
 /**
  * The blog index (`/blog`). Fetches `GET /api/posts` (spec §4.1) and renders
- * teaser cards — cover, title, excerpt, tags, date — each linking to
- * `/blog/:slug`. A tag filter refetches the list scoped to one tag, and a
- * cursor-based "Load more" appends the next page (§4.1: `?tag=`, `?cursor=`).
+ * teaser cards — cover, title, excerpt, tags, date, and the owning blog's name —
+ * each linking to `/blog/:slug`. A tag filter refetches the list scoped to one
+ * tag; a `?blog=<slug>` URL filter (Blogs v1.13) scopes it to one blog and
+ * round-trips through pagination; a cursor-based "Load more" appends the next
+ * page (§4.1: `?tag=`, `?blog=`, `?cursor=`).
  *
  * Loading, error, and empty states are plain semantic markup (spec §14).
  */
@@ -23,6 +25,18 @@ function mergeTags(known: string[], posts: PostSummary[]): string[] {
   for (const post of posts) {
     for (const tag of post.tags) {
       if (!merged.includes(tag)) merged.push(tag);
+    }
+  }
+  return merged;
+}
+
+/** Distinct blogs (by slug) across the given posts, appended to what is known. */
+function mergeBlogs(known: Blog[], posts: PostSummary[]): Blog[] {
+  const merged = [...known];
+  for (const post of posts) {
+    const blog = post.blog;
+    if (blog && !merged.some((known) => known.slug === blog.slug)) {
+      merged.push(blog);
     }
   }
   return merged;
@@ -50,9 +64,14 @@ function TeaserCard({ post }: { post: PostSummary }) {
               alt={post.cover.alt ?? ''}
             />
           )}
-          <time className={styles.date} dateTime={post.published_at}>
-            {formatDate(post.published_at)}
-          </time>
+          <div className={styles.meta}>
+            <time className={styles.date} dateTime={post.published_at}>
+              {formatDate(post.published_at)}
+            </time>
+            {/* API-derived → mono 'instrument voice' (DESIGN.md §5); a post with
+                no blog shows no chip. */}
+            {post.blog && <span className={styles.blogChip}>{post.blog.name}</span>}
+          </div>
           <h2 className={styles.cardTitle}>{post.title}</h2>
           {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
         </RouterLink>
@@ -76,8 +95,26 @@ export default function BlogIndexPage() {
   const [status, setStatus] = useState<Status>('loading');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [knownTags, setKnownTags] = useState<string[]>([]);
+  const [knownBlogs, setKnownBlogs] = useState<Blog[]>([]);
 
-  // Initial load and every tag change: reset and fetch the first page.
+  // The blog filter lives on the URL (`?blog=<slug>`) so it round-trips through
+  // links, refreshes, and pagination (Blogs v1.13).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeBlog = searchParams.get('blog');
+
+  const setActiveBlog = (slug: string | null) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (slug) next.set('blog', slug);
+        else next.delete('blog');
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  // Initial load and every tag / blog change: reset and fetch the first page.
   useEffect(() => {
     const controller = new AbortController();
     setStatus('loading');
@@ -85,13 +122,14 @@ export default function BlogIndexPage() {
     setCursor(null);
 
     getPosts(
-      { tag: activeTag ?? undefined },
+      { tag: activeTag ?? undefined, blog: activeBlog ?? undefined },
       { signal: controller.signal },
     )
       .then((page) => {
         setPosts(page.posts);
         setCursor(page.next_cursor);
         setKnownTags((prev) => mergeTags(prev, page.posts));
+        setKnownBlogs((prev) => mergeBlogs(prev, page.posts));
         setStatus('ready');
       })
       .catch((error: unknown) => {
@@ -101,16 +139,17 @@ export default function BlogIndexPage() {
       });
 
     return () => controller.abort();
-  }, [activeTag]);
+  }, [activeTag, activeBlog]);
 
   const loadMore = () => {
     if (!cursor) return;
     setStatus('loadingMore');
-    getPosts({ tag: activeTag ?? undefined, cursor })
+    getPosts({ tag: activeTag ?? undefined, blog: activeBlog ?? undefined, cursor })
       .then((page) => {
         setPosts((prev) => [...prev, ...page.posts]);
         setCursor(page.next_cursor);
         setKnownTags((prev) => mergeTags(prev, page.posts));
+        setKnownBlogs((prev) => mergeBlogs(prev, page.posts));
         setStatus('ready');
       })
       .catch((error: unknown) => {
@@ -145,6 +184,30 @@ export default function BlogIndexPage() {
               onClick={() => setActiveTag(tag)}
             >
               {tag}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {knownBlogs.length > 0 && (
+        <nav className={styles.filters} aria-label="Filter posts by blog">
+          <button
+            type="button"
+            className={styles.filter}
+            aria-pressed={activeBlog === null}
+            onClick={() => setActiveBlog(null)}
+          >
+            All
+          </button>
+          {knownBlogs.map((blog) => (
+            <button
+              key={blog.slug}
+              type="button"
+              className={styles.filter}
+              aria-pressed={activeBlog === blog.slug}
+              onClick={() => setActiveBlog(blog.slug)}
+            >
+              {blog.name}
             </button>
           ))}
         </nav>
