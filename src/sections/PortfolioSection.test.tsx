@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import PortfolioSection from './PortfolioSection';
 import styles from './PortfolioSection.module.css';
 import type { MediaMap, Section, SectionItem, SkillsItem } from '../types/content';
@@ -287,5 +288,100 @@ describe('PortfolioSection — Skill Refs v1.8', () => {
     expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
     expect(screen.getAllByAltText('Vercel')).toHaveLength(2);
     expect(screen.getByAltText('Docker')).toBeInTheDocument();
+  });
+});
+
+describe('PortfolioSection — Post Refs v1.14', () => {
+  function renderPortfolio(...items: SectionItem[]) {
+    return render(
+      <MemoryRouter>
+        <PortfolioSection section={portfolioSection(items)} media={{}} />
+      </MemoryRouter>,
+    );
+  }
+
+  it('renders a "From the blog" list of ordered internal links to /blog/<slug>', () => {
+    renderPortfolio(
+      project('p1', {
+        posts: [
+          { id: 'po-1', slug: 'shipping-fast', title: 'Shipping fast', blog: null },
+          { id: 'po-2', slug: 'on-testing', title: 'On testing', blog: null },
+        ],
+      }),
+    );
+
+    // The row is a nav-less list with an accessible label (§A11y).
+    const list = screen.getByRole('list', { name: 'Related blog posts' });
+    // Visible "From the blog" header sits above the list.
+    expect(screen.getByText('From the blog')).toBeInTheDocument();
+
+    // Author order is preserved and each entry routes to /blog/<slug>.
+    const links = within(list).getAllByRole('link');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveTextContent('Shipping fast');
+    expect(links[0]).toHaveAttribute('href', '/blog/shipping-fast');
+    expect(links[1]).toHaveTextContent('On testing');
+    expect(links[1]).toHaveAttribute('href', '/blog/on-testing');
+  });
+
+  it('uses client-side routing — internal links never open a new tab', () => {
+    renderPortfolio(
+      project('p1', {
+        posts: [{ id: 'po-1', slug: 'hello', title: 'Hello', blog: null }],
+      }),
+    );
+
+    const link = screen.getByRole('link', { name: 'Hello' });
+    // react-router Link → a relative in-app href, no target/rel escape hatch.
+    expect(link).toHaveAttribute('href', '/blog/hello');
+    expect(link).not.toHaveAttribute('target');
+    expect(link).not.toHaveAttribute('rel');
+  });
+
+  it('shows the blog name as a dim mono prefix when a post has a blog', () => {
+    const { container } = renderPortfolio(
+      project('p1', {
+        posts: [
+          {
+            id: 'po-1',
+            slug: 'controllers',
+            title: 'Controllers',
+            blog: { slug: 'code', name: 'Code' },
+          },
+          { id: 'po-2', slug: 'no-blog', title: 'Orphan', blog: null },
+        ],
+      }),
+    );
+
+    // The blog-carrying post reads "Code — Controllers"; the prefix is its own
+    // mono span so it can be dimmed apart from the title.
+    const withBlog = screen.getByRole('link', { name: 'Code — Controllers' });
+    expect(withBlog).toHaveClass(styles.postLink);
+    expect(within(withBlog).getByText('Code —')).toHaveClass(styles.postBlog);
+
+    // A blog-less post carries no prefix span at all.
+    const orphan = screen.getByRole('link', { name: 'Orphan' });
+    expect(orphan.querySelector(`.${styles.postBlog}`)).toBeNull();
+
+    // Exactly one prefix span across the panel.
+    expect(container.querySelectorAll(`.${styles.postBlog}`)).toHaveLength(1);
+  });
+
+  it('renders nothing for an item whose posts array is empty', () => {
+    renderPortfolio(project('p1', { posts: [] }));
+
+    expect(screen.queryByText('From the blog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Related blog posts' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when posts is absent (pre-v1.14 payload)', () => {
+    renderPortfolio(project('p1'));
+
+    expect(screen.queryByText('From the blog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Related blog posts' }),
+    ).not.toBeInTheDocument();
   });
 });
