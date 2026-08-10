@@ -3,7 +3,6 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { usePrefersReducedMotion } from '../../lib/prefersReducedMotion';
 import styles from './SkillSphere.module.css';
 import { resolveSkillIconUrl } from './SkillSphere';
 import type { SkillSphereSkill } from './SkillSphere';
@@ -478,14 +477,14 @@ function SkillFace({
 }
 
 /** The rotating group: a solid icosahedron with grid-coloured edge lines plus
- *  one face tile per skill. Auto-rotates via the render loop unless
- *  reduced-motion or a drag is in progress; drag rotation is read from the
- *  shared `stateRef`. */
+ *  one face tile per skill. Auto-rotates via the render loop unless a drag is
+ *  in progress (sphere motion is exempt from prefers-reduced-motion — owner
+ *  decision, see the focus effect); drag rotation is read from the shared
+ *  `stateRef`. */
 function Scene({
   skills,
   detail,
   tokens,
-  reduced,
   stateRef,
   invalidateRef,
   focusSkillId,
@@ -495,7 +494,6 @@ function Scene({
   skills: SkillSphereSkill[];
   detail: number;
   tokens: SceneTokens;
-  reduced: boolean;
   stateRef: React.MutableRefObject<DragState>;
   invalidateRef: React.MutableRefObject<(() => void) | null>;
   focusSkillId: string | null;
@@ -564,14 +562,16 @@ function Scene({
     const target = faceTargetQuaternion(placements[idx].normal);
     // A freshly picked target re-arms the hold a drag may have broken.
     s.holdBroken = false;
-    if (reduced) {
-      s.quat.copy(target);
-      focusRef.current = { from: target.clone(), target, t: 1 };
-    } else {
-      focusRef.current = { from: s.quat.clone(), target, t: 0 };
-    }
+    // ALWAYS the eased tween — never an instant snap. The sphere's motion is
+    // deliberately exempt from prefers-reduced-motion (owner decision,
+    // 2026-08-10): it is the site's signature element and its kinetics are
+    // essential, not decorative. Windows silently flips its Animation-effects
+    // toggle often enough that honouring the flag here read as a bug (frozen
+    // sphere, snapping) rather than as accessibility. Decorative motion
+    // elsewhere (bus pulse, reveals) still honours the preference.
+    focusRef.current = { from: s.quat.clone(), target, t: 0 };
     invalidate();
-  }, [focusSkillId, placements, reduced, skills, stateRef, invalidate]);
+  }, [focusSkillId, placements, skills, stateRef, invalidate]);
 
   useFrame((_, delta) => {
     const group = groupRef.current;
@@ -588,7 +588,7 @@ function Scene({
         s.quat.copy(focus.from).slerp(focus.target, easeInOutCubic(focus.t));
         invalidate(); // keep frames coming through the tween in demand mode
       }
-    } else if (!reduced && !s.dragging) {
+    } else if (!s.dragging) {
       // Slow auto-spin about the screen-vertical axis — the idle state. Also
       // reached with a BROKEN hold (the user dragged away from a locked skill
       // and released without picking another): the sphere returns to its slow
@@ -676,11 +676,12 @@ function Scene({
 /**
  * SkillSphereCanvas — the WebGL half of {@link SkillSphere}, isolated in its own
  * module so `React.lazy` code-splits three.js out of the entry chunk. Owns the
- * pointer-drag → rotation plumbing, the reduced-motion decision, and pausing the
- * render loop when the sphere scrolls off-screen (frameloop `never`). Under
- * reduced-motion the loop drops to `demand` — no auto-spin, but drag still
- * renders (via invalidate). The wrapper is `aria-hidden`; the reading lives in
- * the visually-hidden list rendered by the parent.
+ * pointer-drag → rotation plumbing and pausing the render loop when the sphere
+ * scrolls off-screen (frameloop `never`). Sphere motion — the idle spin and the
+ * rotate-to-target tween — is deliberately EXEMPT from prefers-reduced-motion
+ * (owner decision, 2026-08-10; see the focus effect in Scene). The wrapper is
+ * `aria-hidden`; the reading lives in the visually-hidden list rendered by the
+ * parent.
  */
 export default function SkillSphereCanvas({
   skills,
@@ -689,7 +690,6 @@ export default function SkillSphereCanvas({
   onLock,
 }: CanvasProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const reduced = usePrefersReducedMotion();
   const [inView, setInView] = useState(true);
   // The tile currently under the pointer — drives the mono tooltip. Kept as an
   // id (not a title) so it stays in step with the parent console's preview.
@@ -732,11 +732,9 @@ export default function SkillSphereCanvas({
     return () => io.disconnect();
   }, []);
 
-  const frameloop: 'always' | 'demand' | 'never' = !inView
-    ? 'never'
-    : reduced
-      ? 'demand'
-      : 'always';
+  // 'always' whenever visible: the sphere spins/tweens unconditionally (the
+  // reduced-motion exemption above), so there is no demand tier any more.
+  const frameloop: 'always' | 'never' = !inView ? 'never' : 'always';
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     const s = stateRef.current;
@@ -798,7 +796,6 @@ export default function SkillSphereCanvas({
           skills={skills}
           detail={detail}
           tokens={tokens}
-          reduced={reduced}
           stateRef={stateRef}
           invalidateRef={invalidateRef}
           focusSkillId={focusSkillId}

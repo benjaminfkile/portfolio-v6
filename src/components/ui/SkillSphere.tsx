@@ -168,7 +168,8 @@ const SkillSphereCanvas = lazy(() => import('./SkillSphereCanvas'));
  * with one skill icon lying flat on a face, edge lines in the plotting-grid
  * colour on the
  * dark panel (DESIGN.md §2, §5). Auto-rotates slowly, pointer-drag spins it,
- * and it honours `prefers-reduced-motion` and pauses off-screen.
+ * and it pauses off-screen (sphere motion is exempt from prefers-reduced-motion
+ * — owner decision, 2026-08-10; decorative motion elsewhere still honours it).
  *
  * When WebGL is unavailable — older browsers, and the jsdom test path — it
  * degrades to a plain chip grid instead of the canvas. Either way a

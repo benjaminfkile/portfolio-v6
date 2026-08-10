@@ -178,9 +178,12 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
     right once (~700ms, eased, amber) and stops — never looping; rapid
     re-triggers restart it cleanly (the packet remounts, no queue). Decorative
     (`aria-hidden`, never a focus stop).
-  - **Motion / a11y** — `prefers-reduced-motion`: the sphere snaps to the focus
-    target with no tween (the `demand` frameloop honored), the bus fires no packet
-    (the line stays static decoration), and the auto-spin stays off. Icons are
+  - **Motion / a11y** — the sphere's own motion (idle auto-spin + rotate-to-target
+    tween) is deliberately EXEMPT from `prefers-reduced-motion` (owner decision,
+    2026-08-10): it is the site's signature element and Windows flips its
+    Animation-effects toggle silently often enough that honoring the flag here
+    read as breakage. The bus still honors the preference (no packet — the line
+    stays static decoration). Icons are
     theme-aware (Icons v1.6): an optional `icon_source_dark` override is used in
     the dark theme (falling back to `icon_source`), the light theme always uses
     `icon_source`; the sphere re-rasterizes the tile texture on theme toggle via
@@ -234,7 +237,8 @@ Instrument behaviors only; one orchestrated moment, everything else micro:
   (IntersectionObserver, once).
 - Hovers: border brightens to amber-soft wash, 120ms ease-out. Nothing moves >2px.
 - `prefers-reduced-motion: reduce` disables ALL of the above (dot static, meters
-  render filled, autoplay videos become poster + play button).
+  render filled, autoplay videos become poster + play button) — with ONE
+  exception: the skills sphere's spin/tween, exempt by owner decision (§5).
 
 ## 7. Accessibility
 
