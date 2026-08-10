@@ -104,6 +104,14 @@
   object-fit: cover;
 }
 
+/* Date + blog chip sit on one row above the title (DESIGN.md §5). */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .date {
   font-family: var(--font-mono);
   font-size: var(--fs-label);
@@ -112,6 +120,21 @@
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
+}
+
+/* Blog name — a small mono chip, the API-derived 'instrument voice' (DESIGN.md
+   §5), warmed with the amber accent that marks live/identity data. */
+.blogChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-label);
+  color: var(--amber);
 }
 
 .cardTitle {

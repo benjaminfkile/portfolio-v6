@@ -22,6 +22,12 @@ import styles from './BlogSection.module.css';
 interface BlogData {
   limit?: number;
   tag?: string;
+  /**
+   * A blog slug (Blogs v1.13): when set, the teaser shows only that blog's posts
+   * and its "view all" link targets the index filtered to it. Read defensively —
+   * the regenerated section type may not yet carry the field locally.
+   */
+  blog?: string;
   title?: string;
   eyebrow?: string;
   intro?: string;
@@ -68,7 +74,7 @@ export default function BlogSection({ section }: SectionProps) {
     const controller = new AbortController();
 
     getPosts(
-      { limit: config.limit, tag: config.tag },
+      { limit: config.limit, tag: config.tag, blog: config.blog },
       { signal: controller.signal },
     )
       .then((page) => setState({ status: 'ready', posts: page.posts }))
@@ -79,7 +85,7 @@ export default function BlogSection({ section }: SectionProps) {
       });
 
     return () => controller.abort();
-  }, [config.limit, config.tag]);
+  }, [config.limit, config.tag, config.blog]);
 
   if (state.status === 'loading') {
     return (
@@ -112,7 +118,10 @@ export default function BlogSection({ section }: SectionProps) {
           <TeaserCard key={post.slug} post={post} />
         ))}
       </ul>
-      <RouterLink className={styles.more} to="/blog">
+      <RouterLink
+        className={styles.more}
+        to={config.blog ? `/blog?blog=${encodeURIComponent(config.blog)}` : '/blog'}
+      >
         Read the blog
       </RouterLink>
     </SectionShell>

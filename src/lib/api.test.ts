@@ -91,6 +91,19 @@ describe('getPosts', () => {
     expect(url).toContain('cursor=abc');
     expect(url).toContain('limit=10');
   });
+
+  it('serialises the blog slug into ?blog=, composing with tag (Blogs v1.13)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ posts: [], next_cursor: null }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getPosts({ tag: 'react', blog: 'field-notes' });
+
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('blog=field-notes');
+    expect(url).toContain('tag=react');
+  });
 });
 
 describe('getPost', () => {

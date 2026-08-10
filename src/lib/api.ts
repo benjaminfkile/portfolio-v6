@@ -65,16 +65,24 @@ export interface PostList {
   next_cursor: string | null;
 }
 
-/** Query parameters for {@link getPosts} (spec §4.1: `?limit=`, `?tag=`, `?cursor=`). */
+/**
+ * Query parameters for {@link getPosts} (spec §4.1: `?limit=`, `?tag=`,
+ * `?cursor=`; Blogs v1.13: `?blog=`). `tag` and `blog` compose — a request may
+ * carry both to scope the list to one blog's posts within one tag.
+ */
 export interface GetPostsParams {
   tag?: string;
+  /** A blog slug (Blogs v1.13) — scopes the list to that blog's posts. */
+  blog?: string;
   cursor?: string;
   limit?: number;
 }
 
 /**
  * `GET /api/posts` — a page of published post summaries (spec §4.1). Filters by
- * `tag` and paginates with the cursor from a previous {@link PostList} response.
+ * `tag` and/or `blog` (Blogs v1.13) and paginates with the cursor from a
+ * previous {@link PostList} response. Each summary carries its owning
+ * `blog: {slug, name} | null`.
  */
 export function getPosts(
   params: GetPostsParams = {},
@@ -82,6 +90,7 @@ export function getPosts(
 ): Promise<PostList> {
   const search = new URLSearchParams();
   if (params.tag) search.set('tag', params.tag);
+  if (params.blog) search.set('blog', params.blog);
   if (params.cursor) search.set('cursor', params.cursor);
   if (params.limit != null) search.set('limit', String(params.limit));
   const query = search.toString();

@@ -468,6 +468,7 @@ export const fixturePost: Post = {
   },
   tags: ['engineering', 'react'],
   published_at: '2026-07-20T09:00:00Z',
+  blog: { slug: 'field-notes', name: 'Field Notes' },
   media: {
     'media-inline': {
       url: 'https://media.benkile.com/media/posts/diagram.png',
@@ -517,6 +518,7 @@ export const fixturePostSummaries: PostSummary[] = [
     },
     tags: ['engineering'],
     published_at: '2026-07-24T10:00:00Z',
+    blog: null,
   },
   {
     slug: 'second-post',
@@ -525,5 +527,6 @@ export const fixturePostSummaries: PostSummary[] = [
     cover: null,
     tags: ['react'],
     published_at: '2026-07-18T10:00:00Z',
+    blog: null,
   },
 ];

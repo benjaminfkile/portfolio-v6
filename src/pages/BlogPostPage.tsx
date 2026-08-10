@@ -130,9 +130,21 @@ export default function BlogPostPage() {
         <header className={styles.header}>
           <p className={styles.eyebrow}>// post</p>
           <h1 className={styles.title}>{post.title}</h1>
-          <time className={styles.date} dateTime={post.published_at}>
-            {formatDate(post.published_at)}
-          </time>
+          <div className={styles.meta}>
+            <time className={styles.date} dateTime={post.published_at}>
+              {formatDate(post.published_at)}
+            </time>
+            {/* The owning blog (Blogs v1.13): a small mono eyebrow that links back
+                to the index filtered to this blog. Absent when the post has none. */}
+            {post.blog && (
+              <RouterLink
+                className={styles.blog}
+                to={`/blog?blog=${encodeURIComponent(post.blog.slug)}`}
+              >
+                {post.blog.name}
+              </RouterLink>
+            )}
+          </div>
         </header>
         {post.cover && (
           <img

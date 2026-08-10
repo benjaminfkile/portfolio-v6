@@ -20,6 +20,7 @@ const thirdPost: PostSummary = {
   cover: null,
   tags: ['engineering'],
   published_at: '2026-07-10T10:00:00Z',
+  blog: null,
 };
 
 function renderIndex() {
@@ -119,6 +120,105 @@ describe('BlogIndexPage (spec §3.5, §4.1)', () => {
       String(c[0]).includes('tag=react'),
     );
     expect(tagged).toBeTruthy();
+  });
+
+  it('renders a blog-name chip on cards (none when null) and a blog filter that round-trips through the URL', async () => {
+    const blogPosts: PostSummary[] = [
+      {
+        slug: 'alpha',
+        title: 'Alpha',
+        excerpt: 'A.',
+        cover: null,
+        tags: ['x'],
+        published_at: '2026-07-24T10:00:00Z',
+        blog: { slug: 'field-notes', name: 'Field Notes' },
+      },
+      {
+        slug: 'bravo',
+        title: 'Bravo',
+        excerpt: 'B.',
+        cover: null,
+        tags: ['y'],
+        published_at: '2026-07-20T10:00:00Z',
+        blog: null,
+      },
+    ];
+    const fetchMock = vi.fn((path: string) =>
+      Promise.resolve(
+        path.includes('blog=field-notes')
+          ? jsonResponse({ posts: [blogPosts[0]], next_cursor: null })
+          : jsonResponse({ posts: blogPosts, next_cursor: null }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderIndex();
+    await screen.findByText('Alpha');
+
+    // The card for the blogged post shows its blog name as a chip; the null-blog
+    // card shows no such chip.
+    const alphaCard = screen.getByText('Alpha').closest('article') as HTMLElement;
+    expect(within(alphaCard).getByText('Field Notes')).toBeInTheDocument();
+    const bravoCard = screen.getByText('Bravo').closest('article') as HTMLElement;
+    expect(within(bravoCard).queryByText(/Field Notes|Dev Log/)).toBeNull();
+
+    // The blog filter lists blogs seen across loaded posts; choosing one scopes
+    // the list and marks that chip active (read back from the URL param).
+    const blogFilters = screen.getByRole('navigation', {
+      name: 'Filter posts by blog',
+    });
+    const chip = within(blogFilters).getByRole('button', { name: 'Field Notes' });
+    chip.click();
+
+    await waitFor(() => expect(screen.queryByText('Bravo')).toBeNull());
+    expect(
+      fetchMock.mock.calls.some((c) => String(c[0]).includes('blog=field-notes')),
+    ).toBe(true);
+    expect(
+      within(blogFilters).getByRole('button', { name: 'Field Notes' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('reads ?blog= from the URL on load and carries it through pagination', async () => {
+    const scoped: PostSummary = {
+      slug: 'bravo',
+      title: 'Bravo',
+      excerpt: 'B.',
+      cover: null,
+      tags: ['y'],
+      published_at: '2026-07-20T10:00:00Z',
+      blog: { slug: 'devlog', name: 'Dev Log' },
+    };
+    const nextPage: PostSummary = { ...scoped, slug: 'charlie', title: 'Charlie' };
+    const fetchMock = vi.fn((path: string) =>
+      Promise.resolve(
+        path.includes('cursor=')
+          ? jsonResponse({ posts: [nextPage], next_cursor: null })
+          : jsonResponse({ posts: [scoped], next_cursor: 'C1' }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/blog?blog=devlog']}>
+        <BlogIndexPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('Bravo');
+    // The initial fetch was scoped to the URL's blog, and its chip is active.
+    expect(String(fetchMock.mock.calls[0][0])).toContain('blog=devlog');
+    expect(
+      screen.getByRole('button', { name: 'Dev Log' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    screen.getByRole('button', { name: 'Load more' }).click();
+    await screen.findByText('Charlie');
+
+    // The next page kept the blog scope alongside the cursor.
+    const paged = fetchMock.mock.calls[1][0] as string;
+    expect(paged).toContain('cursor=C1');
+    expect(paged).toContain('blog=devlog');
   });
 
   it('shows an error state when the list cannot be loaded', async () => {

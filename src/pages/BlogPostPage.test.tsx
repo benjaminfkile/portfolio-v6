@@ -59,6 +59,28 @@ describe('BlogPostPage (spec §3.7, §4.1)', () => {
     expect(screen.getByRole('link', { name: 'Source' })).toBeInTheDocument();
   });
 
+  it("shows the post's blog as a mono eyebrow linking to the filtered index (Blogs v1.13)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(fixturePost));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderAt('hello-blocks');
+    await screen.findByRole('heading', { name: 'Every block, once', level: 1 });
+
+    const blogLink = screen.getByRole('link', { name: 'Field Notes' });
+    expect(blogLink).toHaveAttribute('href', '/blog?blog=field-notes');
+  });
+
+  it('shows no blog eyebrow when the post belongs to no blog', async () => {
+    const noBlog = { ...fixturePost, blog: null };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(noBlog));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderAt('hello-blocks');
+    await screen.findByRole('heading', { name: 'Every block, once', level: 1 });
+
+    expect(screen.queryByRole('link', { name: 'Field Notes' })).toBeNull();
+  });
+
   it('renders a clean not-found state for an unknown / unpublished slug (404)', async () => {
     const fetchMock = vi
       .fn()

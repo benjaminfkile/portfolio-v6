@@ -51,6 +51,30 @@ describe('BlogSection (spec §3.5)', () => {
     expect(url).toContain('tag=engineering');
   });
 
+  it('scopes the teaser to data.blog and points "view all" at the filtered index (Blogs v1.13)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse({ posts: fixturePostSummaries, next_cursor: null }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBlog({ limit: 3, blog: 'field-notes' });
+
+    await screen.findByRole('link', { name: /First post/ });
+
+    // The configured blog scopes the request.
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('blog=field-notes');
+    expect(url).toContain('limit=3');
+
+    // "View all" carries the blog through to the filtered index.
+    expect(screen.getByRole('link', { name: /read the blog/i })).toHaveAttribute(
+      'href',
+      '/blog?blog=field-notes',
+    );
+  });
+
   it('degrades to nothing (never a broken page) when the fetch fails', async () => {
     vi.stubGlobal(
       'fetch',

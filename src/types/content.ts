@@ -301,6 +301,16 @@ export interface MediaRef {
 export type MediaMap = Record<string, MediaRef>;
 
 /**
+ * A post's blog identity (Blogs v1.13): the owning blog's `slug` (used to filter
+ * the index, `/blog?blog=<slug>`) and its display `name`. A post that belongs to
+ * no blog carries `blog: null`.
+ */
+export interface Blog {
+  slug: string;
+  name: string;
+}
+
+/**
  * `GET /api/posts` returns summaries only — never bodies (§4.1).
  */
 export interface PostSummary {
@@ -310,6 +320,8 @@ export interface PostSummary {
   cover: MediaRef | null;
   tags: string[];
   published_at: string;
+  /** The blog this post belongs to (Blogs v1.13), or `null` if none. */
+  blog: Blog | null;
 }
 
 /**
