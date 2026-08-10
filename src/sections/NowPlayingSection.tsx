@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SectionProps } from './types';
-import { getNowPlaying } from '../lib/api';
 import type { NowPlayingResponse } from '../lib/api';
+import { useNowPlaying } from '../lib/useNowPlaying';
 import { usePrefersReducedMotion } from '../lib/prefersReducedMotion';
 import SectionShell from '../components/ui/SectionShell';
 import Panel from '../components/ui/Panel';
@@ -18,10 +18,9 @@ import styles from './NowPlayingSection.module.css';
  * `GET /api/now-playing`.
  *
  * This is the one live section whose data changes *while the visitor is on the
- * page*, so it refetches on a ~30s interval (matching the API cache) — but only
- * while mounted **and** `document.visibilityState` is visible: a backgrounded
- * tab must not poll (§3.5). We also refetch immediately when the tab becomes
- * visible again.
+ * page*. The fetching/polling itself lives in the shared {@link useNowPlaying}
+ * store (one ~5s poller for the whole app, visibility-gated per §3.5, shared
+ * with the hero instrument strip); this section only renders the shared state.
  *
  * Between polls the progress bar is interpolated locally from `progress_ms` →
  * `duration_ms`; under `prefers-reduced-motion` the interpolation is disabled
@@ -42,70 +41,30 @@ interface NowPlayingData {
   eyebrow?: string;
 }
 
-/** Re-poll to match the endpoint's ~30s server-side cache (DESIGN.md §5). */
-const POLL_INTERVAL_MS = 30_000;
 /** Local progress interpolation tick between polls. */
 const CREEP_INTERVAL_MS = 1_000;
-
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'ready'; data: NowPlayingResponse };
 
 export default function NowPlayingSection({ section }: SectionProps) {
   const config = section.data as NowPlayingData;
   const reduced = usePrefersReducedMotion();
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const state = useNowPlaying();
 
   // Local progress interpolation: remember the last reported progress + the
   // wall-clock moment it arrived, then advance `progressMs` each tick.
   const anchor = useRef<{ base: number; at: number } | null>(null);
   const [progressMs, setProgressMs] = useState(0);
 
+  // Re-anchor on every payload from the store (each poll reports a fresh
+  // `progress_ms`, even for the same track). A degrade clears the anchor.
   useEffect(() => {
-    let cancelled = false;
-
-    const load = () => {
-      getNowPlaying()
-        .then((data) => {
-          if (cancelled) return;
-          if (data.playing) {
-            anchor.current = { base: data.track.progress_ms ?? 0, at: Date.now() };
-            setProgressMs(data.track.progress_ms ?? 0);
-          } else {
-            anchor.current = null;
-          }
-          setState({ status: 'ready', data });
-        })
-        .catch((error: unknown) => {
-          // Degrade to idle — a failed fetch is "not listening", not an error.
-          if (cancelled) return;
-          anchor.current = null;
-          setState({ status: 'ready', data: { playing: false } });
-          console.error('Failed to load now-playing', error);
-        });
-    };
-
-    load(); // initial fetch on mount
-
-    // Poll on an interval, but each tick only fetches while the tab is visible;
-    // a hidden tab's ticks are no-ops, so a backgrounded tab never polls (§3.5).
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') load();
-    }, POLL_INTERVAL_MS);
-
-    // Refetch immediately when the tab returns to the foreground, so a visitor
-    // coming back sees a fresh track rather than a stale one.
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') load();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, []);
+    if (state.status === 'ready' && state.data.playing) {
+      const base = state.data.track.progress_ms ?? 0;
+      anchor.current = { base, at: Date.now() };
+      setProgressMs(base);
+    } else {
+      anchor.current = null;
+    }
+  }, [state]);
 
   // Creep the progress bar between polls. Static under reduced motion (§6), and
   // only while an actual track with a known duration is playing.
@@ -137,7 +96,9 @@ export default function NowPlayingSection({ section }: SectionProps) {
     );
   }
 
-  const { data } = state;
+  // Degrade to idle — a failed fetch is "not listening", not an error (§3.5).
+  const data: NowPlayingResponse =
+    state.status === 'ready' ? state.data : { playing: false };
 
   if (!data.playing) {
     // Idle is config (§3.5): `hide` removes the section; `message` renders a line.

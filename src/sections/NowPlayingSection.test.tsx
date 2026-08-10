@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import NowPlayingSection from './NowPlayingSection';
 import type { Section } from '../types/content';
 import type { NowPlayingResponse } from '../lib/api';
+import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -118,7 +119,7 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('polls ~30s only while the tab is visible, pausing when hidden', async () => {
+  it('polls every 5s only while the tab is visible, pausing when hidden', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -136,16 +137,16 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     });
     expect(npCalls()).toBe(1);
 
-    // Visible: a 30s tick refetches.
+    // Visible: a poll tick refetches.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
     });
     expect(npCalls()).toBe(2);
 
     // Hidden: ticks are no-ops — a backgrounded tab must not poll (§3.5).
     await act(async () => {
       setVisibility('hidden');
-      await vi.advanceTimersByTimeAsync(180_000);
+      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS * 12);
     });
     expect(npCalls()).toBe(2);
 
@@ -157,7 +158,7 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(npCalls()).toBe(3);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
     });
     expect(npCalls()).toBe(4);
   });

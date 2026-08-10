@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import HeroInstrumentStrip from './HeroInstrumentStrip';
 import type { NowPlayingResponse, StatusResponse } from '../lib/api';
+import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -34,6 +35,7 @@ function stubStrip(opts: { now?: Response; status?: Response } = {}) {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
@@ -105,6 +107,46 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
     render(<HeroInstrumentStrip siteVersion={1} />);
 
     expect(await screen.findByText('Degraded')).toBeInTheDocument();
+  });
+
+  it('updates the NOW PLAYING readout live when a later poll reports a new track', async () => {
+    vi.useFakeTimers();
+    // Mutable body: the shared store's next poll sees whatever is current.
+    let now: NowPlayingResponse = { playing: false };
+    const fetchMock = vi.fn((path: string) => {
+      if (path.startsWith('/api/now-playing')) {
+        return Promise.resolve(jsonResponse(now));
+      }
+      if (path.startsWith('/api/status')) {
+        return Promise.resolve(
+          jsonResponse({ degraded: false, services: [] } satisfies StatusResponse),
+        );
+      }
+      throw new Error(`unexpected fetch: ${path}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<HeroInstrumentStrip siteVersion={1} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText('Not playing')).toBeInTheDocument();
+
+    now = {
+      playing: true,
+      track: {
+        title: 'Windowlicker',
+        artists: ['Aphex Twin'],
+        album: 'Windowlicker',
+        art_url: null,
+        url: 'https://open.spotify.com/track/xyz',
+      },
+    };
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
+    });
+    expect(screen.getByText('Windowlicker — Aphex Twin')).toBeInTheDocument();
   });
 
   it('degrades each live instrument silently on fetch failure', async () => {

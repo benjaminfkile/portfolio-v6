@@ -192,7 +192,9 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   times in mono tabular-nums.
 - **now_playing** — `Instrument` with album art in a small `MediaFrame`, track/
   artist, live progress bar (thin amber `Meter` that creeps); idle state per
-  section config. Poll ~30s, matching the API cache.
+  section config. Poll ~5s via the shared `useNowPlaying` store (one poller for
+  the whole app — the hero strip subscribes to the same state), matching the
+  API cache.
 - **blog** (teaser) — list of post panels: mono date, title, excerpt.
 - **duolingo** — an `Instrument` pair: STREAK (mono amber count + day label) and the
   course readout (title, XP in tabular-nums; crowns small in --text-dim). The manual

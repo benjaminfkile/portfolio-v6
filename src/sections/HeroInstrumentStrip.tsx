@@ -2,21 +2,24 @@ import { useEffect, useState } from 'react';
 import Instrument from '../components/ui/Instrument';
 import StatusDot from '../components/ui/StatusDot';
 import type { StatusVariant } from '../components/ui/StatusDot';
-import { getNowPlaying, getStatus } from '../lib/api';
+import { getStatus } from '../lib/api';
 import type { NowPlayingResponse, StatusResponse } from '../lib/api';
+import { useNowPlaying } from '../lib/useNowPlaying';
 import styles from './HeroInstrumentStrip.module.css';
 
 /**
  * The hero **instrument strip** (DESIGN.md §5): three `Instrument` readouts —
- * NOW PLAYING, API, and SITE vN — sitting below the hero header. The first two
- * are fed by the live endpoints (`GET /api/now-playing`, `GET /api/status`); the
- * third is the published document's version, threaded in via props from the
- * already-fetched document (no extra request).
+ * NOW PLAYING, API, and SITE vN — sitting below the hero header. NOW PLAYING
+ * subscribes to the shared {@link useNowPlaying} store (one app-wide ~5s
+ * poller, shared with the `now_playing` section) so it updates live on track
+ * changes; API is a single `GET /api/status` fetch on mount (the full `status`
+ * section owns its own polling, §3.5); SITE is the published document's
+ * version, threaded in via props from the already-fetched document (no extra
+ * request).
  *
  * Each live instrument **degrades independently and silently** (§3.5 spirit): a
  * loading tick shows "…", any failure shows a dim "—", and neither ever throws
- * or blocks the hero. A single fetch on mount is enough for this compact strip —
- * the full `now_playing` / `status` sections own their own polling (§3.5).
+ * or blocks the hero.
  */
 export interface HeroInstrumentStripProps {
   /** Published document version → the SITE vN readout. Omitted renders no SITE. */
@@ -55,19 +58,11 @@ function apiReadout(
 export default function HeroInstrumentStrip({
   siteVersion,
 }: HeroInstrumentStripProps) {
-  const [now, setNow] = useState<Live<NowPlayingResponse>>({ status: 'loading' });
+  const now = useNowPlaying();
   const [status, setStatus] = useState<Live<StatusResponse>>({ status: 'loading' });
 
   useEffect(() => {
     const controller = new AbortController();
-
-    getNowPlaying({ signal: controller.signal })
-      .then((data) => setNow({ status: 'ready', data }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setNow({ status: 'error' });
-        console.error('Hero strip: now-playing unavailable', error);
-      });
 
     getStatus({ signal: controller.signal })
       .then((data) => setStatus({ status: 'ready', data }))
