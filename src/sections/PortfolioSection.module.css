@@ -81,6 +81,64 @@
   object-fit: contain;
 }
 
+/* Post Refs v1.14: the "From the blog" related-posts row. Sits below the
+   links/tech rows; internal RouterLinks styled in the amber link voice, with an
+   optional dim mono blog-name prefix. */
+.posts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.postsLabel {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.postList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.postLink {
+  display: inline-flex;
+  align-items: center;
+  /* Interactive rows are touch targets — keep them ≥44px tall (DESIGN.md §3). */
+  min-height: 44px;
+  color: var(--amber);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body-s);
+  line-height: var(--lh-prose);
+  text-decoration: none;
+  transition: color 120ms ease-out;
+}
+
+.postLink:hover {
+  color: var(--text-bright);
+  text-decoration: underline;
+}
+
+.postLink:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* The owning blog's name as a subtle mono prefix (e.g. "Code — Post Title"). */
+.postBlog {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+}
+
 /* Two-column media/text split from 900px, alternating side per item (§5). */
 @media (min-width: 900px) {
   .project {

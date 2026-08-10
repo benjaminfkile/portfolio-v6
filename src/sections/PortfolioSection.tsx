@@ -1,3 +1,4 @@
+import { Link as RouterLink } from 'react-router-dom';
 import type { SectionProps } from './types';
 import type { MediaRef, PortfolioItem, SkillsItem } from '../types/content';
 import SectionShell from '../components/ui/SectionShell';
@@ -136,6 +137,10 @@ export default function PortfolioSection({
             : [];
           const legacyIcons = isSkillRefs ? [] : project.tech_icons ?? [];
           const links = project.links ?? [];
+          // Related posts (Post Refs v1.14): read defensively — a pre-v1.14
+          // payload omits the field entirely. Already resolved to published
+          // posts in author order server-side, so we render straight through.
+          const posts = project.posts ?? [];
           // From 900px up the media/text split alternates side per item (§5).
           const reversed = index % 2 === 1;
 
@@ -209,6 +214,37 @@ export default function PortfolioSection({
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {/* Post Refs v1.14: a compact "From the blog" row of internal
+                      links to related posts. Absent/empty renders nothing — no
+                      header, no gap (§3.4). These are internal routes, so they
+                      use client-side routing (react-router Link, NOT a new tab).
+                      The list carries its own aria-label; the blog name, when
+                      present, renders as a dim mono prefix. */}
+                  {posts.length > 0 && (
+                    <div className={styles.posts}>
+                      <p className={styles.postsLabel}>From the blog</p>
+                      <ul
+                        className={styles.postList}
+                        aria-label="Related blog posts"
+                      >
+                        {posts.map((post) => (
+                          <li key={post.id}>
+                            <RouterLink
+                              className={styles.postLink}
+                              to={`/blog/${post.slug}`}
+                            >
+                              {post.blog && (
+                                <span className={styles.postBlog}>
+                                  {post.blog.name} —{' '}
+                                </span>
+                              )}
+                              {post.title}
+                            </RouterLink>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               </Panel>

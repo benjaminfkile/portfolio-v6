@@ -118,6 +118,30 @@ export interface PortfolioItem {
    */
   tech_icons?: string[];
   links: Link[];
+  /**
+   * Related published posts (Post Refs v1.14). The API resolves these
+   * server-side to currently-published posts only, in the author's order, and
+   * serializes them on each portfolio item in `GET /api/content` (and the admin
+   * preview). Draft/deleted refs never reach this payload, so the renderer needs
+   * no filtering. Optional so a pre-v1.14 payload (or the not-yet-regenerated
+   * local schema) degrades to "no related posts" rather than crashing — an
+   * absent or empty array renders nothing.
+   */
+  posts?: PostRef[];
+}
+
+/**
+ * A related-post reference on a portfolio item (Post Refs v1.14) — the minimal
+ * shape needed to render an internal link to the post: its `id` (React key),
+ * `slug` (routed to `/blog/<slug>`), display `title`, and owning {@link Blog}
+ * identity (`null` when the post belongs to no blog). Already resolved to a
+ * currently-published post server-side; the public site only ever renders it.
+ */
+export interface PostRef {
+  id: string;
+  slug: string;
+  title: string;
+  blog: Blog | null;
 }
 
 /* ---- Static-section config shapes (spec §3.4) ----------------------------- */
