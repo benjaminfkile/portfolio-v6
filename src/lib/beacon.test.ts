@@ -5,7 +5,9 @@ import { sendEvent } from './beacon';
  * Beacon client tests (spec §4.8). jsdom ships neither `navigator.sendBeacon`
  * nor `fetch` in a controllable form, so both are installed as spies. The
  * privacy gates — DNT, GPC, preview mode — must suppress *every* event, and the
- * happy path must post a JSON `{ event, path, referrer?, meta? }` body.
+ * happy path must post a JSON `{ event, path, referrer?, meta? }` body against
+ * the API origin with a CORS-safelisted content type (bug #42: `application/json`
+ * blows the preflight cross-origin and hit Vercel's 405 rewriter).
  */
 
 let sendBeacon: ReturnType<typeof vi.fn>;
@@ -38,6 +40,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.resetModules();
   vi.restoreAllMocks();
 });
 
@@ -58,13 +62,15 @@ async function beaconBody(): Promise<Record<string, unknown>> {
 }
 
 describe('sendEvent', () => {
-  it('posts via sendBeacon with a JSON blob carrying path, referrer, meta', async () => {
+  it('posts via sendBeacon with a CORS-safelisted text/plain blob carrying path, referrer, meta', async () => {
     sendEvent('link_out', { href: 'github.com/ben' });
 
     expect(sendBeacon).toHaveBeenCalledTimes(1);
     const [endpoint, blob] = sendBeacon.mock.calls[0];
     expect(endpoint).toBe('/api/beacon');
-    expect((blob as Blob).type).toBe('application/json');
+    // Content type must be CORS-safelisted (bug #42): application/json triggers
+    // a preflight sendBeacon cannot make, failing cross-origin silently.
+    expect((blob as Blob).type).toBe('text/plain');
 
     expect(await beaconBody()).toEqual({
       event: 'link_out',
@@ -116,7 +122,7 @@ describe('sendEvent', () => {
     expect(sendBeacon).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to a keepalive fetch when sendBeacon is unavailable', () => {
+  it('falls back to a keepalive fetch with a text/plain Content-Type when sendBeacon is unavailable', () => {
     setNav('sendBeacon', undefined);
     sendEvent('theme_toggle');
 
@@ -124,6 +130,11 @@ describe('sendEvent', () => {
     const [endpoint, init] = fetchSpy.mock.calls[0];
     expect(endpoint).toBe('/api/beacon');
     expect(init).toMatchObject({ method: 'POST', keepalive: true });
+    // Content type must be CORS-safelisted (bug #42) — an application/json
+    // Content-Type would trigger a preflight the keepalive fetch cannot survive.
+    expect((init as RequestInit).headers).toMatchObject({
+      'Content-Type': 'text/plain',
+    });
     expect(JSON.parse(init.body as string)).toMatchObject({
       event: 'theme_toggle',
       path: '/work',
@@ -143,5 +154,56 @@ describe('sendEvent', () => {
     setNav('sendBeacon', undefined);
     fetchSpy.mockRejectedValue(new Error('network'));
     expect(() => sendEvent('pageview')).not.toThrow();
+  });
+});
+
+/**
+ * Endpoint resolution (bug #42). The endpoint is derived once at module import
+ * from `VITE_API_BASE_URL` so events reach the API origin on the deployed site,
+ * with the same-origin relative path as the fallback for tests / local dev.
+ * Each test resets the module cache so the new env is picked up on import.
+ */
+describe('sendEvent endpoint resolution', () => {
+  it('prefixes the API base URL when VITE_API_BASE_URL is set (deployed origin, no more 405 from Vercel)', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test');
+    vi.resetModules();
+    const { sendEvent: sendEventFresh } = await import('./beacon');
+
+    sendEventFresh('pageview');
+
+    expect(sendBeacon).toHaveBeenCalledTimes(1);
+    expect(sendBeacon.mock.calls[0][0]).toBe('https://api.example.test/api/beacon');
+  });
+
+  it('strips a trailing slash from the base URL before appending /api/beacon', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test/');
+    vi.resetModules();
+    const { sendEvent: sendEventFresh } = await import('./beacon');
+
+    sendEventFresh('pageview');
+
+    expect(sendBeacon.mock.calls[0][0]).toBe('https://api.example.test/api/beacon');
+  });
+
+  it('falls back to the same-origin relative path when VITE_API_BASE_URL is empty', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', '');
+    vi.resetModules();
+    const { sendEvent: sendEventFresh } = await import('./beacon');
+
+    sendEventFresh('pageview');
+
+    expect(sendBeacon.mock.calls[0][0]).toBe('/api/beacon');
+  });
+
+  it('applies the base URL to the fetch fallback too', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test');
+    vi.resetModules();
+    const { sendEvent: sendEventFresh } = await import('./beacon');
+    setNav('sendBeacon', undefined);
+
+    sendEventFresh('pageview');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://api.example.test/api/beacon');
   });
 });
