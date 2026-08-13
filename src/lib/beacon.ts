@@ -24,7 +24,16 @@ export type BeaconEvent =
   | 'theme_toggle'
   | 'scroll_depth';
 
-const ENDPOINT = '/api/beacon';
+/**
+ * The beacon endpoint. Built from the API origin the rest of the app uses
+ * (`VITE_API_BASE_URL`, see {@link ../lib/api.ts}) so events reach the API on
+ * the deployed site — a relative `/api/beacon` would hit the Vercel static
+ * origin, which rewrites every path to `/index.html` and answers POSTs with
+ * 405. When the env var is absent (tests, local dev with the Vite `/api`
+ * proxy), the same-origin relative path is the intended fallback.
+ */
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const ENDPOINT = `${API_BASE_URL}/api/beacon`;
 
 /**
  * Whether analytics must stay silent for this request: Do Not Track, Global
@@ -64,8 +73,14 @@ export function sendEvent(
     if (meta) body.meta = meta;
     const payload = JSON.stringify(body);
 
+    // Cross-origin CORS constraint: an `application/json` body is NOT a
+    // CORS-safelisted content type, so it triggers a preflight — which
+    // sendBeacon cannot make and keepalive fetch cannot survive on unload.
+    // A `text/plain` body IS safelisted and reaches the API without a
+    // preflight; the API parses the JSON payload regardless of the declared
+    // content type (companion portfolio-v6-api change).
     if (typeof navigator.sendBeacon === 'function') {
-      const blob = new Blob([payload], { type: 'application/json' });
+      const blob = new Blob([payload], { type: 'text/plain' });
       if (navigator.sendBeacon(ENDPOINT, blob)) return;
       // sendBeacon returned false (queue full / too large) — fall through.
     }
@@ -73,7 +88,7 @@ export function sendEvent(
     void fetch(ENDPOINT, {
       method: 'POST',
       keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: payload,
     }).catch(() => {
       /* fire-and-forget: swallow network errors, no retry (§4.8). */
