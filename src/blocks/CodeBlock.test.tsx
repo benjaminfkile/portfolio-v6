@@ -99,7 +99,12 @@ describe('CodeBlock (spec §3.7)', () => {
     render(<CodeBlock block={codeBlock({ language: 'ts' })} media={{}} />);
 
     await waitFor(() =>
-      expect(highlightCode).toHaveBeenCalledWith('const answer = 42;', 'ts'),
+      // jsdom has no data-theme stamped, so the native dark theme is passed.
+      expect(highlightCode).toHaveBeenCalledWith(
+        'const answer = 42;',
+        'ts',
+        'dark',
+      ),
     );
     await waitFor(() => {
       const coloured = document.querySelector('pre code span[style]');

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import type { Theme } from '../components/ThemeToggle';
 import type { BlockProps, BlockOf } from './types';
 import type { CodeToken } from './highlight';
+import { readSiteTheme } from './codeThemes';
 import { normalizeLanguage } from './languages';
 import styles from './CodeBlock.module.css';
 
@@ -25,16 +27,39 @@ import styles from './CodeBlock.module.css';
 
 const COPY_RESET_MS = 2000;
 
+/**
+ * The active site theme, kept live: `ThemeToggle` stamps `data-theme` on
+ * `<html>`, and a MutationObserver on that attribute (the `SkillSphereCanvas`
+ * pattern) re-reads it so an already-rendered code block re-highlights on
+ * toggle instead of keeping mount-time colours.
+ */
+function useSiteTheme(): Theme {
+  const [theme, setTheme] = useState<Theme>(readSiteTheme);
+  useEffect(() => {
+    if (typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(() => setTheme(readSiteTheme()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
+}
+
 export default function CodeBlock({ block }: BlockProps) {
   const { language, code, filename } = block as BlockOf<'code'>;
   const canonical = normalizeLanguage(language);
+  const siteTheme = useSiteTheme();
   const [tokens, setTokens] = useState<CodeToken[][] | null>(null);
   const [copied, setCopied] = useState(false);
   const preRef = useRef<HTMLPreElement>(null);
   const resetTimer = useRef<number | undefined>(undefined);
 
   // Progressive enhancement: pull in the highlighter only for allowlisted
-  // languages, and only once this block has mounted (spec §3.7).
+  // languages, and only once this block has mounted (spec §3.7). Re-runs on a
+  // site-theme change so token colours follow the code theme for that theme
+  // (codeThemes.ts).
   useEffect(() => {
     if (!canonical) {
       setTokens(null);
@@ -42,7 +67,7 @@ export default function CodeBlock({ block }: BlockProps) {
     }
     let cancelled = false;
     import('./highlight')
-      .then(({ highlightCode }) => highlightCode(code, language))
+      .then(({ highlightCode }) => highlightCode(code, language, siteTheme))
       .then((result) => {
         if (!cancelled) setTokens(result);
       })
@@ -52,7 +77,7 @@ export default function CodeBlock({ block }: BlockProps) {
     return () => {
       cancelled = true;
     };
-  }, [canonical, code, language]);
+  }, [canonical, code, language, siteTheme]);
 
   // Clear any pending "Copied" reset on unmount.
   useEffect(

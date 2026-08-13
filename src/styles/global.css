@@ -144,13 +144,14 @@ main {
 
 /* ---- Links — DESIGN.md §2.1 ---------------------------------------------- */
 /*
- * Amber is THE accent, including prose links (blog/markdown copy). Components
- * that render their own link shells (LinkButton, TagChip, nav) set their own
- * colour; this is the base for bare anchors. Hover warms nothing extra — amber
- * is already the accent — so it simply holds the colour.
+ * Prose links (blog/markdown copy) are steel blue via --link — amber stays the
+ * UI accent (live values, active nav, meters) so body copy doesn't read as a
+ * wall of highlights. Components that render their own link shells
+ * (LinkButton, TagChip, nav) set their own colour; this is the base for bare
+ * anchors.
  */
 a {
-  color: var(--amber);
+  color: var(--link);
 }
 
 /* ---- Scrollbars — instrument-thin, token-coloured ------------------------- */

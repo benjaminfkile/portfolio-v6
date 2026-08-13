@@ -17,8 +17,9 @@
   --text: #c9d2e0; /* body text */
   --text-bright: #edf1f7; /* headings */
   --text-dim: #7a8598; /* secondary text, labels */
-  --amber: #e8a33d; /* THE accent: live values, active nav, links, meters */
+  --amber: #e8a33d; /* THE accent: live values, active nav, meters */
   --amber-soft: rgba(232, 163, 61, 0.14); /* accent washes/glows */
+  --link: #7ab3f0; /* prose links (steel blue) — amber stays a UI accent */
   --ok: #4fcb8d; /* status good (semantic, not an accent) */
   --warn: #e0b341; /* status degraded */
   --err: #e06056; /* status down */
@@ -83,6 +84,7 @@
   --text-dim: #636c79; /* darkened from #69727f — was 4.42:1 on --ground, now ≥4.5:1 (§2 floor) */
   --amber: #9a5f0e; /* darkened from #b87514 (was 3.75:1 on --panel) — now ≥4.5:1 on --panel and --ground */
   --amber-soft: rgba(154, 95, 14, 0.12); /* washes track --amber's rgb; alpha wash, not a text pair */
+  --link: #1a5dc8; /* prose links — ≥4.5:1 on --ground and every panel */
   --ok: #1f8f5f;
   --warn: #9a7b12;
   --err: #c24a40;

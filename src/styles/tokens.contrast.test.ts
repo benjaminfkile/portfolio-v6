@@ -100,10 +100,15 @@ const TEXT_PAIRS: { fg: string; bg: string }[] = [
   { fg: '--text-dim', bg: '--ground' },
   { fg: '--text-dim', bg: '--panel' },
   { fg: '--text-dim', bg: '--panel-2' },
-  // Amber is a text role: links, live mono values, section eyebrows. It renders
-  // on the ground (eyebrows/nav) and on panels (values/links) alike.
+  // Amber is a text role: live mono values, section eyebrows, active nav. It
+  // renders on the ground (eyebrows/nav) and on panels (values) alike.
   { fg: '--amber', bg: '--ground' },
   { fg: '--amber', bg: '--panel' },
+  // Prose links are their own text role: bare anchors in blog/markdown copy,
+  // which renders on the ground and inside panels (quotes, cards).
+  { fg: '--link', bg: '--ground' },
+  { fg: '--link', bg: '--panel' },
+  { fg: '--link', bg: '--panel-2' },
 ];
 
 // Semantic colours only ever carry status as a StatusDot (UI mark, ≥3:1); text
@@ -125,6 +130,7 @@ describe('tokens.css contrast floor (DESIGN.md §2, WCAG AA, both themes)', () =
         '--text-bright',
         '--text-dim',
         '--amber',
+        '--link',
         '--ok',
         '--warn',
         '--err',

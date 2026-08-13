@@ -26,6 +26,22 @@ describe('highlightCode — real highlighter (spec §3.7)', () => {
     expect(lines!.flat().map((t) => t.content).join('')).toBe('let y = 2;');
   });
 
+  it('colours tokens per site theme (codeThemes.ts mapping)', async () => {
+    const darkLines = await highlightCode('const x = 1;', 'typescript', 'dark');
+    const lightLines = await highlightCode(
+      'const x = 1;',
+      'typescript',
+      'light',
+    );
+    const keywordColor = (lines: typeof darkLines) =>
+      lines!.flat().find((t) => t.content === 'const')!.color;
+    // Both themes resolve a colour, and they are different palettes — the dark
+    // site theme must not serve light-theme token colours (the old bug).
+    expect(keywordColor(darkLines)).toMatch(/^#/);
+    expect(keywordColor(lightLines)).toMatch(/^#/);
+    expect(keywordColor(darkLines)).not.toBe(keywordColor(lightLines));
+  });
+
   it('returns null for a language outside the allowlist', async () => {
     expect(await highlightCode('+[.]', 'brainfuck')).toBeNull();
   });
