@@ -30,9 +30,9 @@ Three repositories, three deployables:
 
 | Repo | Deploys to | Public URL | Purpose |
 |---|---|---|---|
-| `portfolio-v6` | Vercel | `benkile.com` | Public site + blog. No auth code. |
-| `portfolio-v6-admin` | Vercel | `admin.benkile.com` | Admin UI. Cognito-gated. |
-| `portfolio-v6-api` | ECR → EC2 container | `api.benkile.com/portfolio-v6-api` | Express API. Serves both. |
+| `portfolio-v6` | Vercel (`portfolio-v6-prod` / `portfolio-v6-dev` projects) | `portfolio-v6-prod.vercel.app` (apex `benkile.com` at cutover) | Public site + blog. No auth code. |
+| `portfolio-v6-admin` | Vercel (`portfolio-v6-admin-prod` / `-dev` projects) | `portfolio-v6-admin-prod.vercel.app` | Admin UI. Cognito-gated. |
+| `portfolio-v6-api` | ECR → gateway-managed container | `api.benkile.com/portfolio-v6-api` | Express API. Serves both. |
 
 Everything runs on existing infrastructure: the `bk-gateway-api` ALB and gateway, the
 `bk-db` RDS instance, Secrets Manager, ECR, and the shared EC2 host. New resources are
@@ -45,7 +45,8 @@ repository.
 
 ```
                     ┌──────────────────────────────┐
-   benkile.com ────▶│  portfolio-v6  (Vercel)      │  public, unauthenticated
+ portfolio-v6-prod ▶│  portfolio-v6  (Vercel)      │  public, unauthenticated
+   .vercel.app      │                              │  (benkile.com at cutover)
                     │  Vite + React                │
                     └───────────────┬──────────────┘
                                     │  GET /api/content
@@ -54,15 +55,16 @@ repository.
                     │  ALB bk-gateway-api-lb  (HTTPS :443)             │
                     │  api.benkile.com — ACM cert                      │
                     └───────────────┬──────────────────────────────────┘
-                                    │  HTTP :80 → container :3000
+                                    │
                     ┌───────────────▼──────────────────────────────────┐
-                    │  bk-gateway-api  (proxy, docker net "app-net")   │
-                    │  /portfolio-v6-api/*      → :3002                │
-                    │  /portfolio-v6-api-dev/*  → :4002                │
+                    │  gateway-api  (.NET proxy + node agent)          │
+                    │  /portfolio-v6-api/*      → managed container    │
+                    │  /portfolio-v6-api-dev/*  → managed container    │
+                    │  (host ports Docker-assigned by the reconciler)  │
                     └───────────────┬──────────────────────────────────┘
                                     │
                     ┌───────────────▼──────────────────────────────────┐
-                    │  portfolio-v6-api  (Express, container :3002)     │
+                    │  portfolio-v6-api  (Express, container :8000)     │
                     │    GET  /api/content        public, snapshot      │
                     │    GET  /api/posts[/:slug]  public, blog          │
                     │    GET  /api/status         public, live ~30s     │
@@ -89,7 +91,8 @@ repository.
                                     ▲
                                     │  Bearer <cognito id token>
                     ┌───────────────┴──────────────┐
- admin.benkile.com ▶│ portfolio-v6-admin (Vercel)  │
+portfolio-v6-admin-▶│ portfolio-v6-admin (Vercel)  │
+  prod.vercel.app   │                              │
                     │ Vite + React + Cognito       │
                     └──────────────────────────────┘
 ```
@@ -275,7 +278,7 @@ doesn't recognize degrades rather than crashes.
 | `about` | no | — |
 | `timeline` | yes | `{ date_range, title, description, media_id? }` |
 | `skills` | yes | `{ title, description, icon_source }` (v1.5: `proficiency` removed) |
-| `portfolio` | yes | `{ title, intro, description, media_id, playback_rate?, transform_value?, skill_refs[], links: Link[] }` (v1.8: `tech_icons[]` → `skill_refs[]`; legacy fallback below) |
+| `portfolio` | yes | `{ title, intro, description, media_id, playback_rate?, transform_value?, skill_refs[], posts[], links: Link[] }` (v1.8: `tech_icons[]` → `skill_refs[]`, legacy fallback below; v1.14: `posts[]` = PostRef links to blog posts) |
 | `status` | no | — (live; config only) |
 | `blog` | no | — (live; config only) |
 | `now_playing` | no | — (live; config only) |
@@ -360,7 +363,7 @@ neither can live inside the snapshot without breaking that guarantee.
 | `now_playing` | idle behavior (`hide` \| `message`), whether to show album art | `GET /api/now-playing` |
 | `duolingo` | `language` (course code, default `es`), optional manual `score_label` | `GET /api/duolingo` |
 | `github` | header copy only (v1.10 — the v1.2 `weeks` count is gone; browsing is via the in-section year picker) | `GET /api/github` (default trailing 12 months) · `GET /api/github?year=YYYY` |
-| `ops` | `window_hours` (metric lookback, 1–24, default 3) | `GET /api/ops` |
+| `ops` | header copy only (`heading`, `intro` — v1.7 removed `window_hours`) | `GET /api/ops` (daily replay report; `?date=YYYY-MM-DD`) |
 
 Live-section components must render a loading state and must **degrade rather than
 error** — a failed `/api/status` fetch renders the section as unavailable, never a
@@ -486,29 +489,19 @@ rendered through the site's own gauge/chart components. Not a third-party integr
 CloudWatch through its runtime IAM role, so `ops` never appears on the admin
 Integrations page). Typically placed alone on a dedicated page (§3.10) such as `/ops`.
 
-**Dashboard-driven by design.** `GET /api/ops` reads the CloudWatch dashboard named
-by the `cloudwatch_dashboard_name` secret (an infra identifier — env/Secrets Manager
-only, NEVER in a repo), parses each metric widget's definitions from `GetDashboard`,
-and batches one `GetMetricData` call for the lookback window (`?window_hours=`,
-validated 1–24, default 3, 5-minute period). Editing the dashboard in AWS is editing
-the page — CloudWatch is the CMS for this section.
+**Dashboard-driven by design (v1.7 — daily replay).** `GET /api/ops` serves one
+**immutable report per UTC day**, persisted to the `ops_reports` table and lazily
+built (after 00:15 UTC) from the CloudWatch dashboard named by the
+`cloudwatch_dashboard_name` secret (an infra identifier — env/Secrets Manager only,
+NEVER in a repo). The report samples the full prior UTC day at 5-minute grain.
+`?date=YYYY-MM-DD` selects a specific day; no param returns the latest report, which
+also carries `available_dates` so the client can build a day picker. Editing the
+dashboard in AWS is editing tomorrow's report — CloudWatch is the CMS for this
+section. The v1.3 `window_hours` lookback (and its query param) is **removed**.
 
-**Sanitized curated shape** — the §3.5 degrade rules plus an explicit
-identifier-scrubbing pass, because raw widget definitions contain account and
-resource identifiers that must never reach the public payload:
-
-```jsonc
-{ "available": true, "window_hours": 3,
-  "widgets": [
-    { "title": "ALB - Request Count",   // the human title, only ever the title
-      "kind": "gauge" | "chart",        // inferred: gauge = single-series percent-like
-      "unit": "%" | "MB/s" | null,
-      "latest": 12.4,
-      "series": [ { "label": "…"|null, "points": [ { "t": 1690000000, "v": 12.4 } ] } ] }
-  ] }
-// or
-{ "available": false }
-```
+**Sanitized curated shape** — an explicit identifier-scrubbing pass, because raw
+widget definitions contain account and resource identifiers that must never reach
+the public payload:
 
 - Only widget **titles** and explicitly user-set series labels pass through; metric
   namespaces, dimensions, ARNs, and region/account values are stripped server-side,
@@ -516,17 +509,22 @@ resource identifiers that must never reach the public payload:
   names) is replaced with null. The sanitizer is allowlist-shaped: it emits the
   curated fields, never a filtered copy of the raw definition.
 - `kind` inference: single-series widgets whose unit is Percent (or whose title
-  clearly reads as a utilization) render as gauges; everything else is a chart. The
-  renderer always shows `latest` prominently either way.
-- ~5-minute in-memory cache with single-flight; the client refetches ~60s. At ~15
-  metrics per refresh this costs on the order of $1–3/month in `GetMetricData` calls.
-- Failure of any kind — missing secret, IAM denied, throttling, malformed dashboard —
-  returns `{ "available": false }`, never a 5xx. Locally (IS_LOCAL, no AWS) the
-  endpoint simply degrades.
+  clearly reads as a utilization) render as gauges; everything else is a chart.
+- Status codes: **400** on a malformed `date`, **404** when no report exists yet
+  (the client treats it as `null` and renders the section unavailable), **500** on
+  unexpected failure. `Cache-Control` is computed to expire just past the next UTC
+  day boundary. Locally (IS_LOCAL, no AWS) the endpoint degrades.
 - Infra prerequisite (owner-side): the deployed API's instance/task role needs
   `cloudwatch:GetDashboard` and `cloudwatch:GetMetricData` (read-only).
 
 ### 3.6 The blog
+
+**Blogs v1.13:** posts are grouped into named **blogs** — a first-class `blogs` table
+(`{ slug, name }`, managed at `/api/admin/blogs`); each post carries a nullable
+`blog_id`, summaries expose a `blog` ref, and the public index filters via
+`GET /api/posts?blog=<slug>`. Deleting a blog nulls its posts' `blog_id` rather than
+deleting posts. The rest of this section describes the per-post model, which is
+unchanged.
 
 A post is not a section. Posts have their own URLs, their own publish lifecycle, and a
 rich body; sections are ordered fragments of one page. Modelling posts as
@@ -719,9 +717,10 @@ Base path through the gateway: `https://api.benkile.com/portfolio-v6-api`
 | `GET` | `/api/now-playing` | Current Spotify track for the `now_playing` section (§3.5, §4.6). Cached ~30s. |
 | `GET` | `/api/duolingo` | Streak + course progress for the `duolingo` section (§3.5, v1.2). Cached ~1h. |
 | `GET` | `/api/github` | Browsable contribution calendar for the `github` section (§3.5, v1.10). Default trailing 12 months; `?year=YYYY` for a calendar year. Public-profile data source. Cached ~1h. |
-| `GET` | `/api/ops` | Sanitized CloudWatch dashboard telemetry for the `ops` section (§3.5, v1.3). Cached ~5m. |
-| `POST` | `/api/beacon` | First-party analytics ingest (§4.8, v1.4). Always 204. |
-| `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`. |
+| `GET` | `/api/ops` | Daily-replay ops report for the `ops` section (§3.5, v1.7). `?date=YYYY-MM-DD` or latest; 404 when none exists. |
+| `POST` | `/api/beacon` | First-party analytics ingest (§4.8, v1.4). Always 204. Clients POST to the **absolute API origin** with a CORS-safelisted `text/plain` body (a relative path on the frontends hits the SPA rewrite → 405). |
+| `GET` | `/api/posts` | Published post summaries. `?limit=`, `?tag=`, `?cursor=`, `?blog=` (v1.13). |
+| `GET` | `/api/schema` | JSON Schema of the content model (§8.4). Raw, for `sync:types`. |
 | `GET` | `/api/posts/:slug` | One published post, `published_body` only. `ETag`. |
 
 There is **no** `/api/media` endpoint. Media is served directly from CloudFront and
@@ -756,15 +755,29 @@ Responds `304` on a matching `If-None-Match`. If no version has ever been publis
 returns `200` with an empty `pages` array rather than a 404 — the public site should
 render an empty page, not an error.
 
-### 4.2 Admin endpoints — `requireAdmin()` on every route (two exceptions, marked †)
+### 4.2 Admin endpoints — `requireAdmin()` by default (exceptions marked)
 
-Every route below sits behind `requireAdmin()` (§5.3), with one deliberate exception:
-the two preview-serialization routes marked **†** are guarded by a
-`requireAdminOrPreviewToken()` middleware that accepts *either* a bearer admin token
-*or* a valid preview token (§7). They must, because they are called by the public site
-inside the preview iframe — and the public bundle has no Cognito SDK by design (§2.1),
-so `requireAdmin()` alone would be unsatisfiable there. The preview token grants
-read-only access to exactly those two routes and nothing else.
+Every route below sits behind `requireAdmin()` (§5.3) unless marked, with three
+deliberate exception classes:
+
+- **†** — the two preview-serialization routes are guarded by
+  `requireAdminOrPreviewToken()`, accepting *either* a bearer admin token *or* a valid
+  preview token (§7). They must, because they are called by the public site inside the
+  preview iframe — and the public bundle has no Cognito SDK by design (§2.1). The
+  preview token grants read-only access to exactly those two routes and nothing else.
+- **API keys (v1.16)** — a set of machine-accessible routes is guarded by
+  `requireAdminOrMachine()`, additionally accepting a machine key
+  (`Authorization: Bearer pv6k_…`) minted/revoked at `/api/admin/api-keys` (admin-only,
+  secret shown once, SHA-256 stored). The per-route inventory lives in the API repo's
+  `README.md`; key management and integration-credential routes are never
+  machine-accessible. A `pv6k_` bearer on an admin-only route gets 401. This replaced
+  the never-activated v1.15 Cognito client-credentials flow.
+- **OAuth callbacks** — `GET /api/admin/integrations/:key/callback` (and the legacy
+  spotify alias) carry no bearer; they are guarded by a single-use 10-minute `state`
+  minted at connect time.
+
+The complete per-route auth inventory lives in the API repo's `README.md`; the table
+below lists the core content routes.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -1137,18 +1150,18 @@ req.adminSub = payload.sub;
 Group membership rather than a hardcoded `sub` in secrets: adding or revoking an admin
 becomes a console action instead of a secret rotation plus redeploy.
 
-**The gateway does not authenticate proxied traffic.** Its `protectedRoute()` guards
-only `/api/about-me`, `/api/ec2-launch`, and `/api/deploy`; everything in `serviceMap`
-is proxied unauthenticated. `portfolio-v6-api` is solely responsible for its own
-authorization.
+**The gateway does not authenticate proxied traffic.** The .NET gateway's Cognito
+auth guards only its own `/mgmt/*` management surface; everything in its service
+manifest is proxied unauthenticated. `portfolio-v6-api` is solely responsible for its
+own authorization.
 
 ### 5.4 CORS
 
-The public site (`benkile.com`) and admin (`admin.benkile.com`) are both cross-origin to
-`api.benkile.com`. The gateway runs `cors()` and `helmet({ crossOriginResourcePolicy:
-false })` ahead of its proxy middleware, so it answers preflight itself and permits the
-`Authorization` header on admin requests. Auth is a bearer header, not a cookie, so
-wildcard-origin CORS is correct and no credentials mode is needed.
+The public site and admin (both on `*.vercel.app` project domains) are cross-origin to
+`api.benkile.com`. The gateway applies wildcard CORS to proxied traffic, answering
+preflight itself and permitting the `Authorization` header on admin requests. Auth is a
+bearer header, not a cookie, so wildcard-origin CORS is correct and no credentials mode
+is needed.
 
 `portfolio-v6-api` keeps v5's pattern: enable `cors()` only when `IS_LOCAL=true`, for
 direct local access. In production the gateway owns it.
@@ -1230,8 +1243,8 @@ Both buckets carry the lifecycle rules defined in §6.9 (`expire-pending-uploads
 `expire-orphaned-media`, and abort-incomplete-multipart).
 
 Both buckets also carry a **CORS policy for the browser-direct upload path**
-(§6.7): `PUT` allowed from the admin origins (`https://admin.benkile.com`,
-`https://*.vercel.app` previews, `http://localhost:5174` for local dev), all
+(§6.7): `PUT` allowed from the admin origins (`https://*.vercel.app` — the admin
+projects and previews — plus `http://localhost:5174` for local dev), all
 headers allowed (the presigned signature pins the ones that matter), `ETag`
 exposed. Without this the browser preflight fails and no upload can succeed —
 it is part of bucket provisioning, not an afterthought (added after
@@ -1546,7 +1559,9 @@ portfolio-v6-admin/    git@github.com:benjaminfkile/portfolio-v6-admin.git
     ├── routers/                health, content, status, posts, admin/*
     ├── middleware/requireAdmin.ts
     ├── services/               sectionService, postService, publishService,
-    │                           mediaService, statusService
+    │                           mediaService, statusService, … (plus blogs,
+    │                           api-keys, integrations, analytics, ops, icons,
+    │                           github, duolingo, spotify/token services)
     ├── db/                     db.ts, migrations/
     └── aws/                    getAppSecrets, getDBSecrets, s3Service, cognitoAuth
 ```
@@ -1657,18 +1672,18 @@ addresses rotate.
 
 ### 9.2 Container ports
 
-Ports in use on the shared host: `3001` (portfolio-api/v5), `3003` (wmsfo), `3004`
-(3gixhub), `3005` (lease-tracker), `3007` (file-manager), with dev containers on
-`4003/4004/4005/4007`. Following the established `port + 1000` dev convention:
+Host ports are **Docker-assigned ephemerals** managed by the gateway's reconciler —
+there is no reserved-port scheme. The manifest `port` is purely the container-side
+contract:
 
-| Container | Port | Image tag |
+| Service (manifest row) | Container port | Image tag |
 |---|---|---|
-| `portfolio-v6-api` | 3002 | `:latest` |
-| `portfolio-v6-api-dev` | 4002 | `:dev` |
+| `portfolio-v6-api` | 8000 | `:latest` |
+| `portfolio-v6-api-dev` | 8000 | `:dev` |
 
-Both containers are **permanent**, not transitional. v5's `portfolio-api` on 3001 runs
-alongside them indefinitely — v5 and v6 coexist on the shared host until the owner
-chooses to retire v5 (§12).
+The app binds the `port` value from its app secret (8000 in both envs). Both services
+are **permanent**, not transitional — v5's `portfolio-api` runs alongside them until
+the owner chooses to retire v5 (§12).
 
 ### 9.3 Secrets Manager
 
@@ -1683,7 +1698,7 @@ Shape (following the v5 `IAPISecrets` convention):
 {
   "db_name": "portfolio_v6_prod",
   "node_env": "production",
-  "port": "3002",
+  "port": "8000",
   "s3_bucket_name": "bk-portfolio-v6-prod",
   "cdn_domain": "media.benkile.com",          // media-dev.benkile.com in the dev secret
   "cognito_user_pool_id": "us-east-1_…",
@@ -1708,79 +1723,59 @@ host.
 
 ### 9.4 Gateway registration
 
-Add to `bk-gateway-api/src/config/serviceMap.ts`:
+Registration is a row per service in the .NET gateway's Postgres **service manifest**
+(name, image, tag, container port, desired status, `include_in_health` flag), created
+once via the gateway's management API / ops dashboard. `portfolio-v6-api` (tag
+`latest`, prod) and `portfolio-v6-api-dev` (tag `dev`) are two independent rows, both
+container port 8000. No gateway rebuild or redeploy is involved.
 
-```ts
-"portfolio-v6-api": {
-  port: 3002,
-  includeInHealthCheck: false,   // see below
-  includeDevApi: true,
-},
-```
+**`include_in_health`:** enrolling a service folds it into the gateway's fleet health.
+Dev rows stay out (`false`); the prod row is enrolled.
 
-**`includeInHealthCheck: false` during development, deliberately.** The gateway's
-`/api/health` returns **503 if any enrolled service is down**, and that endpoint is the
-ALB's target health check against a single-instance ASG. Enrolling an unstable service
-means a crash in portfolio-v6 takes down wmsfo, 3gixhub, lease-tracker, and
-file-manager simultaneously. Flip it to `true` only after the service has been stable
-in production for a while.
+### 9.5 Container lifecycle
 
-The gateway must be rebuilt and redeployed for this to take effect.
-
-### 9.5 Launch template
-
-Add two container blocks to the `bk-gateway-api-lt` user data, **before** the gateway
-block (the gateway starts last by design). Add both names to the `docker rm -f` line.
-
-```bash
-docker pull $ECR/benkile/portfolio-v6-api:latest
-docker run -d --restart=always --name portfolio-v6-api \
-  --network app-net -p 3002:3002 \
-  $ECR/benkile/portfolio-v6-api:latest
-
-docker pull $ECR/benkile/portfolio-v6-api:dev
-docker run -d --restart=always --name portfolio-v6-api-dev \
-  --network app-net -p 4002:4002 \
-  $ECR/benkile/portfolio-v6-api:dev
-```
-
-This creates a new launch template version and requires an instance refresh.
+There are no launch-template container blocks. The gateway's reconciler runs each
+manifest service, assigns the host port dynamically, and **blue-greens the container
+in place** on deploy: CI calls `POST /mgmt/services/<name>/deploy {"tag":"<sha>"}`,
+the gateway resolves the tag to a digest, starts the new container alongside the old,
+waits for readiness, and cuts the route over. Other services are unaffected.
 
 ### 9.6 Vercel
 
-Two projects, both on the existing `benkile.com` zone (Vercel is already the
-nameserver, so `admin.benkile.com` is a single record).
+**Four projects** — the dev/prod split is per *project*, not per Vercel environment
+(a "poor man's dev env": each project's Production deploys off its own branch):
 
-| Project | Repo | Production domain | Preview |
+| Project | Repo | Production branch | Production domain |
 |---|---|---|---|
-| `portfolio-v6` | `portfolio-v6` | `v6.benkile.com` → `benkile.com` at cutover | per-branch |
-| `portfolio-v6-admin` | `portfolio-v6-admin` | `admin.benkile.com` | per-branch |
+| `portfolio-v6-dev` | `portfolio-v6` | `dev` | `portfolio-v6-dev.vercel.app` |
+| `portfolio-v6-prod` | `portfolio-v6` | `main` | `portfolio-v6-prod.vercel.app` → `benkile.com` at cutover |
+| `portfolio-v6-admin-dev` | `portfolio-v6-admin` | `dev` | `portfolio-v6-admin-dev.vercel.app` |
+| `portfolio-v6-admin-prod` | `portfolio-v6-admin` | `main` | `portfolio-v6-admin-prod.vercel.app` |
 
-**`benkile.com` stays pointed at the v5 site.** v6 is built and published on an interim
-hostname (`v6.benkile.com`, or the Vercel-generated domain) and the apex is swapped over
-in Vercel when the owner decides to retire v5 (§12). Nothing else in this spec depends
-on which hostname the public site answers on.
+**`benkile.com` stays pointed at the v5 site.** The apex is swapped over in Vercel
+when the owner decides to retire v5 (§12). Nothing else in this spec depends on which
+hostname the public site answers on.
 
-Environment variables, scoped per Vercel environment (Production vs Preview):
+Environment variables, set in each project (primarily its Production environment):
 
 **Public site**
 ```
-VITE_API_BASE_URL = https://api.benkile.com/portfolio-v6-api        (prod)
-                    https://api.benkile.com/portfolio-v6-api-dev    (preview)
+VITE_API_BASE_URL = https://api.benkile.com/portfolio-v6-api        (prod project)
+                    https://api.benkile.com/portfolio-v6-api-dev    (dev project)
 ```
 
 **Admin**
 ```
-VITE_API_BASE_URL          = …same as above per environment
+VITE_API_BASE_URL          = …same split as above per project
 VITE_COGNITO_USER_POOL_ID  = us-east-1_…                (prod vs dev pool)
 VITE_COGNITO_CLIENT_ID     = …
-VITE_COGNITO_REGION        = us-east-1
-VITE_PUBLIC_SITE_URL       = https://v6.benkile.com     (preview iframe target — §7)
+VITE_PUBLIC_SITE_URL       = the matching public-site project URL (preview iframe — §7)
 ```
 
 `VITE_PUBLIC_SITE_URL` points at whatever hostname the public site currently answers
 on, and becomes `https://benkile.com` at cutover. It is the **only** value that has to
-change when the apex is swapped.
+change when the apex is swapped. (There is no `VITE_COGNITO_REGION` — the SDK derives
+the region from the pool id.)
 
 Note the Vite conventions differ from CRA: the prefix is `VITE_`, access is
 `import.meta.env.VITE_*`, and `process` does not exist at runtime — a stray
@@ -1861,10 +1856,9 @@ coupling one-directional.
 
 ## 10. Local development
 
-Run the API locally against the **dev** database and **dev** Cognito pool. Do not
-iterate by deploying — an API deploy triggers an ASG instance refresh that recycles all
-containers on the shared host (~7 minutes, and it bounces every other application).
-Deploy the dev container only when it needs to be reachable from a Vercel preview.
+Run the API locally against the **dev** database and **dev** Cognito pool. Prefer
+local iteration over deploying — a deploy blue-greens only this service's container
+(seconds-to-a-minute, other services unaffected), but the local loop is still faster.
 
 ```
 portfolio-v6-api      npm run dev       → localhost:3002, IS_LOCAL=true
@@ -1892,25 +1886,27 @@ remains as a fallback for direct access.
 
 ### 11.1 API
 
-`.github/workflows/deploy.yaml`, adapted from `portfolio-v5-api`:
+`.github/workflows/deploy.yaml` triggers on pushes to `main` and `dev` (markdown-only
+changes ignored). Both branches run the same job: buildx a multi-arch image, push to
+ECR (`:latest` + `:<sha>` on main, `:dev` + `:<sha>` on dev), then one authenticated
+call to the gateway management API — `POST /mgmt/services/<service>/deploy` with the
+SHA tag, where `<service>` is `portfolio-v6-api` on main and `portfolio-v6-api-dev`
+otherwise. The gateway blue-greens the container in place; no instance refresh.
 
-- `main` → build → push `:latest` + `:<sha>` → cancel in-flight refresh → start
-  instance refresh (Rolling, `MinHealthyPercentage: 100`, `InstanceWarmup: 400`)
-- `dev` branch → build → push `:dev` only, **no instance refresh** (the dev container
-  is picked up on the next boot; restart it manually over SSM if needed sooner)
-
-Builds must be `linux/amd64,linux/arm64` via buildx — the host is `t4g.medium`
-(arm64), and a default CI build produces amd64 only, which will not start.
+Builds must be `linux/amd64,linux/arm64` via buildx — the host is arm64, and a
+default CI build produces amd64 only, which will not start.
 
 ### 11.2 Frontends
 
-Vercel builds on push. `main` → production, other branches → preview URLs.
+Vercel builds on push, per project (§9.6): `main` → the prod projects' Production,
+`dev` → the dev projects' Production, other branches → preview URLs.
 
 ### 11.3 Migrations
 
-Manual, before the API deploy that depends on them. Migrations must be additive and
-backward-compatible with the currently-running container, since the old container keeps
-serving during the ~7 minute refresh.
+Manual, before the API deploy that depends on them (deployed prod containers do not
+auto-migrate — `runMigrations` is skipped when `node_env === 'production'`).
+Migrations must be additive and backward-compatible with the currently-running
+container, since the old container keeps serving during the blue-green swap.
 
 ---
 
@@ -1924,8 +1920,8 @@ serving during the ~7 minute refresh.
    OACs + aliases + bucket policies, Vercel DNS records, two secrets, ECR repo.
 2. **API skeleton** — port v5's `index.ts`/`getAppSecrets`/`getDBSecrets`/`db.ts`, add
    the JSON error handler, add `/api/health`. Deploy once to prove the pipeline.
-3. **Gateway + launch template** — `serviceMap` entry, gateway redeploy, LT version,
-   instance refresh. Confirm `api.benkile.com/portfolio-v6-api/api/health` answers.
+3. **Gateway registration** — service-manifest rows for both services (§9.4).
+   Confirm `api.benkile.com/portfolio-v6-api/api/health` answers.
 4. **Migrations + schema** — six tables, Zod schemas for sections, items, and blocks,
    `/api/schema`.
 5. **Admin auth + shell** — port `cognitoClient.ts` and the interceptors,
@@ -1957,8 +1953,9 @@ serving during the ~7 minute refresh.
 Steps 2–3 first is deliberate: the deploy path and gateway routing are the parts most
 likely to surprise, and they are cheapest to debug against a trivial service.
 
-**Cutover is out of scope for this spec and owner-managed.** v6 ships to
-`v6.benkile.com` and runs there indefinitely. When the owner decides to retire v5, the
+**Cutover is out of scope for this spec and owner-managed.** v6 ships on its Vercel
+project domain (`portfolio-v6-prod.vercel.app`) and runs there indefinitely. When the
+owner decides to retire v5, the
 apex domain is swapped in Vercel — a single change, plus updating
 `VITE_PUBLIC_SITE_URL` (§9.6). v5's container, ECR repo, S3 bucket, database, and repos
 are left untouched until then and retired separately. There is no coordinated cutover
@@ -1976,8 +1973,8 @@ event and nothing in v6 blocks on one.
 | No `users` table | One class of user. Group claim on the ID token is sufficient. |
 | New Cognito pools, not `file-manager-up` | `aws-jwt-verify` binds pool + client, so separate pools give cryptographic isolation. |
 | Databases on existing `bk-db` | A second RDS instance doubles spend; the instance already multi-hosts. |
-| Ports 3002 / 4002 | Only free ports following the `+1000` dev convention. |
-| `includeInHealthCheck: false` initially | Gateway 503s on any enrolled failure, taking every service down with it. |
+| Container port 8000, host ports Docker-assigned | The .NET gateway's reconciler owns host-port allocation; the manifest `port` is the container-side contract only (superseded the original 3002/4002 reserved-port plan). |
+| Dev service out of fleet health (`include_in_health: false`) initially | An unstable enrolled service degrades the gateway's fleet health signal; the prod row is enrolled. |
 | CloudFront from day one; no `/api/media` | Media must never transit the shared `t4g.medium`. Removes v5's throughput ceiling entirely. |
 | Public distribution, not signed URLs | Portfolio media is published public content. Signing adds a round-trip before first paint and cannot coexist with immutable ETag-cached snapshots (§6.1). |
 | Immutable UUID keys + 1-year `max-age` | No invalidations, ever. Replacing media is a new key, not a cache purge. |
@@ -1988,9 +1985,9 @@ event and nothing in v6 blocks on one.
 | `s3_key` in the document, URL resolved at read time | Keeps snapshots domain-agnostic; a distribution can be rebuilt without touching stored media references. |
 | `media.benkile.com` custom alias | Stable hostname decoupled from any specific distribution. Requires an ACM cert in us-east-1. |
 | v5 animated header dropped, not ported | Owner decision. Removes jQuery from the project entirely; `hero` survives as a static section type. |
-| Dev container retained (`:dev` on 4002) | Owner decision. Needed so Vercel preview deployments can reach a non-production API. |
+| Dev container retained (`portfolio-v6-api-dev`, `:dev`) | Owner decision. Needed so the dev Vercel projects can reach a non-production API. |
 | 50 published versions retained | Owner decision. Ample for rollback at this scale. |
-| Cutover owner-managed, not spec'd | v6 ships to `v6.benkile.com`; the apex is swapped in Vercel whenever v5 is retired. No coordinated cutover event. |
+| Cutover owner-managed, not spec'd | v6 ships on its Vercel project domain; the apex is swapped in Vercel whenever v5 is retired. No coordinated cutover event. |
 | `Link[]` replaces `url`/`repo` scalars | A project can span five repos plus dev and prod deployments. Required `label` is what makes five `repo` links distinguishable. |
 | Posts use draft/published columns, not snapshots | A post is a single row — already atomic, already a one-query read. Snapshotting would add a table and a second publishing mechanism for rollback alone. |
 | Post bodies are typed block arrays, not markdown or HTML | Code blocks are first-class objects with a `language` field. Storing HTML would put sanitization in the render path. |
@@ -2107,6 +2104,6 @@ None. Design was the last one; resolved in §14.
 | — | Draft media privacy | **Not a requirement.** Unlisted-UUID stands; the concern is lifecycle instead — unpublished media expires and is cleaned out of S3 (§6.9). |
 | — | Hero animation | **Dropped.** `HeaderBackgroundLogic.js` and jQuery are not ported. `hero` remains a static section type (§3.4). |
 | — | Version retention | **50.** As specified in §3.3. |
-| — | Cutover strategy | **Owner-managed.** v6 ships to `v6.benkile.com`; apex swapped in Vercel when v5 is retired (§12). |
-| — | Dev container needed? | **Yes.** `portfolio-v6-api-dev` on 4002 is permanent, along with the dev pool, database, bucket, distribution, and secret. |
+| — | Cutover strategy | **Owner-managed.** v6 ships on its Vercel project domain; apex swapped in Vercel when v5 is retired (§12). |
+| — | Dev container needed? | **Yes.** `portfolio-v6-api-dev` is permanent, along with the dev pool, database, bucket, distribution, and secret. |
 | — | Design/theming | **Split by frontend (§14).** Public site: plain HTML + minimal CSS under containment rules; restyle later. Admin: fully themed MUI (system theme detection, dark mode), built out completely in v1 (§14.4). |

@@ -1,8 +1,11 @@
 # portfolio-v6
 
-The public site for [benkile.com](https://benkile.com) — a client-rendered
-Vite + React + TypeScript SPA that fetches published content from the
-`portfolio-v6-api` and renders it as plain, semantic HTML.
+The public Portfolio v6 site — a client-rendered Vite + React + TypeScript SPA
+that fetches published content from the `portfolio-v6-api` and renders it as
+plain, semantic HTML. Live at
+[portfolio-v6-prod.vercel.app](https://portfolio-v6-prod.vercel.app) (prod) and
+portfolio-v6-dev.vercel.app (dev); the `benkile.com` apex still serves v5 until
+cutover.
 
 The frontend follows the **"Control Room" design system** — see
 [`DESIGN.md`](./DESIGN.md), which is authoritative for tokens, type, primitives,
@@ -29,7 +32,9 @@ The admin app (fully themed MUI) and the API live in separate repos
 ## Requirements
 
 - Node 18+ and npm.
-- The `portfolio-v6-api` running locally (for content, posts, and type sync).
+- An API to talk to: either `portfolio-v6-api` running locally, or `.env.local`
+  pointing `VITE_API_BASE_URL` at the deployed dev gateway
+  (`https://api.benkile.com/portfolio-v6-api-dev`).
 
 Every dependency is pinned to an exact version in `package.json`; install with
 `npm install`.
@@ -43,12 +48,15 @@ bundle — a stray `process.env.X` is a `ReferenceError`, not `undefined`
 
 | Variable | Required | Description |
 |---|---|---|
-| `VITE_API_BASE_URL` | Production only | Origin of the API gateway. **Leave empty for local dev** so requests are same-origin and go through Vite's `/api` proxy (§10). In production it is the gateway URL, e.g. `https://api.benkile.com/portfolio-v6-api` (preview: `…/portfolio-v6-api-dev`). |
+| `VITE_API_BASE_URL` | Deployed environments | Origin of the API gateway. Empty for local dev against a local API (same-origin via Vite's `/api` proxy, §10), or set in `.env.local` to the deployed dev gateway. Per Vercel **project**: `portfolio-v6-prod` → `https://api.benkile.com/portfolio-v6-api`; `portfolio-v6-dev` → `…/portfolio-v6-api-dev`. |
+| `SCHEMA_URL` | Never (build tool) | Optional override for `npm run sync:types`; defaults to `${VITE_API_BASE_URL}/api/schema`. |
 
 `VITE_API_BASE_URL` is also read **server-side** by the routing middleware
 (`middleware.ts`, see below), where `process.env` *does* exist — so the client
-and the middleware share one source of truth for the API origin. Set it in the
-Vercel project settings, scoped per environment (Production vs Preview).
+and the middleware share one source of truth for the API origin. Set it in
+**both** Vercel projects (primarily each project's Production environment); if
+it's missing, the middleware's same-origin fallback fetches the SPA rewrite and
+every post silently unfurls with generic metadata.
 
 ## Local development
 
@@ -91,7 +99,7 @@ the SPA rewrite in `vercel.json` in production; the dev server serves
 └── src/
     ├── main.tsx
     ├── App.tsx                 routes
-    ├── pages/                  HomePage, BlogIndexPage, BlogPostPage
+    ├── pages/                  ContentPage, BlogIndexPage, BlogPostPage, NotFound
     ├── sections/               one component per section type (§3.4)
     ├── blocks/                 one component per block type (§3.7)
     ├── components/             shared chrome (SiteNav, ThemeToggle, …)
@@ -107,11 +115,15 @@ the SPA rewrite in `vercel.json` in production; the dev server serves
 
 `middleware.ts` at the repo root is a
 [Vercel Routing Middleware](https://vercel.com/docs) (not a Next.js feature; it
-works with a static Vite build) scoped to `/blog/:slug` only. Because the site
+works with a static Vite build) matched on `/blog/:slug*` (nested paths invoke
+it but fail open — only exact `/blog/:slug` gets injection). Because the site
 is a client-rendered SPA, a blog URL serves an `index.html` with no title or
 description until JS runs — and social unfurlers (Open Graph, X cards, Slack,
-iMessage) don't run JS. The middleware fetches `GET /api/posts/:slug` and injects
-per-post `<title>` and `og:`/`twitter:` tags into the served HTML (spec §9.7).
+iMessage) don't run JS. The middleware fetches `GET /api/posts/:slug`, fetches
+the origin's `index.html`, and injects per-post `<title>` and `og:`/`twitter:`
+tags into the served HTML (spec §9.7). Only `og:*`/`twitter:*` tags are
+emitted (no `meta description`); posts without a cover image downgrade to a
+`summary` card with no image tags.
 
 Its rules: it injects for **all** visitors (never branching on user agent —
 serving crawlers different HTML is cloaking), and it **fails open** — on any
@@ -164,6 +176,8 @@ includes it. Then:
 
 ## Deployment
 
-Vercel builds on push: `main` → production, other branches → per-branch preview
-URLs (§11.2). The apex `benkile.com` stays on v5 until cutover; v6 answers on an
-interim hostname until then (§12).
+Two Vercel projects build on push: **portfolio-v6-prod** (production branch
+`main`, portfolio-v6-prod.vercel.app, API base `…/portfolio-v6-api`) and
+**portfolio-v6-dev** (production branch `dev`, portfolio-v6-dev.vercel.app, API
+base `…/portfolio-v6-api-dev`). Other branches get per-branch preview URLs. The
+apex `benkile.com` stays on v5 until cutover (§12).
