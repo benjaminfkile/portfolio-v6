@@ -348,6 +348,42 @@ export function getOps(
   });
 }
 
+/* ---- Live section: resume (spec §3.5) ------------------------------------- */
+
+/**
+ * `GET /api/resume` returns metadata for the newest uploaded resume PDF (spec
+ * §3.5). `url` is the inline PDF URL (served with an inline disposition — safe
+ * to embed in an <object>/<iframe>); the *download* URL is a separate endpoint
+ * (`/api/resume/download`, see {@link resumeDownloadUrl}) that serves the same
+ * bytes with an attachment disposition so the browser saves the file rather
+ * than navigating to it. Any failure or absence returns `{ available: false }`,
+ * so the section degrades rather than errors.
+ */
+export type ResumeResponse =
+  | {
+      available: true;
+      url: string;
+      filename: string;
+      bytes: number;
+      uploaded_at: string;
+    }
+  | { available: false };
+
+/** `GET /api/resume` — see {@link ResumeResponse}. */
+export function getResume(init?: RequestInit): Promise<ResumeResponse> {
+  return apiFetch<ResumeResponse>('/api/resume', init);
+}
+
+/**
+ * The absolute URL of the resume-download endpoint (spec §3.5). Unlike the
+ * inline `url` returned by {@link getResume}, this endpoint serves the newest
+ * PDF with an attachment disposition so the browser saves the file. Built from
+ * the API origin the rest of the app uses (`VITE_API_BASE_URL`) so the button
+ * reaches the API on the deployed site — a relative `/api/resume/download`
+ * would hit the Vercel static origin and 404. Same rule as the beacon endpoint.
+ */
+export const resumeDownloadUrl = `${API_BASE_URL}/api/resume/download`;
+
 /* ---- Preview (spec §7) ---------------------------------------------------- */
 
 /**
