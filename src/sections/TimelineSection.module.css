@@ -61,17 +61,3 @@
   font-size: var(--fs-body);
   line-height: var(--lh-prose);
 }
-
-/* Media thumbnails stay hidden on cramped phones and appear from 640px up
-   (DESIGN.md §5). */
-.thumb {
-  display: none;
-  max-width: 340px;
-  margin-top: var(--space-1);
-}
-
-@media (min-width: 640px) {
-  .thumb {
-    display: block;
-  }
-}
