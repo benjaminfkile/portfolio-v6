@@ -1,0 +1,93 @@
+/* Resume — a responsively-sized inline PDF viewer, download / open-in-new-tab
+   controls, and a prominent small-screen fallback card (DESIGN.md §5). Tokens
+   only; mobile-first. */
+
+.resume {
+  padding-block: var(--space-6);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.panel {
+  padding: var(--space-4);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+/* Embed frame — bordered rounded box, matching MediaFrame's visual voice, sized
+   responsively for readable PDF viewing on desktop / tablet widths. */
+.embedWrapper {
+  /* Hidden by default (mobile-first); a small-screen fallback card takes its
+     place at narrow widths where inline PDF rendering is unreliable. */
+  display: none;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.embed {
+  display: block;
+  width: 100%;
+  /* A generous letterbox — tall enough to read a page without cropping the
+     first section, short enough to leave room for the action row below. */
+  height: min(80vh, 900px);
+  min-height: 480px;
+  border: 0;
+  background: var(--panel);
+}
+
+.embedFallback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+/* The small-screen fallback card — visible only at narrow widths where the
+   inline viewer would render as a cramped, near-unusable box. */
+.smallCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.smallCardBody {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.action {
+  /* LinkButton's `button` variant already carries the ≥44px target — this hook
+     is available so pages can tune per-instance spacing without redefining it. */
+}
+
+/* Wider viewports: swap the mobile card for the inline embed. */
+@media (min-width: 720px) {
+  .embedWrapper {
+    display: block;
+  }
+
+  .smallCard {
+    display: none;
+  }
+}

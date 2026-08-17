@@ -60,6 +60,7 @@ export type SectionType =
   | 'duolingo'
   | 'github'
   | 'ops'
+  | 'resume'
   | 'contact';
 
 /* ---- Section item shapes (spec §3.4 item table) --------------------------- */
@@ -216,9 +217,21 @@ export interface OpsSectionData {
 }
 
 /**
+ * The `resume` section's published config (spec §3.5). The section's *config* is
+ * snapshotted (optional header copy only); its *data* — the newest uploaded PDF —
+ * is fetched at runtime from `GET /api/resume` so a new upload appears without a
+ * content republish. There are no items and no other configurable knobs: the
+ * viewer always shows the latest PDF.
+ */
+export interface ResumeSectionData {
+  heading?: string;
+  intro?: string;
+}
+
+/**
  * The `data` blob of a repeatable child. Section types without repeatable
  * content (hero, about, status, blog, now_playing, duolingo, github, ops,
- * contact) have zero items.
+ * resume, contact) have zero items.
  */
 export type SectionItemData = TimelineItem | SkillsItem | PortfolioItem;
 
