@@ -155,7 +155,9 @@ describe('ContentPage', () => {
       screen.getByRole('heading', { level: 3, name: 'Staff Engineer, Acme Corp' }),
     ).toBeInTheDocument();
     expect(screen.getByText('2019 – 2022')).toBeInTheDocument();
-    expect(screen.getByAltText('Acme Corp logo')).toBeInTheDocument();
+    // timeline entries render text-only — a media_id in an older published
+    // document is ignored, never rendered
+    expect(screen.queryByAltText('Acme Corp logo')).not.toBeInTheDocument();
 
     // skills — the Skills Console (v1.9): a skill list + the geodesic
     // SkillSphere (jsdom has no WebGL, so the sphere takes its chip fallback).
