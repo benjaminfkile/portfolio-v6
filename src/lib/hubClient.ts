@@ -22,6 +22,12 @@
  * environments the hub and API share an origin, so the API base is a sensible
  * fallback; setting `VITE_HUB_BASE_URL` explicitly lets ops move the hub off
  * later without churning `VITE_API_BASE_URL`.
+ *
+ * Channel names carry a per-environment prefix (the API's manifest service
+ * name — `portfolio-v6-api` in prod, `portfolio-v6-api-dev` in dev). Consumers
+ * compose their channel string from {@link hubChannelPrefix} rather than
+ * hardcoding — otherwise the dev site would subscribe to channels the dev API
+ * can never publish on. See {@link hubChannelPrefix} for the env override.
  */
 
 import {
@@ -71,6 +77,24 @@ const HUB_BASE_URL = (
 ).replace(/\/$/, '');
 
 const HUB_PATH = '/hub';
+
+/**
+ * Default channel prefix — the API's prod manifest service name. Kept exported
+ * so tests and consumers can reference it without duplicating the literal.
+ */
+export const DEFAULT_HUB_CHANNEL_PREFIX = 'portfolio-v6-api';
+
+/**
+ * The realtime channel namespace this build subscribes under. Read from
+ * `VITE_HUB_CHANNEL_PREFIX` at call time so tests can stub it via `vi.stubEnv`;
+ * defaults to {@link DEFAULT_HUB_CHANNEL_PREFIX} so prod needs no new config.
+ *
+ * Consumers MUST compose their channel string from this — a literal prefix
+ * would join a channel the dev API cannot publish on.
+ */
+export function hubChannelPrefix(): string {
+  return import.meta.env.VITE_HUB_CHANNEL_PREFIX || DEFAULT_HUB_CHANNEL_PREFIX;
+}
 
 /** Test seam — the tests replace this with a controllable double. */
 export type HubConnectionFactory = () => HubConnection;
