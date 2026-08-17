@@ -9,7 +9,7 @@ import {
 } from './hubClient';
 
 /**
- * Shared now-playing state (spec §3.5, §4.6; REALTIME.md; task 85) — ONE
+ * Shared now-playing state (spec §3.5, §4.6; REALTIME.md; tasks 85, 91) — ONE
  * module-level store consumed by every component that renders the current
  * track (`NowPlayingSection`, `HeroInstrumentStrip`). Before this existed each
  * consumer fetched privately: the section polled while the hero strip fetched
@@ -18,17 +18,24 @@ import {
  *
  * Realtime path (REALTIME.md): the store joins the app-wide SignalR hub on the
  * `<prefix>:now-playing` channel (see {@link hubChannelPrefix}) and applies
- * `ChannelEvent` payloads directly. Events are hints — the HTTP endpoint
- * stays the source of truth —
- * so we still poll, just at a 30s FLOOR while the hub is healthy (and the
- * usual 5s FALLBACK when it isn't). On initial connect and after every
- * reconnect the hub client re-joins us to the channel and we re-fetch over
- * HTTP so we can't miss whatever changed while we were offline.
+ * `ChannelEvent` payloads directly.
+ *
+ * HTTP is strictly a fallback (task 91):
+ *   - On subscribe: one fetch to render before the hub is confirmed up.
+ *   - On hub connect and every reconnect: one fetch to catch anything that
+ *     changed while we were offline.
+ *   - On visibilitychange back to foreground: one fetch (a hidden tab receives
+ *     no events reliably, so this is a cheap resync).
+ *   - When the hub is unavailable, disconnected, or heartbeats go stale: start
+ *     the 5s polling interval. When the hub recovers, refetch once and stop
+ *     the interval again.
+ * In steady state with a healthy hub, there is ZERO recurring HTTP traffic —
+ * the visible product is one fetch on load, then a live websocket.
  *
  * The store is deliberately plain module state + `useSyncExternalStore` — no
  * context provider, no state-management dependency (DESIGN.md §8 spirit: the
- * smallest thing that works). Both the poller AND the hub subscription are
- * refcounted: they start when the first subscriber mounts and stop when the
+ * smallest thing that works). Both the fallback poller AND the hub subscription
+ * are refcounted: they start when the first subscriber mounts and stop when the
  * last unmounts, so a page with no now-playing UI never polls or connects.
  *
  * Live-section rules carry over:
@@ -45,22 +52,15 @@ export type NowPlayingState =
   | { status: 'ready'; data: NowPlayingResponse };
 
 /**
- * Fast HTTP fallback cadence — used when the hub is unavailable. Matches the
- * API's server-side now-playing cache TTL (§4.6), so a faster poll would just
- * re-read the cached payload without seeing anything new.
+ * HTTP fallback cadence — only used when the hub is unavailable, disconnected,
+ * or stale. Matches the API's server-side now-playing cache TTL (§4.6), so a
+ * faster poll would just re-read the cached payload without seeing anything new.
  */
 export const NOW_PLAYING_POLL_INTERVAL_MS = 5_000;
 
 /**
- * Slow HTTP floor while the hub is healthy (REALTIME.md, task 85). The hub
- * pushes track changes live; this floor is just a safety re-fetch in case an
- * event was dropped or the payload drifted.
- */
-export const NOW_PLAYING_POLL_FLOOR_MS = 30_000;
-
-/**
  * If no ChannelEvent (heartbeat or otherwise) arrives for this long while the
- * hub claims to be connected, treat the hub as sick and drop back to the fast
+ * hub claims to be connected, treat the hub as sick and drop back to the HTTP
  * fallback cadence. REALTIME.md guidance: heartbeats stop → fetch is truth.
  */
 export const HUB_HEARTBEAT_STALE_MS = 45_000;
@@ -84,11 +84,10 @@ const INITIAL: NowPlayingState = { status: 'loading' };
 let state: NowPlayingState = INITIAL;
 const subscribers = new Set<() => void>();
 let intervalId: number | null = null;
-let currentIntervalMs: number = NOW_PLAYING_POLL_INTERVAL_MS;
 let inFlight: AbortController | null = null;
 
 /** Hub state — driven by callbacks from {@link ../lib/hubClient}. */
-let hubConnected = false;
+let hubHealthy = false;
 let lastHubMessageAt = 0;
 let staleCheckId: number | null = null;
 let unsubHub: (() => void) | null = null;
@@ -126,10 +125,15 @@ function onVisibilityChange(): void {
   if (document.visibilityState === 'visible') load();
 }
 
-function scheduleInterval(ms: number): void {
-  if (intervalId != null) window.clearInterval(intervalId);
-  currentIntervalMs = ms;
-  intervalId = window.setInterval(onTick, ms);
+function startPolling(): void {
+  if (intervalId != null) return;
+  intervalId = window.setInterval(onTick, NOW_PLAYING_POLL_INTERVAL_MS);
+}
+
+function stopPolling(): void {
+  if (intervalId == null) return;
+  window.clearInterval(intervalId);
+  intervalId = null;
 }
 
 function isNowPlayingPayload(x: unknown): x is NowPlayingResponse {
@@ -137,29 +141,12 @@ function isNowPlayingPayload(x: unknown): x is NowPlayingResponse {
   return typeof (x as { playing?: unknown }).playing === 'boolean';
 }
 
-function switchToFastPoll(): void {
-  hubConnected = false;
-  if (currentIntervalMs !== NOW_PLAYING_POLL_INTERVAL_MS) {
-    scheduleInterval(NOW_PLAYING_POLL_INTERVAL_MS);
-    // The fallback exists to keep the UI fresh — grab a fresh payload right
-    // away rather than waiting up to a full fast tick for the next scheduled
-    // fetch. `load()` coalesces so a stray in-flight request isn't duplicated.
-    load();
-  }
-}
-
-function switchToFloorPoll(): void {
-  hubConnected = true;
-  if (currentIntervalMs !== NOW_PLAYING_POLL_FLOOR_MS) {
-    scheduleInterval(NOW_PLAYING_POLL_FLOOR_MS);
-  }
-}
-
 function checkHeartbeat(): void {
-  if (!hubConnected) return;
+  if (!hubHealthy) return;
   if (Date.now() - lastHubMessageAt > HUB_HEARTBEAT_STALE_MS) {
     // Hub claims connected but stopped talking — fetch is truth.
-    switchToFastPoll();
+    hubHealthy = false;
+    startPolling();
   }
 }
 
@@ -169,7 +156,8 @@ function applyHubEvent(env: ChannelEnvelope): void {
   // payload is not track data. `heartbeat` similarly just refreshes liveness.
   if (env.type === 'joined' || env.type === 'heartbeat') return;
   // Everything else is a hint carrying a now-playing payload. Apply it
-  // directly — the periodic floor fetch will correct any drift.
+  // directly — the HTTP path stays the source of truth and refreshes on
+  // reconnect / visibility / recovery, so drift can't accumulate.
   if (isNowPlayingPayload(env.data)) {
     emit({ status: 'ready', data: env.data });
   }
@@ -177,39 +165,50 @@ function applyHubEvent(env: ChannelEnvelope): void {
 
 const hubSubscriber: ChannelSubscriber = {
   onEvent(env) {
+    const wasFallback = !hubHealthy;
     applyHubEvent(env);
-    // Any event proves the hub is delivering — slow the poll if we hadn't yet.
-    if (!hubConnected) switchToFloorPoll();
+    hubHealthy = true;
+    if (wasFallback) {
+      // Recovery: hub is talking again after being unavailable/stale. Grab
+      // one fresh HTTP payload (offline events are lost by design) and stop
+      // the fallback interval.
+      stopPolling();
+      load();
+    }
   },
   onReconnected() {
     // Membership dies on reconnect (REALTIME.md) — the hub client has already
-    // re-joined for us; we re-fetch to catch anything that happened offline.
+    // re-joined for us; we re-fetch to catch anything that happened offline
+    // and drop the fallback interval that the transient disconnect started.
     lastHubMessageAt = Date.now();
-    switchToFloorPoll();
+    hubHealthy = true;
+    stopPolling();
     load();
   },
   onStatusChange(connected) {
     if (connected) {
       lastHubMessageAt = Date.now();
-      switchToFloorPoll();
-      // Initial connect: re-fetch over HTTP as required by REALTIME.md.
+      hubHealthy = true;
+      // Initial connect: re-fetch over HTTP as required by REALTIME.md and
+      // stop any fallback interval that ran while we were connecting.
+      stopPolling();
       load();
     } else {
-      switchToFastPoll();
+      hubHealthy = false;
+      startPolling();
     }
   },
 };
 
 function start(): void {
   // Render from HTTP first — the hub is an enhancement and MUST NOT delay first
-  // paint (task 85).
+  // paint (task 85). No polling interval yet: it starts only when the hub is
+  // proven unhealthy (task 91).
   load();
 
-  currentIntervalMs = NOW_PLAYING_POLL_INTERVAL_MS;
-  intervalId = window.setInterval(onTick, NOW_PLAYING_POLL_INTERVAL_MS);
   document.addEventListener('visibilitychange', onVisibilityChange);
 
-  hubConnected = false;
+  hubHealthy = false;
   lastHubMessageAt = 0;
   staleCheckId = window.setInterval(checkHeartbeat, STALE_CHECK_INTERVAL_MS);
 
@@ -217,10 +216,7 @@ function start(): void {
 }
 
 function stop(): void {
-  if (intervalId != null) {
-    window.clearInterval(intervalId);
-    intervalId = null;
-  }
+  stopPolling();
   if (staleCheckId != null) {
     window.clearInterval(staleCheckId);
     staleCheckId = null;
@@ -234,9 +230,8 @@ function stop(): void {
     unsubHub();
     unsubHub = null;
   }
-  hubConnected = false;
+  hubHealthy = false;
   lastHubMessageAt = 0;
-  currentIntervalMs = NOW_PLAYING_POLL_INTERVAL_MS;
 }
 
 function subscribe(listener: () => void): () => void {

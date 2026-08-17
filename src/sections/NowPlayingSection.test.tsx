@@ -4,6 +4,7 @@ import NowPlayingSection, { relativeTimeSince } from './NowPlayingSection';
 import type { Section } from '../types/content';
 import type { NowPlayingResponse } from '../lib/api';
 import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
+import { currentFakeConnection } from '../test/hubDouble';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -159,8 +160,9 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('polls every 5s only while the tab is visible, pausing when hidden', async () => {
+  it('falls back to 5s polling only when the hub is unavailable, pausing when hidden (§3.5, task 91)', async () => {
     vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -177,7 +179,13 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     });
     expect(npCalls()).toBe(1);
 
-    // Visible: a poll tick refetches.
+    // Hub goes down — the fallback poller starts.
+    await act(async () => {
+      currentFakeConnection()?.rejectStart(new Error('hub unavailable'));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Visible + hub down: a poll tick refetches.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
     });

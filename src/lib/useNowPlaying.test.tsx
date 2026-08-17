@@ -3,7 +3,6 @@ import { act, render } from '@testing-library/react';
 import {
   HUB_HEARTBEAT_STALE_MS,
   nowPlayingChannel,
-  NOW_PLAYING_POLL_FLOOR_MS,
   NOW_PLAYING_POLL_INTERVAL_MS,
   useNowPlaying,
   type NowPlayingState,
@@ -45,14 +44,28 @@ async function flushMicroAndTimers() {
   await vi.advanceTimersByTimeAsync(0);
 }
 
+/** Force `document.visibilityState`/`hidden` and fire the change event. */
+function setVisibility(value: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', {
+    value,
+    configurable: true,
+  });
+  Object.defineProperty(document, 'hidden', {
+    value: value === 'hidden',
+    configurable: true,
+  });
+  document.dispatchEvent(new Event('visibilitychange'));
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  setVisibility('visible');
 });
 
 describe('useNowPlaying — shared HTTP + hub store', () => {
-  it('two mounted consumers share ONE fetch per poll tick', async () => {
+  it('two mounted consumers share ONE fetch on mount', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -68,14 +81,9 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       await flushMicroAndTimers();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('stops polling and disconnects the hub when the last consumer unmounts', async () => {
+  it('stops the fallback poller and disconnects the hub when the last consumer unmounts', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -89,18 +97,26 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     // One shared connection was built for the shared subscribe.
     expect(connectionsBuilt()).toBe(1);
     const conn = currentFakeConnection();
-    conn?.resolveStart();
+    // Force the hub into the fallback state so a polling interval IS running,
+    // then confirm unmount tears everything down.
+    conn?.rejectStart(new Error('down'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+    const baseline = fetchMock.mock.calls.length;
 
     unmount();
 
-    // With no subscribers the interval AND hub subscription are gone.
+    // With no subscribers the fallback interval AND hub subscription are gone.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS * 10);
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(baseline);
   });
 
-  it('when the hub connects, JoinChannel fires and the poll slows to a 30s floor', async () => {
+  it('when the hub connects, JoinChannel fires and NO polling interval runs in steady state', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -116,7 +132,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     const conn = currentFakeConnection();
     expect(conn).not.toBeNull();
 
-    // Hub becomes connected → onStatusChange(true) → floor cadence + re-fetch.
+    // Hub becomes connected → onStatusChange(true) → re-fetch, no polling.
     await act(async () => {
       conn!.resolveStart();
       await flushMicroAndTimers();
@@ -125,20 +141,18 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     // Re-fetch on initial connect (REALTIME.md).
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    // 5s ticks are gone — the floor is 30s. Advance ~29s: no fetch.
+    // Zero fetches over the next several minutes — steady state is silent.
+    // We keep emitting periodic heartbeats to prove the hub stays healthy.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_FLOOR_MS - 1_000);
+      for (let i = 0; i < 30; i += 1) {
+        await vi.advanceTimersByTimeAsync(10_000);
+        conn!.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
+      }
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    // Cross the 30s floor: one more fetch.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000);
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it('ChannelEvent payloads apply directly to state (events are hints, no fetch)', async () => {
+  it('hub events still update state live while no polling is happening', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -217,38 +231,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     expect(el?.getAttribute('data-status')).toBe('ready');
   });
 
-  it('heartbeats keep the floor slow — no fallback while they arrive', async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    render(<Probe />);
-
-    await act(async () => {
-      await flushMicroAndTimers();
-    });
-    const conn = currentFakeConnection()!;
-    await act(async () => {
-      conn.resolveStart();
-      await flushMicroAndTimers();
-    });
-    // After connect: floor cadence, only two fetches so far (mount + connect).
-    const baseline = fetchMock.mock.calls.length;
-
-    // Emit a heartbeat every 10s for a full minute — never crossing the 45s
-    // stale threshold, so the floor remains 30s (2 fetches in the minute).
-    for (let i = 0; i < 6; i += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(10_000);
-        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
-        await flushMicroAndTimers();
-      });
-    }
-    // 60s / 30s floor = 2 floor-cadence fetches.
-    expect(fetchMock.mock.calls.length - baseline).toBe(2);
-  });
-
-  it('missing heartbeats fall back to the 5s polling cadence', async () => {
+  it('missing heartbeats start the 5s fallback polling', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -266,18 +249,58 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     const baseline = fetchMock.mock.calls.length;
 
     // No heartbeats for well past the stale threshold — the stale check runs
-    // every 5s and switches back to fast polling.
+    // every 5s and switches on the fallback polling.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(HUB_HEARTBEAT_STALE_MS + 10_000);
+      await vi.advanceTimersByTimeAsync(HUB_HEARTBEAT_STALE_MS + 30_000);
     });
 
-    // We should have accrued extra fetches at ~5s cadence — well above the 30s
-    // floor would allow in the same span.
+    // We should have accrued extra fetches at ~5s cadence.
     const after = fetchMock.mock.calls.length - baseline;
     expect(after).toBeGreaterThan(2);
   });
 
-  it('connect failure keeps the 5s HTTP polling and does not spam errors', async () => {
+  it('hub recovery from staleness fires ONE resync fetch and stops the fallback polling', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<Probe />);
+
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+    const conn = currentFakeConnection()!;
+    await act(async () => {
+      conn.resolveStart();
+      await flushMicroAndTimers();
+    });
+
+    // Let the hub go stale — fallback polling kicks in.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HUB_HEARTBEAT_STALE_MS + 10_000);
+    });
+    const beforeRecovery = fetchMock.mock.calls.length;
+
+    // Hub starts talking again — recovery: one resync fetch, polling stops.
+    await act(async () => {
+      conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
+      await flushMicroAndTimers();
+    });
+    const afterRecovery = fetchMock.mock.calls.length;
+    expect(afterRecovery - beforeRecovery).toBe(1);
+
+    // Now the polling interval should be gone — long fake-timer window
+    // continues to see zero fetches.
+    await act(async () => {
+      for (let i = 0; i < 6; i += 1) {
+        await vi.advanceTimersByTimeAsync(10_000);
+        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
+      }
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(afterRecovery);
+  });
+
+  it('connect failure starts the 5s HTTP polling and does not spam errors', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -339,6 +362,52 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       nowPlayingChannel(),
     ]);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(beforeReconnect);
+
+    // Post-reconnect the fallback polling is gone again — no extra fetches
+    // over a long window while heartbeats keep the hub healthy.
+    const afterReconnect = fetchMock.mock.calls.length;
+    await act(async () => {
+      for (let i = 0; i < 6; i += 1) {
+        await vi.advanceTimersByTimeAsync(10_000);
+        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
+      }
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(afterReconnect);
+  });
+
+  it('visibility return to foreground triggers a single immediate resync fetch', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<Probe />);
+
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+    const conn = currentFakeConnection()!;
+    await act(async () => {
+      conn.resolveStart();
+      await flushMicroAndTimers();
+    });
+    const baseline = fetchMock.mock.calls.length;
+
+    // Hide the tab, wait a while — no polling and no fetches.
+    await act(async () => {
+      setVisibility('hidden');
+      for (let i = 0; i < 6; i += 1) {
+        await vi.advanceTimersByTimeAsync(10_000);
+        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
+      }
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(baseline);
+
+    // Coming back to the foreground triggers a single resync fetch.
+    await act(async () => {
+      setVisibility('visible');
+      await flushMicroAndTimers();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(baseline + 1);
   });
 
   it('shares ONE connection across multiple consumers (refcounted)', async () => {
