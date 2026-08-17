@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { getNowPlaying } from './api';
 import type { NowPlayingResponse } from './api';
 import {
+  hubChannelPrefix,
   subscribeChannel,
   type ChannelEnvelope,
   type ChannelSubscriber,
@@ -16,8 +17,9 @@ import {
  * identical requests.
  *
  * Realtime path (REALTIME.md): the store joins the app-wide SignalR hub on the
- * `portfolio-v6-api:now-playing` channel and applies `ChannelEvent` payloads
- * directly. Events are hints — the HTTP endpoint stays the source of truth —
+ * `<prefix>:now-playing` channel (see {@link hubChannelPrefix}) and applies
+ * `ChannelEvent` payloads directly. Events are hints — the HTTP endpoint
+ * stays the source of truth —
  * so we still poll, just at a 30s FLOOR while the hub is healthy (and the
  * usual 5s FALLBACK when it isn't). On initial connect and after every
  * reconnect the hub client re-joins us to the channel and we re-fetch over
@@ -66,8 +68,16 @@ export const HUB_HEARTBEAT_STALE_MS = 45_000;
 /** How often to check the hub heartbeat freshness — coarse is fine. */
 const STALE_CHECK_INTERVAL_MS = 5_000;
 
-/** Channel name owned by the API for now-playing pushes (REALTIME.md). */
-export const NOW_PLAYING_CHANNEL = 'portfolio-v6-api:now-playing';
+/**
+ * Channel name owned by the API for now-playing pushes (REALTIME.md, task 88).
+ * Composed from the env-driven {@link hubChannelPrefix} at call time so the
+ * dev site subscribes to `portfolio-v6-api-dev:now-playing` while prod stays on
+ * `portfolio-v6-api:now-playing`. Read on each `start()` — never cached at
+ * module load — so tests can override the prefix via `vi.stubEnv`.
+ */
+export function nowPlayingChannel(): string {
+  return `${hubChannelPrefix()}:now-playing`;
+}
 
 const INITIAL: NowPlayingState = { status: 'loading' };
 
@@ -203,7 +213,7 @@ function start(): void {
   lastHubMessageAt = 0;
   staleCheckId = window.setInterval(checkHeartbeat, STALE_CHECK_INTERVAL_MS);
 
-  unsubHub = subscribeChannel(NOW_PLAYING_CHANNEL, hubSubscriber);
+  unsubHub = subscribeChannel(nowPlayingChannel(), hubSubscriber);
 }
 
 function stop(): void {

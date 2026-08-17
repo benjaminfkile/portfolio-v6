@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import {
   HUB_HEARTBEAT_STALE_MS,
-  NOW_PLAYING_CHANNEL,
+  nowPlayingChannel,
   NOW_PLAYING_POLL_FLOOR_MS,
   NOW_PLAYING_POLL_INTERVAL_MS,
   useNowPlaying,
@@ -121,7 +121,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       conn!.resolveStart();
       await flushMicroAndTimers();
     });
-    expect(allJoinCalls()).toEqual([NOW_PLAYING_CHANNEL]);
+    expect(allJoinCalls()).toEqual([nowPlayingChannel()]);
     // Re-fetch on initial connect (REALTIME.md).
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
@@ -169,7 +169,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     };
     await act(async () => {
       conn.emit({
-        channel: NOW_PLAYING_CHANNEL,
+        channel: nowPlayingChannel(),
         type: 'track',
         data: nextTrack,
       });
@@ -205,7 +205,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     // A joined ack arrives — its payload MUST NOT be interpreted as track data.
     await act(async () => {
       conn.emit({
-        channel: NOW_PLAYING_CHANNEL,
+        channel: nowPlayingChannel(),
         type: 'joined',
         data: { playing: true, track: { title: 'X', artists: [], album: '', art_url: null, url: '' } },
       });
@@ -240,7 +240,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     for (let i = 0; i < 6; i += 1) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10_000);
-        conn.emit({ channel: NOW_PLAYING_CHANNEL, type: 'heartbeat' });
+        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
         await flushMicroAndTimers();
       });
     }
@@ -323,7 +323,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       conn.resolveStart();
       await flushMicroAndTimers();
     });
-    expect(allJoinCalls()).toEqual([NOW_PLAYING_CHANNEL]);
+    expect(allJoinCalls()).toEqual([nowPlayingChannel()]);
 
     const beforeReconnect = fetchMock.mock.calls.length;
 
@@ -335,8 +335,8 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     });
 
     expect(allJoinCalls()).toEqual([
-      NOW_PLAYING_CHANNEL,
-      NOW_PLAYING_CHANNEL,
+      nowPlayingChannel(),
+      nowPlayingChannel(),
     ]);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(beforeReconnect);
   });
@@ -372,5 +372,68 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
     expect(connectionsBuilt()).toBe(1);
+  });
+
+  it('composes the channel name from VITE_HUB_CHANNEL_PREFIX (env-driven, not hardcoded)', async () => {
+    // Non-default prefix — the dev API publishes on `portfolio-v6-api-dev:*`,
+    // so the dev site MUST subscribe there or it will never see events (task 88).
+    vi.stubEnv('VITE_HUB_CHANNEL_PREFIX', 'portfolio-v6-api-dev');
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const seen: NowPlayingState[] = [];
+    render(<Probe onState={(s) => seen.push(s)} />);
+
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+    const conn = currentFakeConnection()!;
+    await act(async () => {
+      conn.resolveStart();
+      await flushMicroAndTimers();
+    });
+
+    // The channel name derived from the hook must reflect the stubbed prefix.
+    expect(nowPlayingChannel()).toBe('portfolio-v6-api-dev:now-playing');
+    // JoinChannel was invoked with the dev-prefixed channel, not the default.
+    expect(allJoinCalls()).toEqual(['portfolio-v6-api-dev:now-playing']);
+
+    // Envelopes on the configured channel reach the store.
+    const nextTrack: NowPlayingResponse = {
+      playing: true,
+      track: {
+        title: 'Non-default Prefix Track',
+        artists: ['Ops'],
+        album: 'Env',
+        art_url: null,
+        url: 'https://open.spotify.com/track/abc',
+      },
+    };
+    await act(async () => {
+      conn.emit({
+        channel: 'portfolio-v6-api-dev:now-playing',
+        type: 'track',
+        data: nextTrack,
+      });
+      await flushMicroAndTimers();
+    });
+    const applied = seen[seen.length - 1];
+    expect(applied.status).toBe('ready');
+    if (applied.status === 'ready' && applied.data.playing) {
+      expect(applied.data.track.title).toBe('Non-default Prefix Track');
+    }
+
+    // An envelope on the default (prod) prefix must NOT reach a dev subscriber.
+    const rendersBefore = seen.length;
+    await act(async () => {
+      conn.emit({
+        channel: 'portfolio-v6-api:now-playing',
+        type: 'track',
+        data: { playing: false } satisfies NowPlayingResponse,
+      });
+      await flushMicroAndTimers();
+    });
+    expect(seen.length).toBe(rendersBefore);
   });
 });
