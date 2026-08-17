@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import HeroInstrumentStrip from './HeroInstrumentStrip';
 import type { DuolingoResponse, NowPlayingResponse } from '../lib/api';
-import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
+import { nowPlayingChannel } from '../lib/useNowPlaying';
+import { currentFakeConnection } from '../test/hubDouble';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -132,13 +133,13 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
     );
   });
 
-  it('updates the NOW PLAYING readout live when a later poll reports a new track', async () => {
+  it('updates the NOW PLAYING readout live when a hub event reports a new track', async () => {
     vi.useFakeTimers();
-    // Mutable body: the shared store's next poll sees whatever is current.
-    let now: NowPlayingResponse = { playing: false };
     const fetchMock = vi.fn((path: string) => {
       if (path.startsWith('/api/now-playing')) {
-        return Promise.resolve(jsonResponse(now));
+        return Promise.resolve(
+          jsonResponse({ playing: false } satisfies NowPlayingResponse),
+        );
       }
       if (path.startsWith('/api/duolingo')) {
         return Promise.resolve(
@@ -160,7 +161,14 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
     });
     expect(screen.getByText('Not playing')).toBeInTheDocument();
 
-    now = {
+    // Bring the hub up and push a track event — the shared store applies
+    // the payload directly, no polling required (task 91).
+    const conn = currentFakeConnection()!;
+    await act(async () => {
+      conn.resolveStart();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const track: NowPlayingResponse = {
       playing: true,
       track: {
         title: 'Windowlicker',
@@ -171,7 +179,12 @@ describe('HeroInstrumentStrip (DESIGN.md §5)', () => {
       },
     };
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
+      conn.emit({
+        channel: nowPlayingChannel(),
+        type: 'track',
+        data: track,
+      });
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByText('Windowlicker — Aphex Twin')).toBeInTheDocument();
   });
