@@ -1,0 +1,10 @@
+/* LinkIcon — per-link-type inline SVG glyph. Sized to the chip's line-height
+   (1em box) and coloured via currentColor so it inherits chip text colour in
+   both themes (DESIGN.md §2). Kept as a flex-none, block-level element so the
+   chip's gap owns the spacing between icon and label. */
+
+.icon {
+  flex: none;
+  display: block;
+  color: currentColor;
+}

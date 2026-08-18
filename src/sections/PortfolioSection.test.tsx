@@ -85,6 +85,130 @@ describe('PortfolioSection (DESIGN.md §5)', () => {
     expect(screen.getByRole('link', { name: 'Live site' })).toBeInTheDocument();
   });
 
+  it('applies the prod > dev > rest visual hierarchy via chip variant classes', () => {
+    // Weight order is prod > dev > everything else (Task #109); array order is
+    // display order (§3.4) and is preserved regardless of type.
+    render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', {
+            links: [
+              { type: 'repo', label: 'Repo', url: 'https://example.com/r' },
+              { type: 'prod', label: 'Live', url: 'https://example.com/p' },
+              { type: 'dev', label: 'Dev', url: 'https://example.com/d' },
+              { type: 'docs', label: 'Docs', url: 'https://example.com/x' },
+            ],
+          }),
+        ])}
+        media={{}}
+      />,
+    );
+
+    // prod / dev carry their emphasis classes; everything else stays quiet.
+    expect(screen.getByRole('link', { name: /Live/ })).toHaveClass(
+      styles.linkChipProd,
+    );
+    expect(screen.getByRole('link', { name: /Live/ })).not.toHaveClass(
+      styles.linkChipDev,
+    );
+    expect(screen.getByRole('link', { name: /Dev/ })).toHaveClass(
+      styles.linkChipDev,
+    );
+    expect(screen.getByRole('link', { name: /Dev/ })).not.toHaveClass(
+      styles.linkChipProd,
+    );
+    for (const label of ['Repo', 'Docs']) {
+      const chip = screen.getByRole('link', { name: new RegExp(label) });
+      expect(chip).not.toHaveClass(styles.linkChipProd);
+      expect(chip).not.toHaveClass(styles.linkChipDev);
+    }
+  });
+
+  it('preserves link array order regardless of type (weight ordering never rewrites the DOM order)', () => {
+    render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', {
+            links: [
+              { type: 'docs', label: 'Docs', url: 'https://example.com/x' },
+              { type: 'prod', label: 'Live', url: 'https://example.com/p' },
+              { type: 'repo', label: 'Repo', url: 'https://example.com/r' },
+              { type: 'dev', label: 'Dev', url: 'https://example.com/d' },
+            ],
+          }),
+        ])}
+        media={{}}
+      />,
+    );
+
+    const linkList = screen.getAllByRole('list').find((el) =>
+      el.classList.contains(styles.links),
+    )!;
+    const labels = within(linkList)
+      .getAllByRole('link')
+      .map((a) => a.textContent);
+    expect(labels).toEqual(['Docs', 'Live', 'Repo', 'Dev']);
+  });
+
+  it('adds a per-type inline SVG icon to every link chip, aria-hidden', () => {
+    render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', {
+            links: [
+              { type: 'repo', label: 'Repo', url: 'https://example.com/r' },
+              { type: 'docs', label: 'Docs', url: 'https://example.com/x' },
+              { type: 'package', label: 'Package', url: 'https://example.com/pk' },
+              { type: 'article', label: 'Article', url: 'https://example.com/a' },
+              { type: 'demo', label: 'Demo', url: 'https://example.com/de' },
+              { type: 'other', label: 'Other', url: 'https://example.com/o' },
+              { type: 'prod', label: 'Live', url: 'https://example.com/p' },
+              { type: 'dev', label: 'Dev', url: 'https://example.com/d' },
+            ],
+          }),
+        ])}
+        media={{}}
+      />,
+    );
+
+    for (const label of ['Repo', 'Docs', 'Package', 'Article', 'Demo', 'Other', 'Live', 'Dev']) {
+      const chip = screen.getByRole('link', { name: new RegExp(label) });
+      const svg = chip.querySelector('svg');
+      expect(svg).not.toBeNull();
+      // Decorative — the chip label carries the meaning.
+      expect(svg).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
+  it('draws the GitHub mark for repo links (unique brand silhouette)', () => {
+    render(
+      <PortfolioSection
+        section={portfolioSection([
+          project('p1', {
+            links: [
+              { type: 'repo', label: 'Repo', url: 'https://example.com/r' },
+              { type: 'docs', label: 'Docs', url: 'https://example.com/x' },
+            ],
+          }),
+        ])}
+        media={{}}
+      />,
+    );
+
+    const repoSvg = screen
+      .getByRole('link', { name: /Repo/ })
+      .querySelector('svg')!;
+    const docsSvg = screen
+      .getByRole('link', { name: /Docs/ })
+      .querySelector('svg')!;
+    // The GitHub mark is a single filled path; the docs icon is stroke-drawn.
+    const repoPath = repoSvg.querySelector('path[fill="currentColor"]');
+    expect(repoPath).not.toBeNull();
+    expect(repoSvg.getAttribute('viewBox')).toBe('0 0 16 16');
+    // Sibling glyphs draw different shapes.
+    expect(repoSvg.innerHTML).not.toBe(docsSvg.innerHTML);
+  });
+
   it('renders LEGACY tech_icons as small image chips, unchanged (pre-v1.8)', () => {
     // A pre-v1.8 item carries `tech_icons` and NO `skill_refs`, so it keeps the
     // legacy raw-URL rendering with filename-stem names.
