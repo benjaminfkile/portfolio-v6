@@ -48,7 +48,12 @@ const skills: SectionItem[] = [
 ];
 
 function renderConsole() {
-  return render(<SkillsSection section={skillsSection(skills)} media={{}} />);
+  return render(
+    <SkillsSection
+      section={skillsSection(skills, { heading: 'Skills' })}
+      media={{}}
+    />,
+  );
 }
 
 /** The left-panel list (labelled), distinct from the sphere's chip fallback. */
@@ -94,11 +99,9 @@ describe('SkillsSection console — layout & list', () => {
     ]);
   });
 
-  it('falls back to a default heading and an empty list for no skills', () => {
+  it('emits no heading when the section has none (§7 headerless)', () => {
     render(<SkillsSection section={skillsSection([])} media={{}} />);
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Skills' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(within(list()).queryAllByRole('button')).toHaveLength(0);
   });
 });

@@ -33,7 +33,11 @@ describe('StatusSection (spec §3.5)', () => {
     );
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    renderStatus({ services: [], show_response_times: false });
+    renderStatus({
+      title: 'Status',
+      services: [],
+      show_response_times: false,
+    });
 
     expect(await screen.findByText(/unavailable/i)).toBeInTheDocument();
     // Degrade, not error: nothing throws and there is no crash/alert role.

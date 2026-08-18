@@ -156,8 +156,8 @@ export default function StatusSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={config.title ?? 'Status'}
-      eyebrow={config.eyebrow ?? '// service health'}
+      title={config.title}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.status}
     >

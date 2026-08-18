@@ -72,8 +72,8 @@ export default function DuolingoSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={config.heading ?? 'Duolingo'}
-      eyebrow={config.eyebrow ?? '// language practice'}
+      title={config.heading}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.duolingo}
     >

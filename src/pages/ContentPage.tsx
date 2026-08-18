@@ -126,7 +126,6 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
             key={section.id}
             section={section}
             media={media}
-            documentVersion={state.document.version}
             skillsById={skillsById}
           />
         );

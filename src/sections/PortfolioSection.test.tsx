@@ -132,12 +132,10 @@ describe('PortfolioSection (DESIGN.md §5)', () => {
     expect(panels[2]).toHaveAttribute('data-align', 'start');
   });
 
-  it('falls back to a default heading', () => {
+  it('emits no heading when the data has none (§7 headerless)', () => {
     render(<PortfolioSection section={portfolioSection([])} media={{}} />);
 
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Portfolio' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
   });
 });
 

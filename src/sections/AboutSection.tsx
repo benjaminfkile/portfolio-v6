@@ -27,7 +27,7 @@ export default function AboutSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.heading ?? 'About'}
+      title={data.heading}
       className={styles.about}
     >
       {data.body && (

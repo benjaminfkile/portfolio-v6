@@ -23,7 +23,7 @@ export default function ContactSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.heading ?? 'Contact'}
+      title={data.heading}
       className={styles.contact}
     >
       <Panel className={styles.panel}>

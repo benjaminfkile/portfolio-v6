@@ -6,8 +6,12 @@ type HeadingLevel = 'h1' | 'h2' | 'h3';
 export interface SectionShellProps {
   /** Mono, amber, uppercase kicker above the heading (DESIGN.md §4). */
   eyebrow?: ReactNode;
-  /** The section heading text. */
-  title: ReactNode;
+  /**
+   * The section heading text. Omit (or pass `undefined` / `''`) and the shell
+   * emits no heading at all — no fallback copy, no empty element, no reserved
+   * space (headerless sections, §7).
+   */
+  title?: ReactNode;
   /** Optional lead-in prose below the heading. */
   intro?: ReactNode;
   /** Heading element to render; defaults to <h2> (one <h1> per page, §7). */
@@ -36,7 +40,14 @@ export default function SectionShell({
   children,
 }: SectionShellProps) {
   const Heading = headingLevel;
-  const headingId = id ? `${id}-title` : undefined;
+  const hasEyebrow = eyebrow != null && eyebrow !== '';
+  const hasTitle = title != null && title !== '';
+  const hasIntro = intro != null && intro !== '';
+  const hasHeader = hasEyebrow || hasTitle || hasIntro;
+  // Only reserve an aria-labelledby target when there IS a heading to point at
+  // — a headerless section labelled by a nonexistent id is worse than one that
+  // is simply unlabelled (§7).
+  const headingId = id && hasTitle ? `${id}-title` : undefined;
 
   return (
     <Wrapper
@@ -45,29 +56,25 @@ export default function SectionShell({
       aria-labelledby={headingId}
     >
       {/*
-        A plain <div>, not <header>: a section's intro block is not a page
-        landmark, and emitting a <header> here would add a stray "banner" to the
-        page's landmark list (§7 wants exactly header/main/footer).
+        Headerless section (§7): when no eyebrow / title / intro is published,
+        emit no header markup at all — no empty <div>, no reserved whitespace,
+        no h2. The heading outline degrades gracefully to whatever the body
+        contains.
       */}
-      <div className={styles.header}>
-        {eyebrow != null && eyebrow !== '' && (
-          <p className={styles.eyebrow}>{eyebrow}</p>
-        )}
-        {/*
-          Never emit an empty heading: an <h1></h1> with no text is a WCAG
-          failure (and a stray, unlabelled heading in the outline). A section
-          given no title simply renders none — the hero, when its document has
-          no title, must not plant a blank page <h1> (a11y sweep, §7).
-        */}
-        {title != null && title !== '' && (
-          <Heading id={headingId} className={styles.heading}>
-            {title}
-          </Heading>
-        )}
-        {intro != null && intro !== '' && (
-          <p className={styles.intro}>{intro}</p>
-        )}
-      </div>
+      {hasHeader && (
+        // A plain <div>, not <header>: a section's intro block is not a page
+        // landmark, and emitting a <header> here would add a stray "banner" to
+        // the page's landmark list (§7 wants exactly header/main/footer).
+        <div className={styles.header}>
+          {hasEyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
+          {hasTitle && (
+            <Heading id={headingId} className={styles.heading}>
+              {title}
+            </Heading>
+          )}
+          {hasIntro && <p className={styles.intro}>{intro}</p>}
+        </div>
+      )}
       {children != null && children !== '' && (
         <div className={styles.body}>{children}</div>
       )}

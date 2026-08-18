@@ -47,8 +47,6 @@ import styles from './OpsSection.module.css';
  * SVG is decorative (`aria-hidden`) with a visually-hidden summary (§7).
  */
 
-const EYEBROW = '// daily replay';
-
 type LoadState =
   | { status: 'loading' }
   | { status: 'empty' }
@@ -217,8 +215,8 @@ export default function OpsSection({ section }: SectionProps) {
   if (state.status === 'empty') {
     return (
       <SectionShell
-        title={config.heading ?? 'Ops'}
-        eyebrow={EYEBROW}
+        title={config.heading}
+        eyebrow={config.eyebrow}
         intro={config.intro}
         className={styles.ops}
       >
@@ -260,8 +258,8 @@ function OpsReplay({ report, config, timeZone }: ReplayProps) {
 
   return (
     <SectionShell
-      title={config.heading ?? 'Ops'}
-      eyebrow={EYEBROW}
+      title={config.heading}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.ops}
     >

@@ -30,6 +30,8 @@
   font-weight: var(--fw-medium);
 }
 
-.line {
+.version {
   color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
 }

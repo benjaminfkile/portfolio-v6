@@ -58,17 +58,17 @@ describe('ContactSection (DESIGN.md §5)', () => {
     expect(screen.getByRole('link', { name: 'LinkedIn' })).toBeInTheDocument();
   });
 
-  it('falls back to a default heading and renders no row without actions', () => {
-    render(
+  it('emits no heading when the data has no heading (§7 headerless)', () => {
+    const { container } = render(
       <ContactSection
         section={contactSection({ body: 'Just a note.' })}
         media={{}}
       />,
     );
 
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Contact' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain('Contact');
+    expect(screen.getByText('Just a note.')).toBeInTheDocument();
   });
 });

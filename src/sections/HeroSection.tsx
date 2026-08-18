@@ -1,18 +1,17 @@
 import type { SectionProps } from './types';
 import SectionShell from '../components/ui/SectionShell';
 import { usePrefersReducedMotion } from '../lib/prefersReducedMotion';
-import HeroInstrumentStrip from './HeroInstrumentStrip';
 import styles from './HeroSection.module.css';
 
 /**
  * The hero (spec §3.8, DESIGN.md §5) — a **static** section: a mono amber tagline
- * (the "// software developer" instrument voice), a display headline, a short
- * intro, and below them the instrument strip (NOW PLAYING · API · SITE vN).
+ * (the "// software developer" instrument voice), a display headline, and a
+ * short intro.
  *
- * On page load the header lines and the strip fade/rise 12px, staggered 60ms and
- * once (DESIGN.md §6). Under `prefers-reduced-motion` the orchestration is
- * dropped entirely and everything renders in its final, static state — decided in
- * JS here, with a CSS `@media` guard behind it. v5's animated jQuery header does
+ * On page load the header lines fade/rise 12px, staggered 60ms and once
+ * (DESIGN.md §6). Under `prefers-reduced-motion` the orchestration is dropped
+ * entirely and everything renders in its final, static state — decided in JS
+ * here, with a CSS `@media` guard behind it. v5's animated jQuery header does
  * not carry over; no canvas or scroll theatrics are written (§3.8).
  */
 interface HeroData {
@@ -24,11 +23,7 @@ interface HeroData {
   background_media_id?: string;
 }
 
-export default function HeroSection({
-  section,
-  media,
-  documentVersion,
-}: SectionProps) {
+export default function HeroSection({ section, media }: SectionProps) {
   const data = section.data as HeroData;
   const reduced = usePrefersReducedMotion();
   const background = data.background_media_id
@@ -57,11 +52,9 @@ export default function HeroSection({
         headingLevel="h1"
         className={shellClass}
         eyebrow={data.tagline}
-        title={data.title ?? ''}
+        title={data.title}
         intro={data.intro}
-      >
-        <HeroInstrumentStrip siteVersion={documentVersion} />
-      </SectionShell>
+      />
     </div>
   );
 }

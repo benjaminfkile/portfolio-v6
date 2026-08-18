@@ -87,11 +87,9 @@ describe('TimelineSection (DESIGN.md §5)', () => {
     ).toBeInTheDocument();
   });
 
-  it('falls back to a default heading', () => {
+  it('emits no heading when the data has none (§7 headerless)', () => {
     render(<TimelineSection section={timelineSection([])} media={{}} />);
 
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Timeline' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
   });
 });

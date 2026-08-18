@@ -96,8 +96,8 @@ function IndexModeSection({ config }: { config: BlogData }) {
 
   return (
     <SectionShell
-      title={config.title ?? 'Blog'}
-      eyebrow={config.eyebrow ?? '// writing'}
+      title={config.title}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.blog}
     >
@@ -130,8 +130,8 @@ function TeaserModeSection({ config }: { config: BlogData }) {
   if (state.status === 'loading') {
     return (
       <SectionShell
-        title={config.title ?? 'From the blog'}
-        eyebrow={config.eyebrow ?? '// recent posts'}
+        title={config.title}
+        eyebrow={config.eyebrow}
         intro={config.intro}
         className={styles.blog}
       >
@@ -148,8 +148,8 @@ function TeaserModeSection({ config }: { config: BlogData }) {
 
   return (
     <SectionShell
-      title={config.title ?? 'From the blog'}
-      eyebrow={config.eyebrow ?? '// recent posts'}
+      title={config.title}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.blog}
     >
