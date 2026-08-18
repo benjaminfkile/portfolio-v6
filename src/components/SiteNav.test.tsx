@@ -80,26 +80,28 @@ afterEach(() => {
 });
 
 describe('SiteNav', () => {
-  it('lists nav-labelled pages in nav_position order, then a Blog link', async () => {
+  it('lists nav-labelled pages in nav_position order', async () => {
     stubApi();
 
     renderNav();
 
     const nav = primaryNav();
-    // "Home" (position 0) and "Projects" (position 1) plus the static Blog link,
-    // in that order; the null-nav_label "secret" page is omitted.
-    await waitFor(() => expect(navLinks(nav)).toHaveLength(3));
+    // "Home" (position 0) and "Projects" (position 1); the null-nav_label
+    // "secret" page is omitted. Blog Page v1.x removed the hardcoded Blog
+    // entry — nav order comes exclusively from the content document.
+    await waitFor(() => expect(navLinks(nav)).toHaveLength(2));
     expect(navLinks(nav).map((a) => a.textContent)).toEqual([
       'Home',
       'Projects',
-      'Blog',
     ]);
 
     expect(navLink(nav, 'Home')).toHaveAttribute('href', '/');
     expect(navLink(nav, 'Projects')).toHaveAttribute('href', '/projects');
-    expect(navLink(nav, 'Blog')).toHaveAttribute('href', '/blog');
     // A page with a null nav_label is never listed (§3.10).
     expect(navLinks(nav).some((a) => a.textContent === 'Secret')).toBe(false);
+    // No hardcoded Blog link — the admin adds one by publishing a page slugged
+    // `blog` with a `nav_label` (Blog Page v1.x).
+    expect(navLinks(nav).some((a) => a.textContent === 'Blog')).toBe(false);
   });
 
   it('orders strictly by nav_position, not document order', async () => {
@@ -130,24 +132,23 @@ describe('SiteNav', () => {
     renderNav();
 
     const nav = primaryNav();
-    await waitFor(() => expect(navLinks(nav)).toHaveLength(3));
-    expect(navLinks(nav).map((a) => a.textContent)).toEqual([
-      'Home',
-      'Later',
-      'Blog',
-    ]);
+    await waitFor(() => expect(navLinks(nav)).toHaveLength(2));
+    expect(navLinks(nav).map((a) => a.textContent)).toEqual(['Home', 'Later']);
   });
 
-  it('still shows the static Blog link when the document fails to load', async () => {
+  it('renders no nav links when the document fails to load', async () => {
     stubContent({}, { ok: false, status: 500 });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     renderNav();
 
     const nav = primaryNav();
-    // No page links could be derived; only the static Blog link remains.
-    await waitFor(() => expect(navLinks(nav)).toHaveLength(1));
-    expect(navLink(nav, 'Blog')).toHaveAttribute('href', '/blog');
+    // Give the failing fetch a beat to settle.
+    await waitFor(() =>
+      expect(within(nav).queryAllByRole('link', { hidden: true })).toHaveLength(0),
+    );
+    // No hardcoded Blog fallback anymore — Blog Page v1.x.
+    expect(within(nav).queryAllByRole('link', { hidden: true })).toHaveLength(0);
   });
 
   it('mounts the theme toggle', () => {

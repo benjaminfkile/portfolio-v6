@@ -20,13 +20,24 @@ const REGISTRY = SECTION_REGISTRY as Record<
   ComponentType<SectionProps> | undefined
 >;
 
+export interface ContentPageProps {
+  /**
+   * Slug of the page to render, overriding the `:slug` route param. Used by
+   * routes without a `:slug` segment that still need to render a specific
+   * content page — e.g. `/blog` when the document carries a `blog` page (Blog
+   * Page v1.x). When omitted, the slug comes from `useParams` (`home` for `/`).
+   */
+  slug?: string;
+}
+
 /**
  * A dynamic content page (spec §3.10). Fetches `GET /api/content` once, selects
  * the page whose `slug` matches the route — `home` for `/`, the `:slug` segment
- * otherwise — and maps that page's sections through `SECTION_REGISTRY` (§3.4),
- * passing each section its `data`/`items` and the document-level media map (§6.8).
- * An unknown section `type` renders nothing and logs a warning, so a section
- * published ahead of a public deploy degrades rather than crashes.
+ * otherwise (or the explicit `slug` prop) — and maps that page's sections through
+ * `SECTION_REGISTRY` (§3.4), passing each section its `data`/`items` and the
+ * document-level media map (§6.8). An unknown section `type` renders nothing
+ * and logs a warning, so a section published ahead of a public deploy degrades
+ * rather than crashes.
  *
  * A `/:slug` that matches no page is a 404 ({@link NotFound}). The home route is
  * the exception: when nothing has ever been published the document's `pages` is
@@ -38,9 +49,9 @@ const REGISTRY = SECTION_REGISTRY as Record<
  * shows a small preview indicator. An invalid/expired token, or any load
  * failure, renders a plain failure message.
  */
-export default function ContentPage() {
+export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
   const { slug: slugParam } = useParams<{ slug: string }>();
-  const slug = slugParam ?? 'home';
+  const slug = slugProp ?? slugParam ?? 'home';
   const { state, preview } = useContentDocument();
 
   const page =
