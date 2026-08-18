@@ -11,13 +11,13 @@ export interface SkillDetailProps {
 
 /**
  * SkillDetail — the console's right panel (Skills Console v1.9, DESIGN.md §5).
- * Shows the previewed skill, else the locked one, else an instrument-voice
- * STANDBY empty state (the NO SIGNAL family, §5). Content is a mono icon+title
- * header over the skill `description` as body prose. The scroll region carries
- * `aria-live="polite"` so screen readers hear preview changes without spam, and
- * is keyboard-focusable (with a visible ring) so a locked skill's long
- * description can be scrolled by keyboard. `overflow-y: auto` inside the shared
- * console height is set by the section.
+ * Shows the previewed skill, else (on mobile) the locked one, else an
+ * instrument-voice STANDBY empty state (the NO SIGNAL family, §5). Content is a
+ * mono icon+title header over the skill `description` as body prose. The scroll
+ * region carries `aria-live="polite"` so screen readers hear preview changes
+ * without spam, and is keyboard-focusable (with a visible ring) so a mobile
+ * locked skill's long description can be scrolled by keyboard. `overflow-y:
+ * auto` inside the shared console height is set by the section.
  */
 export default function SkillDetail({ skill, className }: SkillDetailProps) {
   return (
@@ -43,7 +43,7 @@ export default function SkillDetail({ skill, className }: SkillDetailProps) {
           )}
         </>
       ) : (
-        <p className={styles.empty}>STANDBY — select a skill</p>
+        <p className={styles.empty}>STANDBY — pick a skill</p>
       )}
     </div>
   );
