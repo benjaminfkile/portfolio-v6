@@ -26,12 +26,16 @@ describe('AboutSection (DESIGN.md §5)', () => {
     expect(screen.getByText('Second paragraph of the bio.')).toBeInTheDocument();
   });
 
-  it('falls back to a default heading when none is provided', () => {
-    render(<AboutSection section={aboutSection({ body: 'Bio.' })} media={{}} />);
+  it('emits no heading when the data has no heading (§7 headerless)', () => {
+    const { container } = render(
+      <AboutSection section={aboutSection({ body: 'Bio.' })} media={{}} />,
+    );
 
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'About' }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).toBeNull();
+    // The body still renders — the section is headerless, not empty.
+    expect(screen.getByText('Bio.')).toBeInTheDocument();
+    // And no fallback copy is emitted.
+    expect(container.textContent).not.toContain('About');
   });
 
   it('ignores unknown legacy keys and still renders the heading', () => {

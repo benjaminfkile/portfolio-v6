@@ -16,7 +16,7 @@ function resumeSection(data: Record<string, unknown> = {}): Section {
   return { id: 'sec-resume', type: 'resume', data, items: [] } as Section;
 }
 
-function renderResume(data: Record<string, unknown> = {}) {
+function renderResume(data: Record<string, unknown> = { heading: 'Resume' }) {
   return render(<ResumeSection section={resumeSection(data)} media={{}} />);
 }
 

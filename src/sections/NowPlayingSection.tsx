@@ -104,8 +104,8 @@ export default function NowPlayingSection({ section }: SectionProps) {
   if (state.status === 'loading') {
     return (
       <SectionShell
-        title={config.title ?? 'Now playing'}
-        eyebrow={config.eyebrow ?? '// on the decks'}
+        title={config.title}
+        eyebrow={config.eyebrow}
         className={styles.nowPlaying}
       >
         <Panel className={styles.panel}>
@@ -129,8 +129,8 @@ export default function NowPlayingSection({ section }: SectionProps) {
       const age = relativeTimeSince(last.played_at);
       return (
         <SectionShell
-          title={config.title ?? 'Now playing'}
-          eyebrow={config.eyebrow ?? '// on the decks'}
+          title={config.title}
+          eyebrow={config.eyebrow}
           className={styles.nowPlaying}
         >
           <Panel className={styles.panel}>
@@ -172,8 +172,8 @@ export default function NowPlayingSection({ section }: SectionProps) {
     if (config.idle !== 'message') return null;
     return (
       <SectionShell
-        title={config.title ?? 'Now playing'}
-        eyebrow={config.eyebrow ?? '// on the decks'}
+        title={config.title}
+        eyebrow={config.eyebrow}
         className={styles.nowPlaying}
       >
         <Panel className={styles.panel}>
@@ -191,8 +191,8 @@ export default function NowPlayingSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={config.title ?? 'Now playing'}
-      eyebrow={config.eyebrow ?? '// on the decks'}
+      title={config.title}
+      eyebrow={config.eyebrow}
       className={styles.nowPlaying}
     >
       <Panel className={styles.panel}>

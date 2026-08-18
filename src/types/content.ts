@@ -213,6 +213,7 @@ export interface GithubSectionData {
  */
 export interface OpsSectionData {
   heading?: string;
+  eyebrow?: string;
   intro?: string;
 }
 
@@ -225,6 +226,7 @@ export interface OpsSectionData {
  */
 export interface ResumeSectionData {
   heading?: string;
+  eyebrow?: string;
   intro?: string;
 }
 

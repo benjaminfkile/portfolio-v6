@@ -22,7 +22,7 @@ export default function TimelineSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.heading ?? 'Timeline'}
+      title={data.heading}
       intro={data.intro}
       className={styles.timeline}
     >

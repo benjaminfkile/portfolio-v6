@@ -181,8 +181,8 @@ export default function GithubSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={config.heading ?? 'GitHub'}
-      eyebrow={config.eyebrow ?? '// contributions'}
+      title={config.heading}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.github}
     >

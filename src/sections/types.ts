@@ -14,14 +14,6 @@ export interface SectionProps {
   section: Section;
   media: MediaMap;
   /**
-   * The published document's version number (spec §3.3, §4.1), threaded down
-   * from `ContentPage` so the hero's instrument strip can render the SITE vN
-   * readout (DESIGN.md §5) without a second fetch. Optional: sections that don't
-   * surface a version ignore it, and a document that predates the field renders
-   * without the readout rather than crashing.
-   */
-  documentVersion?: number;
-  /**
    * A document-wide index of every `skills` item by id (Skill Refs v1.8), built
    * from ALL `skills` sections on ALL pages of the document and threaded down from
    * `ContentPage` (both the live and preview paths). The portfolio resolves each

@@ -11,10 +11,9 @@ import {
 /**
  * Shared now-playing state (spec §3.5, §4.6; REALTIME.md; tasks 85, 91) — ONE
  * module-level store consumed by every component that renders the current
- * track (`NowPlayingSection`, `HeroInstrumentStrip`). Before this existed each
- * consumer fetched privately: the section polled while the hero strip fetched
- * once and went stale on track changes, and a page showing both paid for two
- * identical requests.
+ * track. Refcounted subscribers via `useSyncExternalStore`: the underlying
+ * fetch and hub subscription start with the first mounted consumer and stop
+ * with the last, so a page without any now-playing UI never polls or connects.
  *
  * Realtime path (REALTIME.md): the store joins the app-wide SignalR hub on the
  * `<prefix>:now-playing` channel (see {@link hubChannelPrefix}) and applies

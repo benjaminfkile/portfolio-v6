@@ -64,12 +64,10 @@ export default function ResumeSection({ section }: SectionProps) {
     };
   }, []);
 
-  const heading = config.heading ?? 'Resume';
-
   return (
     <SectionShell
-      title={heading}
-      eyebrow="// current cv"
+      title={config.heading}
+      eyebrow={config.eyebrow}
       intro={config.intro}
       className={styles.resume}
     >

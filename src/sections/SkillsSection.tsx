@@ -96,7 +96,7 @@ export default function SkillsSection({ section }: SectionProps) {
 
   return (
     <SectionShell
-      title={data.heading ?? 'Skills'}
+      title={data.heading}
       intro={data.intro}
       className={styles.skills}
     >

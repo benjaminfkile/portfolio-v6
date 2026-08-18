@@ -119,7 +119,7 @@ export default function PortfolioSection({
 
   return (
     <SectionShell
-      title={data.heading ?? 'Portfolio'}
+      title={data.heading}
       intro={data.intro}
       className={styles.portfolio}
     >
