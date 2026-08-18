@@ -39,12 +39,14 @@ function deriveStatus(data: StatusResponse): StatusVariant {
  * At ≥900px the page links sit inline; below that a 44px hamburger opens the
  * full-screen {@link NavOverlay}.
  *
- * The page links are derived from the published document (spec §3.10) — the
- * pages with a non-null `nav_label`, ordered by `nav_position` — plus a static
- * "Blog" link for the blog routes (§3.6). It reads the same document as
- * `ContentPage` (via `useContentDocument`), so preview mode reflects the draft.
- * While the document is loading or failed, only the static Blog link shows; the
- * nav never blocks the page.
+ * The page links are derived exclusively from the published document (spec
+ * §3.10) — the pages with a non-null `nav_label`, ordered by `nav_position`.
+ * Blog Page v1.x removed the hardcoded "Blog" entry: the admin now orders the
+ * blog like any other page by adding a page slugged `blog` (whose `blog`
+ * section runs in `mode: 'index'`) and giving it a `nav_label`. It reads the
+ * same document as `ContentPage` (via `useContentDocument`), so preview mode
+ * reflects the draft. While the document is loading or failed, the nav is
+ * empty; it never blocks the page.
  *
  * The status LED degrades silently: a failed `/api/status` fetch simply renders
  * no dot (DESIGN.md §5) — it never blocks the header. `NavLink` supplies the
@@ -107,11 +109,6 @@ export default function SiteNav() {
                 </NavLink>
               </li>
             ))}
-            <li>
-              <NavLink to="/blog" className={linkClass}>
-                Blog
-              </NavLink>
-            </li>
           </ul>
         </nav>
 

@@ -107,11 +107,6 @@ export default function NavOverlay({ pages, pagePath, onClose }: NavOverlayProps
                 </NavLink>
               </li>
             ))}
-            <li>
-              <NavLink to="/blog" className={linkClass} onClick={onClose}>
-                Blog
-              </NavLink>
-            </li>
           </ul>
         </nav>
       </div>

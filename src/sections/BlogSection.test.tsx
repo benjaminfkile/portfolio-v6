@@ -98,4 +98,95 @@ describe('BlogSection (spec §3.5)', () => {
 
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
+
+  describe('mode: "index" (Blog Page v1.x)', () => {
+    const secondPage = {
+      slug: 'third-post',
+      title: 'Third post',
+      excerpt: 'The last one.',
+      cover: null,
+      tags: ['react'],
+      published_at: '2026-07-10T10:00:00Z',
+      blog: null,
+    };
+
+    it('renders the full paginated index (filter chips, cards, Load more) instead of the teaser', async () => {
+      const fetchMock = vi.fn((path: string) =>
+        Promise.resolve(
+          path.includes('cursor=')
+            ? jsonResponse({ posts: [secondPage], next_cursor: null })
+            : jsonResponse({
+                posts: fixturePostSummaries,
+                next_cursor: 'CURSOR1',
+              }),
+        ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      renderBlog({ mode: 'index' });
+
+      // The index-mode section renders BlogListing (cards + Load more), not
+      // the teaser's "Read the blog" link.
+      await screen.findByText('First post');
+      expect(screen.queryByRole('link', { name: /read the blog/i })).toBeNull();
+
+      // Cursor-based Load more appends the next page.
+      const loadMore = screen.getByRole('button', { name: 'Load more' });
+      loadMore.click();
+      await screen.findByText('Third post');
+      expect(screen.getByText('First post')).toBeInTheDocument();
+      expect(String(fetchMock.mock.calls[1][0])).toContain('cursor=CURSOR1');
+    });
+
+    it('honours header copy overrides from the section config', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          jsonResponse({ posts: fixturePostSummaries, next_cursor: null }),
+        ),
+      );
+
+      renderBlog({
+        mode: 'index',
+        title: 'Field Notes',
+        eyebrow: '// notebook',
+        intro: 'Writing about the platform.',
+      });
+
+      await screen.findByText('First post');
+      expect(
+        screen.getByRole('heading', { level: 2, name: 'Field Notes' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('// notebook')).toBeInTheDocument();
+      expect(screen.getByText('Writing about the platform.')).toBeInTheDocument();
+    });
+
+    it('degrades to nothing on a fetch failure (live-section rules)', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(jsonResponse({}, { ok: false, status: 500 })),
+      );
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { container } = renderBlog({ mode: 'index' });
+
+      await waitFor(() => expect(container).toBeEmptyDOMElement());
+    });
+
+    it('reads mode defensively — an unknown mode value falls back to teaser', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          jsonResponse({ posts: fixturePostSummaries, next_cursor: null }),
+        ),
+      );
+
+      renderBlog({ mode: 'nonsense' as unknown as 'teaser', limit: 3 });
+
+      // Teaser mode fingerprint: the "Read the blog" link (index mode has none).
+      expect(
+        await screen.findByRole('link', { name: /read the blog/i }),
+      ).toBeInTheDocument();
+    });
+  });
 });

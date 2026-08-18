@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import ContentPage from './pages/ContentPage';
-import BlogIndexPage from './pages/BlogIndexPage';
+import BlogRoute from './pages/BlogRoute';
 import BlogPostPage from './pages/BlogPostPage';
 import NotFound from './pages/NotFound';
 import SiteLayout from './components/SiteLayout';
@@ -14,6 +14,12 @@ import SiteLayout from './components/SiteLayout';
  * hits are served `index.html` via the Vercel SPA rewrite (spec §9.6) so
  * client-side routing resolves them.
  *
+ * `/blog` goes through {@link BlogRoute} (Blog Page v1.x): if the document
+ * carries a page slugged `blog`, it renders as a content page; otherwise it
+ * falls back to the classic `BlogIndexPage`, so the site degrades gracefully
+ * until the admin creates the page. `/blog/:slug` post URLs are immutable and
+ * route to `BlogPostPage` directly (spec §3.6).
+ *
  * The router provider (BrowserRouter) is wired in `main.tsx`; tests mount this
  * component inside their own router.
  */
@@ -21,7 +27,7 @@ export default function App() {
   return (
     <Routes>
       <Route element={<SiteLayout />}>
-        <Route path="/blog" element={<BlogIndexPage />} />
+        <Route path="/blog" element={<BlogRoute />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="/" element={<ContentPage />} />
         <Route path="/:slug" element={<ContentPage />} />

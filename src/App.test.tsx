@@ -84,13 +84,48 @@ describe('App routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('resolves "/blog" to the blog index (not swallowed by "/:slug")', () => {
+  it('resolves "/blog" to the classic index when the document has no `blog` page (fallback)', async () => {
     stubApi();
 
     renderAt('/blog');
 
+    // The fallback BlogIndexPage renders its "Blog" heading — the fixture
+    // document has no page slugged `blog`, so BlogRoute falls back to it.
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Blog' }),
+      await screen.findByRole('heading', { level: 1, name: 'Blog' }),
+    ).toBeInTheDocument();
+  });
+
+  it('resolves "/blog" to the content page slugged "blog" when it exists (Blog Page v1.x)', async () => {
+    // Extend the fixture with a `blog` page whose sole section identifies the
+    // rendered ContentPage — a hero with a distinctive title.
+    const doc = {
+      ...fixtureDocument,
+      pages: [
+        ...fixtureDocument.pages,
+        {
+          id: 'page-blog',
+          slug: 'blog',
+          title: 'Field Notes',
+          nav_label: 'Blog',
+          nav_position: 3,
+          sections: [
+            {
+              id: 'sec-blog-hero',
+              type: 'hero' as const,
+              data: { title: 'Field Notes' },
+              items: [],
+            },
+          ],
+        },
+      ],
+    };
+    stubApi({ content: () => jsonResponse(doc) });
+
+    renderAt('/blog');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Field Notes' }),
     ).toBeInTheDocument();
   });
 
@@ -124,7 +159,7 @@ describe('App routing', () => {
     ).toBe(true);
   });
 
-  it('renders the site nav on every route, with page links and a Blog link', async () => {
+  it('renders the site nav on every route, with page links from the document', async () => {
     stubApi();
 
     renderAt('/');
@@ -136,14 +171,16 @@ describe('App routing', () => {
       .getAllByRole('navigation', { hidden: true })
       .find((n) => n.getAttribute('aria-label') === 'Primary')!;
     await waitFor(() =>
-      expect(within(nav).getAllByRole('link', { hidden: true })).toHaveLength(3),
+      expect(within(nav).getAllByRole('link', { hidden: true })).toHaveLength(2),
     );
     const links = within(nav).getAllByRole('link', { hidden: true });
     const href = (text: string) =>
       links.find((a) => a.textContent === text)!.getAttribute('href');
     expect(href('Home')).toBe('/');
     expect(href('Projects')).toBe('/projects');
-    expect(href('Blog')).toBe('/blog');
+    // Blog Page v1.x: no hardcoded Blog link — the admin orders `/blog` via a
+    // page slugged `blog` with a `nav_label`.
+    expect(links.some((a) => a.textContent === 'Blog')).toBe(false);
   });
 
   it('exposes the header, main, and footer landmarks (§7)', async () => {
