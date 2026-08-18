@@ -41,18 +41,11 @@
   outline-offset: 2px;
 }
 
-/* Previewed / locked (the focus target): the row the console is reading. */
+/* Previewed (the focus target): the row the console is reading. Desktop is
+   hover-preview only — no latched state (Ben, 2026-08-18). */
 .active {
   border-color: var(--amber);
   background: var(--amber-soft);
-}
-
-/* Latched selection — engaged treatment that survives mouse-out (that is the
-   point: it lets the detail text be scrolled). aria-pressed carries it to AT. */
-.item[aria-pressed='true'] {
-  border-color: var(--amber);
-  background: var(--amber-soft);
-  color: var(--text-bright);
 }
 
 .icon {
@@ -66,10 +59,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The lock latch dot, pushed to the row's trailing edge. */
-.latch {
-  flex: none;
-  margin-left: auto;
 }

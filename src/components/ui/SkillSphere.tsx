@@ -87,10 +87,11 @@ function webglAvailable(): boolean {
  * the bundle entirely.
  *
  * When the console wires interactions (Skills Console v1.9), each chip is a
- * button: hover/focus previews the skill, click toggles its lock, and the
- * focused (previewed/locked) chip gets the highlighted state — so the fallback
- * keeps the list/detail flow working with no rotation. Absent handlers (the
- * bare Suspense placeholder) render inert chips.
+ * button: hover/focus previews the skill, and — on MOBILE only — click toggles
+ * its lock (`aria-pressed` reflects the latch). Desktop keeps the same chip
+ * button for hover/focus preview but wires no click handler and no
+ * `aria-pressed` since desktop is hover-preview only (Ben, 2026-08-18). Absent
+ * handlers (the bare Suspense placeholder) render inert chips.
  */
 function Chips({
   skills,
@@ -106,6 +107,7 @@ function Chips({
   onLock?: (id: string) => void;
 }) {
   const interactive = Boolean(onPreview || onLock);
+  const lockable = Boolean(onLock);
   return (
     <ul className={styles.chips}>
       {skills.map((skill) => {
@@ -131,12 +133,15 @@ function Chips({
             <button
               type="button"
               className={className}
-              aria-pressed={locked}
+              // Only advertise a toggle when lock is actually wired (mobile).
+              aria-pressed={lockable ? locked : undefined}
               onMouseEnter={() => onPreview?.(skill.id)}
               onMouseLeave={() => onPreview?.(null)}
               onFocus={() => onPreview?.(skill.id)}
               onBlur={() => onPreview?.(null)}
-              onClick={() => onLock?.(skill.id)}
+              // Desktop passes no onLock — the chip stays a preview-only
+              // affordance and clicks latch nothing.
+              onClick={onLock ? () => onLock(skill.id) : undefined}
             >
               <ChipIcon skill={skill} />
               <span>{skill.title}</span>
@@ -211,7 +216,9 @@ export default function SkillSphere({
       <Suspense fallback={<Chips skills={skills} />}>
         {/* No onPreview: sphere-tile hover is tooltip-only — rotate-to-target
             belongs to the skill LIST (and the chip fallback); the sphere must
-            not chase the tile under the user's own pointer. Click still locks. */}
+            not chase the tile under the user's own pointer. `onLock` is only
+            wired on mobile (the parent passes `undefined` on desktop, since
+            desktop is hover-preview only). */}
         <SkillSphereCanvas
           skills={skills}
           detail={resolvedDetail}

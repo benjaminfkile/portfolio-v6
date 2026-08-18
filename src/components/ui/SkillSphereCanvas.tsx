@@ -386,8 +386,8 @@ function SkillFace({
   fill: string;
   /** Hover in/out lights the tooltip for this skill (`id`) / clears it (`null`). */
   onHover: (id: string | null) => void;
-  /** Click toggles this skill's lock. */
-  onLock: (id: string) => void;
+  /** Click toggles this skill's lock — undefined on desktop (hover-preview only). */
+  onLock?: (id: string) => void;
   invalidate: () => void;
 }) {
   const [map, setMap] = useState<THREE.Texture | null>(null);
@@ -453,10 +453,16 @@ function SkillFace({
         onHover(skill.id);
       }}
       onPointerOut={() => onHover(null)}
-      onClick={(e: ThreeEvent<MouseEvent>) => {
-        e.stopPropagation();
-        onLock(skill.id);
-      }}
+      // Desktop is hover-preview only: with no `onLock` wired, tile clicks
+      // latch nothing (Ben, 2026-08-18).
+      onClick={
+        onLock
+          ? (e: ThreeEvent<MouseEvent>) => {
+              e.stopPropagation();
+              onLock(skill.id);
+            }
+          : undefined
+      }
     >
       {/* A circle, not a plane: the disc shape lives in GEOMETRY, and the
           texture is opaque edge-to-edge. Any texture alpha edge gets
@@ -498,7 +504,7 @@ function Scene({
   invalidateRef: React.MutableRefObject<(() => void) | null>;
   focusSkillId: string | null;
   onHover: (id: string | null) => void;
-  onLock: (id: string) => void;
+  onLock?: (id: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { invalidate } = useThree();
@@ -800,7 +806,7 @@ export default function SkillSphereCanvas({
           invalidateRef={invalidateRef}
           focusSkillId={focusSkillId}
           onHover={handleTileHover}
-          onLock={(id) => onLock?.(id)}
+          onLock={onLock}
         />
       </Canvas>
       {hoveredTitle && <div className={styles.tooltip}>{hoveredTitle}</div>}
