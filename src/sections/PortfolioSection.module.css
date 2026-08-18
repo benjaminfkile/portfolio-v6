@@ -69,6 +69,48 @@
   gap: var(--space-2);
 }
 
+/* Portfolio link chips carry a per-type visual hierarchy (spec §3.4): prod is
+   the "go see it live" action and gets the filled/accent treatment; dev sits
+   clearly above the rest as a lighter emphasised variant; every other type
+   keeps the quiet chip look inherited from TagChip. Array order is display
+   order — only the emphasis changes. Hover/focus mirror the base chip's
+   amber-brighten interaction (DESIGN.md §6). */
+
+.linkChipProd {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--ground);
+  font-weight: var(--fw-semibold);
+}
+
+.linkChipProd:hover {
+  background: var(--text-bright);
+  border-color: var(--text-bright);
+  color: var(--ground);
+}
+
+.linkChipProd:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.linkChipDev {
+  background: var(--amber-soft);
+  border-color: var(--amber);
+  color: var(--text-bright);
+  font-weight: var(--fw-medium);
+}
+
+.linkChipDev:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.linkChipDev:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
 /* Tech-icon chips hold only the mark, so tighten the chip padding. */
 .techChip {
   padding: var(--space-1) var(--space-2);

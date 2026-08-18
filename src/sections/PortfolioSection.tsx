@@ -1,14 +1,28 @@
 import { Link as RouterLink } from 'react-router-dom';
 import type { SectionProps } from './types';
-import type { MediaRef, PortfolioItem, SkillsItem } from '../types/content';
+import type { LinkType, MediaRef, PortfolioItem, SkillsItem } from '../types/content';
 import SectionShell from '../components/ui/SectionShell';
 import Panel from '../components/ui/Panel';
 import MediaFrame from '../components/ui/MediaFrame';
 import TagChip from '../components/ui/TagChip';
 import SkillIcon from '../components/ui/SkillIcon';
+import LinkIcon from '../components/ui/LinkIcon';
 import type { SkillsById } from '../lib/skillsIndex';
 import { sendEvent } from '../lib/beacon';
 import styles from './PortfolioSection.module.css';
+
+/**
+ * Per-link-type chip variant. `prod` gets the filled/accent treatment (the
+ * "go see it live" action), `dev` gets a lighter emphasised variant clearly
+ * above the rest, and every other type keeps the quiet chip look. Weight
+ * order is prod > dev > rest; array order is display order (spec §3.4) and is
+ * never rewritten to match this hierarchy.
+ */
+function chipVariantClass(type: LinkType): string | null {
+  if (type === 'prod') return styles.linkChipProd;
+  if (type === 'dev') return styles.linkChipDev;
+  return null;
+}
 
 /**
  * The `portfolio` section (spec §3.4, DESIGN.md §5) — each project is a
@@ -202,17 +216,24 @@ export default function PortfolioSection({
                   )}
                   {links.length > 0 && (
                     <ul className={styles.links}>
-                      {links.map((link, i) => (
-                        <li key={`${link.url}-${i}`}>
-                          <TagChip
-                            href={link.url}
-                            external
-                            className={styles.linkChip}
-                          >
-                            {link.label}
-                          </TagChip>
-                        </li>
-                      ))}
+                      {links.map((link, i) => {
+                        const variant = chipVariantClass(link.type);
+                        const chipClass = [styles.linkChip, variant]
+                          .filter(Boolean)
+                          .join(' ');
+                        return (
+                          <li key={`${link.url}-${i}`}>
+                            <TagChip
+                              href={link.url}
+                              external
+                              className={chipClass}
+                            >
+                              <LinkIcon type={link.type} />
+                              {link.label}
+                            </TagChip>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                   {/* Post Refs v1.14: a compact "From the blog" row of internal
