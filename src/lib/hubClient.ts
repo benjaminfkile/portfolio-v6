@@ -18,9 +18,11 @@
  *   - The `joined` envelope is an ack, not data. Consumers should ignore its
  *     payload (they may use its arrival as a "hub is live" indicator).
  *
- * The hub URL is `<VITE_HUB_BASE_URL || VITE_API_BASE_URL>/hub`. In deployed
- * environments the hub and API share an origin, so the API base is a sensible
- * fallback; setting `VITE_HUB_BASE_URL` explicitly lets ops move the hub off
+ * The hub URL is `<VITE_HUB_BASE_URL || origin(VITE_API_BASE_URL)>/hub`. The
+ * GATEWAY owns the hub and serves it at the origin root (`/hub`) — never under
+ * a service's path prefix — so the fallback strips the service path from the
+ * API base (`https://…/portfolio-v6-api-dev` → `https://…`). Setting
+ * `VITE_HUB_BASE_URL` explicitly still wins, letting ops move the hub off
  * later without churning `VITE_API_BASE_URL`.
  *
  * Channel names carry a per-environment prefix (the API's manifest service
@@ -70,11 +72,33 @@ export interface ChannelSubscriber {
   onStatusChange(connected: boolean): void;
 }
 
-const HUB_BASE_URL = (
-  import.meta.env.VITE_HUB_BASE_URL ??
-  import.meta.env.VITE_API_BASE_URL ??
-  ''
-).replace(/\/$/, '');
+/**
+ * Resolve the hub base URL. An explicit `VITE_HUB_BASE_URL` wins; otherwise
+ * fall back to the ORIGIN of `VITE_API_BASE_URL`, because the gateway serves
+ * the hub at the origin root, not under the service's path prefix — a raw
+ * `<api-base>/hub` is exactly the 404 this guards against. An empty or
+ * unparseable API base yields '' (same-origin local-API mode: no hub there,
+ * the connect fails once and HTTP polling covers it).
+ */
+export function resolveHubBaseUrl(
+  hubBase: string | undefined,
+  apiBase: string | undefined,
+): string {
+  const explicit = (hubBase ?? '').replace(/\/$/, '');
+  if (explicit) return explicit;
+  const api = (apiBase ?? '').trim();
+  if (!api) return '';
+  try {
+    return new URL(api).origin;
+  } catch {
+    return '';
+  }
+}
+
+const HUB_BASE_URL = resolveHubBaseUrl(
+  import.meta.env.VITE_HUB_BASE_URL,
+  import.meta.env.VITE_API_BASE_URL,
+);
 
 const HUB_PATH = '/hub';
 

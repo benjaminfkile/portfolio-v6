@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  resolveHubBaseUrl,
   subscribeChannel,
   type ChannelSubscriber,
 } from './hubClient';
@@ -144,5 +145,33 @@ describe('hubClient', () => {
     conn.emit({ channel: 42, type: 'x' });
 
     expect(a.onEvent).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The gateway serves the hub at the ORIGIN root, never under a service's path
+ * prefix — so the fallback must strip the service path from the API base.
+ * `<api-base>/hub` (e.g. `…/portfolio-v6-api-dev/hub`) is a guaranteed 404.
+ */
+describe('resolveHubBaseUrl', () => {
+  it('prefers an explicit hub base and strips its trailing slash', () => {
+    expect(
+      resolveHubBaseUrl('https://api.example.test/', 'https://api.example.test/portfolio-v6-api'),
+    ).toBe('https://api.example.test');
+  });
+
+  it('falls back to the ORIGIN of the API base, dropping the service path', () => {
+    expect(resolveHubBaseUrl(undefined, 'https://api.example.test/portfolio-v6-api-dev')).toBe(
+      'https://api.example.test',
+    );
+  });
+
+  it('treats an empty API base as same-origin local mode (no hub host)', () => {
+    expect(resolveHubBaseUrl(undefined, '')).toBe('');
+    expect(resolveHubBaseUrl(undefined, undefined)).toBe('');
+  });
+
+  it('yields same-origin mode for an unparseable API base instead of throwing', () => {
+    expect(resolveHubBaseUrl(undefined, 'not a url')).toBe('');
   });
 });

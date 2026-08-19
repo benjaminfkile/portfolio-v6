@@ -49,6 +49,8 @@ bundle — a stray `process.env.X` is a `ReferenceError`, not `undefined`
 | Variable | Required | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | Deployed environments | Origin of the API gateway. Empty for local dev against a local API (same-origin via Vite's `/api` proxy, §10), or set in `.env.local` to the deployed dev gateway. Per Vercel **project**: `portfolio-v6-prod` → `https://api.benkile.com/portfolio-v6-api`; `portfolio-v6-dev` → `…/portfolio-v6-api-dev`. |
+| `VITE_HUB_BASE_URL` | No | Origin serving the realtime SignalR hub. The GATEWAY owns the hub at its origin root (`https://api.benkile.com/hub`), never under a service path — when unset, the client falls back to the **origin** of `VITE_API_BASE_URL` (service path stripped), which is correct for every gateway-fronted environment. Set it only if the hub ever moves off the API origin. |
+| `VITE_HUB_CHANNEL_PREFIX` | Dev environments | Realtime channel namespace = the API's manifest service name. Defaults to `portfolio-v6-api` (prod). Anything pointed at the dev API (`portfolio-v6-dev`, or `.env.local` targeting `…-dev`) must set `portfolio-v6-api-dev`, or it subscribes to channels the dev API never publishes on. |
 | `SCHEMA_URL` | Never (build tool) | Optional override for `npm run sync:types`; defaults to `${VITE_API_BASE_URL}/api/schema`. |
 
 `VITE_API_BASE_URL` is also read **server-side** by the routing middleware
