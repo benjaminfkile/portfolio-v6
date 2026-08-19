@@ -173,6 +173,11 @@ export default function PortfolioSection({
                   </div>
                 )}
                 <div className={styles.text}>
+                  {/* At ≥900px (media items only) this region is an absolute
+                      fill, so the media alone sets the card height and long
+                      text scrolls inside it (same mechanism as the Skills
+                      Console equal-height rule). */}
+                  <div className={styles.textScroll}>
                   <h3 className={styles.projectTitle}>{project.title}</h3>
                   {project.intro && (
                     <p className={styles.intro}>{project.intro}</p>
@@ -267,6 +272,7 @@ export default function PortfolioSection({
                       </ul>
                     </div>
                   )}
+                  </div>
                 </div>
               </Panel>
             </li>
