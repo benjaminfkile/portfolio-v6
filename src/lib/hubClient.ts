@@ -39,15 +39,30 @@ import {
   HttpTransportType,
 } from '@microsoft/signalr';
 
-/** ChannelEvent envelope shape (REALTIME.md). `data` is opaque to this layer. */
+/**
+ * ChannelEvent envelope shape. `data` is opaque to this layer.
+ *
+ * The gateway names the event field `event` (e.g. `{ channel, event:
+ * "snapshot", data }`); older docs / tests called it `type`. Both are optional
+ * and normalized by {@link envelopeEvent} — real events carry `data`, and the
+ * ack/heartbeat frames are identified by their event name, so this layer never
+ * requires either field to be present.
+ */
 export interface ChannelEnvelope {
   channel: string;
-  /** e.g. `"joined"`, `"heartbeat"`, or a channel-specific event name. */
-  type: string;
+  /** The gateway's event-name field, e.g. `"snapshot"`, `"joined"`, `"heartbeat"`. */
+  event?: string;
+  /** Legacy alias for {@link event}; some builds/tests use `type`. */
+  type?: string;
   /** ISO-8601 timestamp emitted by the server; optional. */
   ts?: string;
   /** Payload for typed events; absent on `joined`/`heartbeat`. */
   data?: unknown;
+}
+
+/** Normalized event name — the gateway uses `event`, older paths used `type`. */
+export function envelopeEvent(env: ChannelEnvelope): string | undefined {
+  return env.event ?? env.type;
 }
 
 /**
@@ -179,7 +194,10 @@ function bindConnection(c: HubConnection): void {
   c.on('ChannelEvent', (env: unknown) => {
     if (!env || typeof env !== 'object') return;
     const envelope = env as ChannelEnvelope;
-    if (typeof envelope.channel !== 'string' || typeof envelope.type !== 'string') {
+    // Route by channel only. The event-name field is `event` (the gateway) or
+    // `type` (legacy) and may be absent; requiring it here silently dropped
+    // every real snapshot event, which is exactly the bug this guards against.
+    if (typeof envelope.channel !== 'string') {
       return;
     }
     const set = subs.get(envelope.channel);

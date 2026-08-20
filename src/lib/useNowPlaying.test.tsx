@@ -183,6 +183,65 @@ describe('useNowPlaying — event-driven store (no polling)', () => {
     }
   });
 
+  it('applies a real gateway envelope (event field, no type) — regression', async () => {
+    // The gateway names the event field `event`, not `type`, and omits `type`
+    // entirely. Requiring `type` silently dropped every snapshot; this locks
+    // in that the real wire shape updates the UI.
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const seen: NowPlayingState[] = [];
+    render(<Probe onState={(s) => seen.push(s)} />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+    const conn = currentFakeConnection()!;
+    await act(async () => {
+      conn.resolveStart();
+      await flushMicroAndTimers();
+    });
+
+    const track: NowPlayingResponse = {
+      playing: true,
+      track: {
+        title: 'Gateway Shape',
+        artists: ['G'],
+        album: 'W',
+        art_url: 'https://x/y',
+        url: 'https://open.spotify.com/track/g',
+      },
+    };
+    await act(async () => {
+      // Note: `event`, not `type`, and no `type` field at all.
+      conn.emit({ channel: nowPlayingChannel(), event: 'snapshot', data: track });
+      await flushMicroAndTimers();
+    });
+    const last = seen[seen.length - 1];
+    expect(last.status).toBe('ready');
+    if (last.status === 'ready' && last.data.playing) {
+      expect(last.data.track.title).toBe('Gateway Shape');
+    }
+
+    // A `joined` ack on the `event` field must still be ignored.
+    const before = seen.length;
+    await act(async () => {
+      conn.emit({
+        channel: nowPlayingChannel(),
+        event: 'joined',
+        data: { channel: nowPlayingChannel() },
+      });
+      await flushMicroAndTimers();
+    });
+    // No new "ready" with different data — the ack didn't clobber the track.
+    const after = seen[seen.length - 1];
+    expect(after.status).toBe('ready');
+    if (after.status === 'ready' && after.data.playing) {
+      expect(after.data.track.title).toBe('Gateway Shape');
+    }
+    expect(seen.length).toBeGreaterThanOrEqual(before);
+  });
+
   it('the `joined` ack does not clobber state and is not treated as data', async () => {
     vi.useFakeTimers();
     const initial: NowPlayingResponse = { playing: false };

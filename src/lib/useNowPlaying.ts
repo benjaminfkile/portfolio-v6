@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { getNowPlaying } from './api';
 import type { NowPlayingResponse } from './api';
 import {
+  envelopeEvent,
   hubChannelPrefix,
   subscribeChannel,
   type ChannelEnvelope,
@@ -89,8 +90,10 @@ function isNowPlayingPayload(x: unknown): x is NowPlayingResponse {
 
 function applyHubEvent(env: ChannelEnvelope): void {
   // `joined` is a membership ack and `heartbeat` (if any) carries no track
-  // data — neither changes what we render.
-  if (env.type === 'joined' || env.type === 'heartbeat') return;
+  // data — neither changes what we render. The event name is on `event` (the
+  // gateway) or `type` (legacy), so normalize before comparing.
+  const name = envelopeEvent(env);
+  if (name === 'joined' || name === 'heartbeat') return;
   if (isNowPlayingPayload(env.data)) {
     emit({ status: 'ready', data: env.data });
   }
