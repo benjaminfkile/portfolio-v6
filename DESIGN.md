@@ -190,13 +190,17 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 - **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop;
   tap-to-play on touch), title, intro, `TagChip` tech
   icons row, links. ≥900px: media left / text right alternating; <900px stacked.
-  Card height stays CLOSE to the media height: the DESCRIPTION is the only
-  scrollable region (it flexes into the room the media height leaves, floor of
-  ~4 lines, and scrolls only when longer), while title/chips/links/posts always
-  render in full — a busy footer makes the card a little taller than its media,
-  never a scroll target (owner decision 2026-08-19: the "From the blog" row
-  must be visible without scrolling). Text-only and stacked (<900px) cards keep
-  natural flow with a 40vh capped, scrollable description.
+  Card height stays CLOSE to the media height (owner decision 2026-08-19,
+  refined twice): EVERY part of the card — title, intro, chips, links, posts —
+  always renders in full, and the DESCRIPTION is the only scrollable region.
+  It is always VISIBLE too: it flexes into the room the media height leaves
+  with a floor of ~6 lines (never squeezed to zero), and scrolls only when
+  longer. A busy links/posts footer makes the card a little taller than its
+  media — never a full-content expansion (a blog-linked card must NOT grow to
+  its whole description; that was tried and rejected as "a mile tall"), and
+  never a scroll target hiding the blog row. Description and posts are both
+  optional; any combination holds these rules. Text-only and stacked (<900px)
+  cards keep natural flow with a 40vh capped, scrollable description.
 - **status** — a panel of `Instrument`s with `StatusDot`s per service + response
   times in mono tabular-nums.
 - **now_playing** — `Instrument` with album art in a small `MediaFrame`, track/

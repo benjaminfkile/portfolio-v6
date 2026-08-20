@@ -69,14 +69,6 @@
   overflow-y: auto;
 }
 
-/* Owner rule (2026-08-19): a project carrying a "From the blog" row shows its
-   FULL text — no internal scrolling anywhere on that card, at any breakpoint.
-   The long-description guard applies only to items without posts. */
-.text:has(.posts) .description {
-  max-height: none;
-  overflow-y: visible;
-}
-
 .techIcons,
 .links {
   list-style: none;
@@ -236,14 +228,6 @@
     flex: 1 1 0;
     min-height: calc(1em * var(--lh-prose) * 6);
     max-height: max-content;
-  }
-
-  /* Blog-linked cards (owner rule above): the description keeps its natural
-     height — it contributes fully to the card instead of flexing, so the whole
-     card renders scroll-free however long the text is. */
-  .mediaCol + .text:has(.posts) .description {
-    flex: 0 0 auto;
-    min-height: 0;
   }
 
   /* Mirror the row's old centered look when the media is the taller side:
