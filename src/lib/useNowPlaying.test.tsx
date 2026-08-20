@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import {
-  HUB_HEARTBEAT_STALE_MS,
   nowPlayingChannel,
-  NOW_PLAYING_POLL_INTERVAL_MS,
   useNowPlaying,
   type NowPlayingState,
 } from './useNowPlaying';
@@ -64,7 +62,7 @@ afterEach(() => {
   setVisibility('visible');
 });
 
-describe('useNowPlaying — shared HTTP + hub store', () => {
+describe('useNowPlaying — event-driven store (no polling)', () => {
   it('two mounted consumers share ONE fetch on mount', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
@@ -83,7 +81,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('stops the fallback poller and disconnects the hub when the last consumer unmounts', async () => {
+  it('disconnects the hub and issues no further fetches when the last consumer unmounts', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -94,29 +92,19 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       await flushMicroAndTimers();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    // One shared connection was built for the shared subscribe.
     expect(connectionsBuilt()).toBe(1);
-    const conn = currentFakeConnection();
-    // Force the hub into the fallback state so a polling interval IS running,
-    // then confirm unmount tears everything down.
-    conn?.rejectStart(new Error('down'));
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    await act(async () => {
-      await flushMicroAndTimers();
-    });
     const baseline = fetchMock.mock.calls.length;
 
     unmount();
 
-    // With no subscribers the fallback interval AND hub subscription are gone.
+    // With no subscribers the hub subscription is gone and nothing fetches.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS * 10);
+      await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(baseline);
   });
 
-  it('when the hub connects, JoinChannel fires and NO polling interval runs in steady state', async () => {
+  it('when the hub connects, JoinChannel fires and exactly one catch-up fetch runs — never a poll', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -132,27 +120,23 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     const conn = currentFakeConnection();
     expect(conn).not.toBeNull();
 
-    // Hub becomes connected → onStatusChange(true) → re-fetch, no polling.
+    // Hub becomes connected → onStatusChange(true) → one catch-up fetch.
     await act(async () => {
       conn!.resolveStart();
       await flushMicroAndTimers();
     });
     expect(allJoinCalls()).toEqual([nowPlayingChannel()]);
-    // Re-fetch on initial connect (REALTIME.md).
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    // Zero fetches over the next several minutes — steady state is silent.
-    // We keep emitting periodic heartbeats to prove the hub stays healthy.
+    // Zero fetches over the next several minutes, with NO heartbeats at all —
+    // the store must not poll to stay alive.
     await act(async () => {
-      for (let i = 0; i < 30; i += 1) {
-        await vi.advanceTimersByTimeAsync(10_000);
-        conn!.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
-      }
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('hub events still update state live while no polling is happening', async () => {
+  it('hub events update state live', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -226,81 +210,11 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       await flushMicroAndTimers();
     });
 
-    // State is still the initial idle payload.
     const el = document.querySelector('[data-status]');
     expect(el?.getAttribute('data-status')).toBe('ready');
   });
 
-  it('missing heartbeats start the 5s fallback polling', async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    render(<Probe />);
-
-    await act(async () => {
-      await flushMicroAndTimers();
-    });
-    const conn = currentFakeConnection()!;
-    await act(async () => {
-      conn.resolveStart();
-      await flushMicroAndTimers();
-    });
-    const baseline = fetchMock.mock.calls.length;
-
-    // No heartbeats for well past the stale threshold — the stale check runs
-    // every 5s and switches on the fallback polling.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(HUB_HEARTBEAT_STALE_MS + 30_000);
-    });
-
-    // We should have accrued extra fetches at ~5s cadence.
-    const after = fetchMock.mock.calls.length - baseline;
-    expect(after).toBeGreaterThan(2);
-  });
-
-  it('hub recovery from staleness fires ONE resync fetch and stops the fallback polling', async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    render(<Probe />);
-
-    await act(async () => {
-      await flushMicroAndTimers();
-    });
-    const conn = currentFakeConnection()!;
-    await act(async () => {
-      conn.resolveStart();
-      await flushMicroAndTimers();
-    });
-
-    // Let the hub go stale — fallback polling kicks in.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(HUB_HEARTBEAT_STALE_MS + 10_000);
-    });
-    const beforeRecovery = fetchMock.mock.calls.length;
-
-    // Hub starts talking again — recovery: one resync fetch, polling stops.
-    await act(async () => {
-      conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
-      await flushMicroAndTimers();
-    });
-    const afterRecovery = fetchMock.mock.calls.length;
-    expect(afterRecovery - beforeRecovery).toBe(1);
-
-    // Now the polling interval should be gone — long fake-timer window
-    // continues to see zero fetches.
-    await act(async () => {
-      for (let i = 0; i < 6; i += 1) {
-        await vi.advanceTimersByTimeAsync(10_000);
-        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
-      }
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(afterRecovery);
-  });
-
-  it('connect failure starts the 5s HTTP polling and does not spam errors', async () => {
+  it('a hub connect FAILURE never starts polling and does not spam errors', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -312,6 +226,8 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     await act(async () => {
       await flushMicroAndTimers();
     });
+    // One fetch on mount (the durable last-known).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const conn = currentFakeConnection()!;
 
     await act(async () => {
@@ -319,19 +235,70 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       await flushMicroAndTimers();
     });
 
-    // No console.error spam from the fallback path — a single console.warn is
-    // acceptable, but console.error should not fire.
+    // The failed initial fetch shape logs nothing here (fetch succeeded); the
+    // hub-down path must not spam console.error either.
     expect(errSpy).not.toHaveBeenCalled();
 
     const baseline = fetchMock.mock.calls.length;
-    // A minute of the fast cadence gets us ~12 fetches, not ~2.
+    // A full minute passes with the hub down — ZERO extra fetches: no polling.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    expect(fetchMock.mock.calls.length - baseline).toBeGreaterThan(6);
+    expect(fetchMock).toHaveBeenCalledTimes(baseline);
   });
 
-  it('reconnects re-join the channel and immediately re-fetch over HTTP', async () => {
+  it('a hub disconnect keeps the last-known track and does not start polling', async () => {
+    vi.useFakeTimers();
+    const idle: NowPlayingResponse = { playing: false };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(idle));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const seen: NowPlayingState[] = [];
+    render(<Probe onState={(s) => seen.push(s)} />);
+
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+    const conn = currentFakeConnection()!;
+    await act(async () => {
+      conn.resolveStart();
+      await flushMicroAndTimers();
+    });
+
+    // A live track arrives over the socket.
+    const track: NowPlayingResponse = {
+      playing: true,
+      track: {
+        title: 'Only Live Source',
+        artists: ['X'],
+        album: 'Y',
+        art_url: null,
+        url: 'https://open.spotify.com/track/z',
+      },
+    };
+    await act(async () => {
+      conn.emit({ channel: nowPlayingChannel(), type: 'track', data: track });
+      await flushMicroAndTimers();
+    });
+
+    // Hub drops hard. No polling starts; the last-known track stays on screen.
+    await act(async () => {
+      conn.close(new Error('dropped'));
+      await flushMicroAndTimers();
+    });
+    const baseline = fetchMock.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(baseline);
+    const last = seen[seen.length - 1];
+    expect(last.status).toBe('ready');
+    if (last.status === 'ready' && last.data.playing) {
+      expect(last.data.track.title).toBe('Only Live Source');
+    }
+  });
+
+  it('reconnects re-join the channel and immediately re-fetch once — no polling', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -351,7 +318,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     const beforeReconnect = fetchMock.mock.calls.length;
 
     // Reconnect — membership dies, so JoinChannel must re-fire and the store
-    // must re-fetch state over HTTP.
+    // must re-fetch state over HTTP exactly once.
     await act(async () => {
       conn.reconnect();
       await flushMicroAndTimers();
@@ -363,19 +330,15 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     ]);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(beforeReconnect);
 
-    // Post-reconnect the fallback polling is gone again — no extra fetches
-    // over a long window while heartbeats keep the hub healthy.
+    // No polling afterward — a long window with no heartbeats stays silent.
     const afterReconnect = fetchMock.mock.calls.length;
     await act(async () => {
-      for (let i = 0; i < 6; i += 1) {
-        await vi.advanceTimersByTimeAsync(10_000);
-        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
-      }
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(afterReconnect);
   });
 
-  it('visibility return to foreground triggers a single immediate resync fetch', async () => {
+  it('visibility changes do NOT trigger any fetch (pure event-driven)', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
     vi.stubGlobal('fetch', fetchMock);
@@ -392,22 +355,14 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     });
     const baseline = fetchMock.mock.calls.length;
 
-    // Hide the tab, wait a while — no polling and no fetches.
+    // Hide then re-show the tab — neither edge fetches; only socket events do.
     await act(async () => {
       setVisibility('hidden');
-      for (let i = 0; i < 6; i += 1) {
-        await vi.advanceTimersByTimeAsync(10_000);
-        conn.emit({ channel: nowPlayingChannel(), type: 'heartbeat' });
-      }
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(baseline);
-
-    // Coming back to the foreground triggers a single resync fetch.
-    await act(async () => {
+      await flushMicroAndTimers();
       setVisibility('visible');
       await flushMicroAndTimers();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(baseline + 1);
+    expect(fetchMock).toHaveBeenCalledTimes(baseline);
   });
 
   it('shares ONE connection across multiple consumers (refcounted)', async () => {
@@ -425,9 +380,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     await act(async () => {
       await flushMicroAndTimers();
     });
-    // Only one HubConnection built for the two consumers.
     expect(connectionsBuilt()).toBe(1);
-    // Only one JoinChannel invocation — the channel is shared.
     const conn = currentFakeConnection()!;
     await act(async () => {
       conn.resolveStart();
@@ -436,7 +389,6 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
     expect(allJoinCalls().length).toBe(1);
 
     unmount();
-    // No new connection after unmount.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
@@ -445,7 +397,7 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
 
   it('composes the channel name from VITE_HUB_CHANNEL_PREFIX (env-driven, not hardcoded)', async () => {
     // Non-default prefix — the dev API publishes on `portfolio-v6-api-dev:*`,
-    // so the dev site MUST subscribe there or it will never see events (task 88).
+    // so the dev site MUST subscribe there or it will never see events.
     vi.stubEnv('VITE_HUB_CHANNEL_PREFIX', 'portfolio-v6-api-dev');
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
@@ -463,12 +415,9 @@ describe('useNowPlaying — shared HTTP + hub store', () => {
       await flushMicroAndTimers();
     });
 
-    // The channel name derived from the hook must reflect the stubbed prefix.
     expect(nowPlayingChannel()).toBe('portfolio-v6-api-dev:now-playing');
-    // JoinChannel was invoked with the dev-prefixed channel, not the default.
     expect(allJoinCalls()).toEqual(['portfolio-v6-api-dev:now-playing']);
 
-    // Envelopes on the configured channel reach the store.
     const nextTrack: NowPlayingResponse = {
       playing: true,
       track: {
