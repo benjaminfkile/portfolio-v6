@@ -190,11 +190,13 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 - **portfolio** — project panels: `MediaFrame` (video autoplays muted/loop;
   tap-to-play on touch), title, intro, `TagChip` tech
   icons row, links. ≥900px: media left / text right alternating; <900px stacked.
-  On media items the MEDIA DRIVES THE CARD HEIGHT (the skills-console
-  equal-height mechanism: the text column is an absolute fill inside its
-  stretched cell) and the description takes `overflow-y: auto`, so a very long
-  description scrolls instead of growing the card; text-only items keep
-  natural flow with the same capped, scrollable description.
+  Card height stays CLOSE to the media height: the DESCRIPTION is the only
+  scrollable region (it flexes into the room the media height leaves, floor of
+  ~4 lines, and scrolls only when longer), while title/chips/links/posts always
+  render in full — a busy footer makes the card a little taller than its media,
+  never a scroll target (owner decision 2026-08-19: the "From the blog" row
+  must be visible without scrolling). Text-only and stacked (<900px) cards keep
+  natural flow with a 40vh capped, scrollable description.
 - **status** — a panel of `Instrument`s with `StatusDot`s per service + response
   times in mono tabular-nums.
 - **now_playing** — `Instrument` with album art in a small `MediaFrame`, track/

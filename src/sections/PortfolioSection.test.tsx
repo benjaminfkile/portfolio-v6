@@ -475,11 +475,12 @@ describe('PortfolioSection — Post Refs v1.14', () => {
       }),
     );
 
-    // The blog-carrying post reads "Code — Controllers"; the prefix is its own
-    // mono span so it can be dimmed apart from the title.
-    const withBlog = screen.getByRole('link', { name: 'Code — Controllers' });
+    // The blog-carrying post reads "Code · Controllers" (middle dot, NOT an
+    // em-dash — owner rule: zero em-dashes in rendered portfolio content); the
+    // prefix is its own mono span so it can be dimmed apart from the title.
+    const withBlog = screen.getByRole('link', { name: 'Code · Controllers' });
     expect(withBlog).toHaveClass(styles.postLink);
-    expect(within(withBlog).getByText('Code —')).toHaveClass(styles.postBlog);
+    expect(within(withBlog).getByText('Code ·')).toHaveClass(styles.postBlog);
 
     // A blog-less post carries no prefix span at all.
     const orphan = screen.getByRole('link', { name: 'Orphan' });

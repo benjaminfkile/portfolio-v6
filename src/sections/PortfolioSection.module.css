@@ -1,6 +1,8 @@
 /* Portfolio — project Panels. Stacked on phones; from 900px up a media/text
-   split whose side alternates per item (DESIGN.md §5). On media items the
-   media drives the card height and long text scrolls inside its column.
+   split whose side alternates per item (DESIGN.md §5). Card height stays close
+   to the media's: title/chips/links/posts always render in full, and the
+   DESCRIPTION alone absorbs the difference — it flexes into whatever room the
+   media height leaves (with a few-line floor) and scrolls only when longer.
    Mobile-first, tokens only. */
 
 .portfolio {
@@ -31,17 +33,11 @@
   width: 100%;
 }
 
-/* .text is the layout cell; .textScroll inside it carries the content column.
-   The split exists for the ≥900px media-led height rule below, where the cell
-   stays in flow and the content column becomes an absolute fill that scrolls. */
 .text {
-  min-width: 0;
-}
-
-.textScroll {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .projectTitle {
@@ -60,18 +56,25 @@
   line-height: var(--lh-prose);
 }
 
-/* The description is the one unbounded-length field, so it is the scroll
-   region: capped so a very long description can never blow the card up, and
-   at ≥900px it additionally shrinks (min-height: 0) to whatever space the
-   media-led card height leaves, keeping title/chips/links always visible. */
+/* The description is the ONE scrollable region of a card. Everything else
+   (title, intro, chips, links, posts) always renders in full — nothing but
+   the description ever hides behind a scroll. The 40vh cap bounds stacked
+   (<900px) and text-only cards; media cards override it below. */
 .description {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-body-s);
   line-height: var(--lh-prose);
-  min-height: 0;
   max-height: 40vh;
   overflow-y: auto;
+}
+
+/* Owner rule (2026-08-19): a project carrying a "From the blog" row shows its
+   FULL text — no internal scrolling anywhere on that card, at any breakpoint.
+   The long-description guard applies only to items without posts. */
+.text:has(.posts) .description {
+  max-height: none;
+  overflow-y: visible;
 }
 
 .techIcons,
@@ -189,7 +192,9 @@
   outline-offset: 2px;
 }
 
-/* The owning blog's name as a subtle mono prefix (e.g. "Code — Post Title"). */
+/* The owning blog's name as a subtle mono prefix (e.g. "Code · Post Title").
+   Separator is the instrument-strip middle dot — NEVER an em-dash (owner rule:
+   zero em-dashes in rendered portfolio content). */
 .postBlog {
   color: var(--text-dim);
   font-family: var(--font-mono);
@@ -215,31 +220,40 @@
     min-width: 0;
   }
 
-  /* Media-led card height (the Skills Console equal-height mechanism): the
-     text cell contributes zero intrinsic height because its content column is
-     an absolute fill, so the media alone sets the card height; the stretched
-     cell then bounds the column and overflowing text scrolls inside instead
-     of growing the card. Guarded on a media sibling — a text-only item keeps
-     natural flow. */
+  /* Media-complementing card height. The description contributes only a
+     few-line floor to the card's intrinsic height (flex-basis 0), so the card
+     is max(media height, the rest of the text + that floor) — a card with a
+     busy links/posts footer grows a little taller than its media rather than
+     hiding the footer behind a scroll. Once the card's height is set, the
+     description flexes into the leftover room (never past its own content —
+     max-content) and scrolls only when longer. Guarded on a media sibling;
+     text-only items keep natural flow with the base 40vh description cap. */
   .mediaCol + .text {
-    position: relative;
     align-self: stretch;
   }
 
-  .mediaCol + .text .textScroll {
-    position: absolute;
-    inset: 0;
-    overflow-y: auto;
+  .mediaCol + .text .description {
+    flex: 1 1 0;
+    min-height: calc(1em * var(--lh-prose) * 6);
+    max-height: max-content;
   }
 
-  /* Mirror the row's old centered look for short text: main-axis auto margins
-     centre the column and collapse to zero once content fills the region —
-     unlike justify-content: center they never push overflow out of reach. */
-  .mediaCol + .text .textScroll > :first-child {
+  /* Blog-linked cards (owner rule above): the description keeps its natural
+     height — it contributes fully to the card instead of flexing, so the whole
+     card renders scroll-free however long the text is. */
+  .mediaCol + .text:has(.posts) .description {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  /* Mirror the row's old centered look when the media is the taller side:
+     main-axis auto margins absorb whatever room the description didn't take
+     and collapse to zero on a full card. */
+  .mediaCol + .text > :first-child {
     margin-top: auto;
   }
 
-  .mediaCol + .text .textScroll > :last-child {
+  .mediaCol + .text > :last-child {
     margin-bottom: auto;
   }
 }
