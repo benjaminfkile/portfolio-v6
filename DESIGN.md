@@ -104,7 +104,7 @@ Each = one component + one CSS Module, tokens only, zero dependencies:
 
 | Primitive | Notes |
 |---|---|
-| `SectionShell` | eyebrow (mono, amber, uppercase) + heading + intro + consistent vertical rhythm; every section renders inside one |
+| `SectionShell` | eyebrow (mono, amber, uppercase) + heading + intro + consistent vertical rhythm; every section renders inside one. All header parts are optional; a fully HEADERLESS section (`data-headerless`) collapses its leading padding site-wide (owner rule 2026-08-19) so the body sits at the page's inter-section gap instead of floating in the void the heading would have anchored |
 | `Panel` | bordered `--panel` surface, `--r-m`; `raised` variant |
 | `Instrument` | small labeled readout (mono label + value line) — the signature element; used by status, now-playing, hero strip |
 | `StatusDot` | 7px dot + soft glow; `ok/warn/err` variants; pulse animation (2s) |

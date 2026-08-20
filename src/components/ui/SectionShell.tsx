@@ -54,6 +54,11 @@ export default function SectionShell({
       id={id}
       className={[styles.shell, className].filter(Boolean).join(' ')}
       aria-labelledby={headingId}
+      // Headerless sections advertise it so the shell stylesheet can collapse
+      // the leading padding — without a heading to anchor the eye, the body
+      // would otherwise float in the full inter-section void (owner rule
+      // 2026-08-19, site-wide).
+      data-headerless={hasHeader ? undefined : ''}
     >
       {/*
         Headerless section (§7): when no eyebrow / title / intro is published,

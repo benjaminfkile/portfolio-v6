@@ -4,6 +4,16 @@
   display: block;
 }
 
+/* Headerless rhythm (owner rule 2026-08-19, site-wide): a section published
+   without eyebrow/heading/intro drops its leading padding, so its body sits at
+   the page's own inter-section gap instead of adding the void the heading
+   would have anchored. Every section module puts `padding-block: var(--space-6)`
+   on the shell element itself, and .shell[data-headerless] out-specifies those
+   single-class rules, so this one declaration covers the whole site. */
+.shell[data-headerless] {
+  padding-block-start: 0;
+}
+
 .header {
   display: flex;
   flex-direction: column;

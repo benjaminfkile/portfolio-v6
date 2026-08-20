@@ -85,4 +85,27 @@ describe('SectionShell', () => {
     );
     expect(container.querySelector('article')).toBeInTheDocument();
   });
+
+  it('marks a headerless section so the stylesheet can collapse its leading padding', () => {
+    const { container } = render(<SectionShell>body</SectionShell>);
+    expect(container.querySelector('section')).toHaveAttribute(
+      'data-headerless',
+    );
+  });
+
+  it('does not mark a section that has any header content', () => {
+    for (const props of [
+      { title: 'T' },
+      { eyebrow: 'E' },
+      { intro: 'I' },
+    ] as const) {
+      const { container, unmount } = render(
+        <SectionShell {...props}>body</SectionShell>,
+      );
+      expect(container.querySelector('section')).not.toHaveAttribute(
+        'data-headerless',
+      );
+      unmount();
+    }
+  });
 });
