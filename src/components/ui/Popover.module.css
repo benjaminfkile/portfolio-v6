@@ -29,6 +29,9 @@
   background: transparent;
   color: inherit;
   font: inherit;
+  /* Buttons centre text by default; the wrapped Instrument must stay
+     left-aligned so a short label sits flush over a longer value. */
+  text-align: left;
   cursor: pointer;
   min-width: 0;
   border-radius: var(--r-s);
