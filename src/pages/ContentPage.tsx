@@ -13,7 +13,7 @@ import styles from './ContentPage.module.css';
 /**
  * The registry indexed by an arbitrary string: `section.type` is a `SectionType`
  * at the type level, but the published document can carry a type this build
- * doesn't know yet — so the lookup must be allowed to miss (spec §3.4).
+ * doesn't know yet - so the lookup must be allowed to miss (spec §3.4).
  */
 const REGISTRY = SECTION_REGISTRY as Record<
   string,
@@ -24,7 +24,7 @@ export interface ContentPageProps {
   /**
    * Slug of the page to render, overriding the `:slug` route param. Used by
    * routes without a `:slug` segment that still need to render a specific
-   * content page — e.g. `/blog` when the document carries a `blog` page (Blog
+   * content page - e.g. `/blog` when the document carries a `blog` page (Blog
    * Page v1.x). When omitted, the slug comes from `useParams` (`home` for `/`).
    */
   slug?: string;
@@ -32,8 +32,8 @@ export interface ContentPageProps {
 
 /**
  * A dynamic content page (spec §3.10). Fetches `GET /api/content` once, selects
- * the page whose `slug` matches the route — `home` for `/`, the `:slug` segment
- * otherwise (or the explicit `slug` prop) — and maps that page's sections through
+ * the page whose `slug` matches the route - `home` for `/`, the `:slug` segment
+ * otherwise (or the explicit `slug` prop) - and maps that page's sections through
  * `SECTION_REGISTRY` (§3.4), passing each section its `data`/`items` and the
  * document-level media map (§6.8). An unknown section `type` renders nothing
  * and logs a warning, so a section published ahead of a public deploy degrades
@@ -43,7 +43,7 @@ export interface ContentPageProps {
  * the exception: when nothing has ever been published the document's `pages` is
  * empty, and `/` renders a clean empty page rather than a 404 (spec §4.1).
  *
- * In **preview mode** (§7) — the URL carries `?preview=<token>` — the document is
+ * In **preview mode** (§7) - the URL carries `?preview=<token>` - the document is
  * the draft serialization, so the page is selected from the draft by slug,
  * including pages that exist only in the draft. The page is marked `noindex` and
  * shows a small preview indicator. An invalid/expired token, or any load
@@ -77,13 +77,13 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
         <p role="alert">
           {preview
             ? 'This preview link is invalid or has expired.'
-            : 'Sorry — the page could not be loaded right now.'}
+            : 'Sorry - the page could not be loaded right now.'}
         </p>
       </main>
     );
   }
 
-  // A missing page is a 404 — except the home route, which renders an empty page
+  // A missing page is a 404 - except the home route, which renders an empty page
   // when nothing has ever been published (empty `pages`, spec §4.1).
   if (!page && slug !== 'home') {
     return <NotFound />;
@@ -111,8 +111,9 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
   const skillsById = buildSkillsIndex(state.document);
   // The hero-strip Duolingo item and the standalone DuolingoSection must share a
   // single /api/duolingo fetch when they co-exist. Read the language config off
-  // any `duolingo` section in the document so both call `useDuolingo(same)`.
-  const duolingoLanguage = findDuolingoLanguage(state.document);
+  // any `duolingo` section in the document so both call `useDuolingo(same)`;
+  // the strip popover also mirrors the same optional `score_label` chip.
+  const duolingoConfig = findDuolingoConfig(state.document);
 
   return (
     <main id="main-content" className={styles.page}>
@@ -121,7 +122,7 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
         const Component = REGISTRY[section.type];
         if (!Component) {
           console.warn(
-            `Unknown section type "${section.type}" — rendering nothing (spec §3.4).`,
+            `Unknown section type "${section.type}" - rendering nothing (spec §3.4).`,
           );
           return null;
         }
@@ -131,7 +132,8 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
             section={section}
             media={media}
             skillsById={skillsById}
-            duolingoLanguage={duolingoLanguage}
+            duolingoLanguage={duolingoConfig.language}
+            duolingoScoreLabel={duolingoConfig.scoreLabel}
           />
         );
       })}
@@ -140,22 +142,33 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
 }
 
 /**
- * Scan the document for a `duolingo` section and return its `language` config,
- * or `undefined` when none is present. The section's canonical config lives on
- * the DuolingoSection, so co-mounted consumers pull the language from here to
- * share the shared `useDuolingo` cache under the same key.
+ * Scan the document for a `duolingo` section and return its `language` +
+ * optional `score_label` config. The section's canonical config lives on the
+ * DuolingoSection, so co-mounted consumers pull it from here to share the
+ * shared `useDuolingo` cache under the same key and mirror the same manual
+ * score chip in the hero-strip popover (task 129).
  */
-function findDuolingoLanguage(
+function findDuolingoConfig(
   document: import('../types/content').ContentDocument,
-): string | undefined {
+): { language?: string; scoreLabel?: string } {
   for (const page of document.pages ?? []) {
     for (const section of page.sections ?? []) {
       if (section.type === 'duolingo') {
-        const language = (section.data as { language?: unknown }).language;
-        if (typeof language === 'string' && language.length > 0) return language;
-        return undefined;
+        const raw = section.data as {
+          language?: unknown;
+          score_label?: unknown;
+        };
+        const language =
+          typeof raw.language === 'string' && raw.language.length > 0
+            ? raw.language
+            : undefined;
+        const scoreLabel =
+          typeof raw.score_label === 'string' && raw.score_label.length > 0
+            ? raw.score_label
+            : undefined;
+        return { language, scoreLabel };
       }
     }
   }
-  return undefined;
+  return {};
 }

@@ -1,0 +1,99 @@
+/* Popover - shared disclosure primitive for the hero strip's Spotify and
+   Duolingo detail layers (DESIGN.md §5). Tokens only; a literal colour or
+   pixel outside the spacing scale would be a review failure. */
+
+/*
+ * The root is inline so it drops into a strip item without upsetting the
+ * flex layout; position: relative anchors the absolutely-positioned panel to
+ * the trigger's box instead of a positioned ancestor further up the tree.
+ */
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/*
+ * The trigger strips all default button chrome so the wrapped Instrument keeps
+ * its native look. The strip item's aria-label carries the accessible name for
+ * screen readers; the visible content (the Instrument's mono label + value)
+ * still supplies the button's compute-from-children name.
+ */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+  border-radius: var(--r-s);
+  outline-offset: 2px;
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--amber);
+}
+
+/*
+ * The panel layers above the strip via absolute positioning and a z-index
+ * just high enough to clear neighbouring content. The horizontal shift is a
+ * JS-set CSS variable so the keyframe below can still animate the vertical
+ * portion without JS trampling it.
+ */
+.panel {
+  --popover-shift: 0px;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--space-2);
+  z-index: 10;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--space-4)));
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow);
+  padding: var(--space-4);
+  color: var(--text);
+  text-align: left;
+  /* Fresh stacking context so children never leak out on their own z-index. */
+  isolation: isolate;
+  transform: translate(var(--popover-shift), 0);
+}
+
+/*
+ * Motion - a subtle fade + tiny rise. DESIGN.md §6 asks reduced-motion to skip
+ * scale/slide; the `.reduced` variant renders instantly at final opacity, and
+ * the CSS @media guard below neutralises the animation on OS-level flags too.
+ */
+@keyframes popoverAppear {
+  from {
+    opacity: 0;
+    transform: translate(var(--popover-shift), 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(var(--popover-shift), 0);
+  }
+}
+
+.animated {
+  animation: popoverAppear 140ms ease-out both;
+}
+
+.reduced {
+  animation: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -5,13 +5,13 @@ import { usePrefersReducedMotion } from '../lib/prefersReducedMotion';
 import styles from './HeroSection.module.css';
 
 /**
- * The hero (spec §3.8, DESIGN.md §5) — a **static** section: a mono amber tagline
+ * The hero (spec §3.8, DESIGN.md §5) - a **static** section: a mono amber tagline
  * (the "// software developer" instrument voice), a display headline, and a
  * short intro.
  *
  * On page load the header lines fade/rise 12px, staggered 60ms and once
  * (DESIGN.md §6). Under `prefers-reduced-motion` the orchestration is dropped
- * entirely and everything renders in its final, static state — decided in JS
+ * entirely and everything renders in its final, static state - decided in JS
  * here, with a CSS `@media` guard behind it. v5's animated jQuery header does
  * not carry over; no canvas or scroll theatrics are written (§3.8).
  */
@@ -28,6 +28,7 @@ export default function HeroSection({
   section,
   media,
   duolingoLanguage,
+  duolingoScoreLabel,
 }: SectionProps) {
   const data = section.data as HeroData;
   const reduced = usePrefersReducedMotion();
@@ -60,7 +61,10 @@ export default function HeroSection({
         title={data.title}
         intro={data.intro}
       >
-        <HeroStrip duolingoLanguage={duolingoLanguage} />
+        <HeroStrip
+          duolingoLanguage={duolingoLanguage}
+          duolingoScoreLabel={duolingoScoreLabel}
+        />
       </SectionShell>
     </div>
   );
