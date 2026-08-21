@@ -44,6 +44,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  transition: opacity 120ms ease-out;
+}
+
+/* Filter change in flight: keep the old cards in place (no layout collapse),
+   just dim them until the new page swaps in. */
+.list[aria-busy='true'] {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* The Panel is the card; hovering warms its border to amber (DESIGN.md §6). */
