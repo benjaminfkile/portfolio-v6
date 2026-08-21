@@ -70,10 +70,15 @@
 
   /* ---- Layout ----------------------------------------------------------- */
   --content-max: 1100px;
+
+  /* Hero CMS backdrop: a faint wash behind the text, never a banner. */
+  --hero-backdrop-opacity: 0.06;
 }
 
 /* ---- Light theme — "console in a lit room", DESIGN.md §2.2 -------------- */
 :root[data-theme='light'] {
+  /* A dark image on paper reads far stronger at the same alpha. */
+  --hero-backdrop-opacity: 0.035;
   --ground: #f2f4f7; /* cool paper, slight blue bias */
   --panel: #ffffff;
   --panel-2: #f7f9fc;
