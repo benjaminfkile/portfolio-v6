@@ -3,13 +3,6 @@
 
 .wrap {
   position: relative;
-  padding: var(--space-6) 0 var(--space-5);
-}
-
-@media (min-width: 900px) {
-  .wrap {
-    padding: var(--space-8) 0 var(--space-6);
-  }
 }
 
 /* Optional CMS background — a faint console backdrop behind the text, never a
@@ -30,10 +23,20 @@
   opacity: 0.1;
 }
 
-/* The hero header block sits above the backdrop. */
+/* The hero header block sits above the backdrop, and carries the horizontal +
+   vertical inset from the backdrop edge so the eyebrow/headline/intro never
+   touch the image's rounded corners. Padding is present with or without a
+   backdrop so the layout does not jump when a background image is added. */
 .hero {
   position: relative;
   z-index: 1;
+  padding: var(--space-5) var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .hero {
+    padding: var(--space-7) var(--space-6);
+  }
 }
 
 /* Display headline: the clamp h1 scale, brighter than SectionShell's default

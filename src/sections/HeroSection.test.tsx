@@ -73,6 +73,50 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     expect(img).toHaveAttribute('src', 'https://media.benkile.com/hero.jpg');
   });
 
+  it('inset-pads the text container without a backdrop, so the layout does not jump', () => {
+    restores.push(mockReducedMotion(false));
+
+    const { container } = render(
+      <HeroSection
+        section={heroSection({
+          title: 'Ben Kile',
+          tagline: '// software developer',
+          intro: 'Building quietly humming systems.',
+        })}
+        media={{}}
+      />,
+    );
+
+    const section = container.querySelector('section');
+    expect(section).toHaveClass(heroStyles.hero);
+  });
+
+  it('inset-pads the text container behind a backdrop, so eyebrow/headline/intro never touch the image edge', () => {
+    restores.push(mockReducedMotion(false));
+
+    const { container } = render(
+      <HeroSection
+        section={heroSection({
+          title: 'Ben Kile',
+          tagline: '// software developer',
+          intro: 'Building quietly humming systems.',
+          background_media_id: 'media-hero',
+        })}
+        media={{
+          'media-hero': {
+            url: 'https://media.benkile.com/hero.jpg',
+            alt: 'A wide skyline',
+          },
+        }}
+      />,
+    );
+
+    const section = container.querySelector('section');
+    expect(section).toHaveClass(heroStyles.hero);
+    // The backdrop still covers the whole hero box behind the padded text.
+    expect(container.querySelector(`.${heroStyles.backdrop}`)).not.toBeNull();
+  });
+
   it('runs the page-load orchestration when motion is allowed', () => {
     restores.push(mockReducedMotion(false));
 
