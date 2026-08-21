@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import NowPlayingSection, { relativeTimeSince } from './NowPlayingSection';
 import type { Section } from '../types/content';
 import type { NowPlayingResponse } from '../lib/api';
-import { NOW_PLAYING_POLL_INTERVAL_MS } from '../lib/useNowPlaying';
-import { currentFakeConnection } from '../test/hubDouble';
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -160,54 +158,7 @@ describe('NowPlayingSection (spec §3.5, §4.6)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('falls back to 5s polling only when the hub is unavailable, pausing when hidden (§3.5, task 91)', async () => {
-    vi.useFakeTimers();
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ playing: false }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const npCalls = () =>
-      fetchMock.mock.calls.filter((call) =>
-        String(call[0]).startsWith('/api/now-playing'),
-      ).length;
-
-    renderNowPlaying({ idle: 'hide' });
-
-    // Initial fetch on mount.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(npCalls()).toBe(1);
-
-    // Hub goes down — the fallback poller starts.
-    await act(async () => {
-      currentFakeConnection()?.rejectStart(new Error('hub unavailable'));
-      await vi.advanceTimersByTimeAsync(0);
-    });
-
-    // Visible + hub down: a poll tick refetches.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
-    });
-    expect(npCalls()).toBe(2);
-
-    // Hidden: ticks are no-ops — a backgrounded tab must not poll (§3.5).
-    await act(async () => {
-      setVisibility('hidden');
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS * 12);
-    });
-    expect(npCalls()).toBe(2);
-
-    // Returning to the foreground refetches immediately, then resumes polling.
-    await act(async () => {
-      setVisibility('visible');
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(npCalls()).toBe(3);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(NOW_PLAYING_POLL_INTERVAL_MS);
-    });
-    expect(npCalls()).toBe(4);
-  });
+  // Polling-fallback behavior was removed in the event-driven-only pass (see
+  // commit "feat(now-playing): event-driven only, remove the polling fallback"
+  // and the exhaustive no-polling coverage in useNowPlaying.test.tsx).
 });
