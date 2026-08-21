@@ -23,4 +23,13 @@ export interface SectionProps {
    * the legacy `tech_icons` path rather than crashing.
    */
   skillsById?: SkillsById;
+  /**
+   * The `language` field of the document's `duolingo` section (spec §3.5, v1.2),
+   * or `undefined` when no `duolingo` section is published. Threaded from
+   * `ContentPage` so the hero-strip Duolingo item and the standalone
+   * `DuolingoSection` can share ONE `/api/duolingo?language=…` fetch (a page
+   * with both must only hit the endpoint once). Absent → the strip item falls
+   * back to the same `es` default the section uses.
+   */
+  duolingoLanguage?: string;
 }

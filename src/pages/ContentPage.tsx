@@ -109,6 +109,10 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
   // Portfolio items reference skills by id across pages (Skill Refs v1.8), so the
   // index spans the whole document (live and preview alike, both `state.document`).
   const skillsById = buildSkillsIndex(state.document);
+  // The hero-strip Duolingo item and the standalone DuolingoSection must share a
+  // single /api/duolingo fetch when they co-exist. Read the language config off
+  // any `duolingo` section in the document so both call `useDuolingo(same)`.
+  const duolingoLanguage = findDuolingoLanguage(state.document);
 
   return (
     <main id="main-content" className={styles.page}>
@@ -127,9 +131,31 @@ export default function ContentPage({ slug: slugProp }: ContentPageProps = {}) {
             section={section}
             media={media}
             skillsById={skillsById}
+            duolingoLanguage={duolingoLanguage}
           />
         );
       })}
     </main>
   );
+}
+
+/**
+ * Scan the document for a `duolingo` section and return its `language` config,
+ * or `undefined` when none is present. The section's canonical config lives on
+ * the DuolingoSection, so co-mounted consumers pull the language from here to
+ * share the shared `useDuolingo` cache under the same key.
+ */
+function findDuolingoLanguage(
+  document: import('../types/content').ContentDocument,
+): string | undefined {
+  for (const page of document.pages ?? []) {
+    for (const section of page.sections ?? []) {
+      if (section.type === 'duolingo') {
+        const language = (section.data as { language?: unknown }).language;
+        if (typeof language === 'string' && language.length > 0) return language;
+        return undefined;
+      }
+    }
+  }
+  return undefined;
 }
