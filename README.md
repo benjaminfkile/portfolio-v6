@@ -3,9 +3,8 @@
 The public Portfolio v6 site — a client-rendered Vite + React + TypeScript SPA
 that fetches published content from the `portfolio-v6-api` and renders it as
 plain, semantic HTML. Live at
-[portfolio-v6-prod.vercel.app](https://portfolio-v6-prod.vercel.app) (prod) and
-portfolio-v6-dev.vercel.app (dev); the `benkile.com` apex still serves v5 until
-cutover.
+[portfolio-v6-prod.vercel.app](https://portfolio-v6-prod.vercel.app); the
+`benkile.com` apex still serves v5 until cutover.
 
 The frontend follows the **"Control Room" design system** — see
 [`DESIGN.md`](./DESIGN.md), which is authoritative for tokens, type, primitives,
@@ -32,9 +31,9 @@ The admin app (fully themed MUI) and the API live in separate repos
 ## Requirements
 
 - Node 18+ and npm.
-- An API to talk to: either `portfolio-v6-api` running locally, or `.env.local`
-  pointing `VITE_API_BASE_URL` at the deployed dev gateway
-  (`https://api.benkile.com/portfolio-v6-api-dev`).
+- An API to talk to: `portfolio-v6-api` running locally (or `.env.local`
+  pointing `VITE_API_BASE_URL` at the deployed gateway,
+  `https://api.benkile.com/portfolio-v6-api`, for read-only poking).
 
 Every dependency is pinned to an exact version in `package.json`; install with
 `npm install`.
@@ -48,22 +47,23 @@ bundle — a stray `process.env.X` is a `ReferenceError`, not `undefined`
 
 | Variable | Required | Description |
 |---|---|---|
-| `VITE_API_BASE_URL` | Deployed environments | Origin of the API gateway. Empty for local dev against a local API (same-origin via Vite's `/api` proxy, §10), or set in `.env.local` to the deployed dev gateway. Per Vercel **project**: `portfolio-v6-prod` → `https://api.benkile.com/portfolio-v6-api`; `portfolio-v6-dev` → `…/portfolio-v6-api-dev`. |
+| `VITE_API_BASE_URL` | Deployed | Origin of the API gateway. Empty for local dev against a local API (same-origin via Vite's `/api` proxy, §10). On the Vercel project `portfolio-v6-prod`: `https://api.benkile.com/portfolio-v6-api`. |
 | `VITE_HUB_BASE_URL` | No | Origin serving the realtime SignalR hub. The GATEWAY owns the hub at its origin root (`https://api.benkile.com/hub`), never under a service path — when unset, the client falls back to the **origin** of `VITE_API_BASE_URL` (service path stripped), which is correct for every gateway-fronted environment. Set it only if the hub ever moves off the API origin. |
-| `VITE_HUB_CHANNEL_PREFIX` | Dev environments | Realtime channel namespace = the API's manifest service name. Defaults to `portfolio-v6-api` (prod). Anything pointed at the dev API (`portfolio-v6-dev`, or `.env.local` targeting `…-dev`) must set `portfolio-v6-api-dev`, or it subscribes to channels the dev API never publishes on. |
+| `VITE_HUB_CHANNEL_PREFIX` | No | Realtime channel namespace = the API's manifest service name. Defaults to `portfolio-v6-api`; only override if the API is deployed under a different manifest service name, otherwise the client subscribes to channels the API never publishes on. |
 | `SCHEMA_URL` | Never (build tool) | Optional override for `npm run sync:types`; defaults to `${VITE_API_BASE_URL}/api/schema`. |
 
 `VITE_API_BASE_URL` is also read **server-side** by the routing middleware
 (`middleware.ts`, see below), where `process.env` *does* exist — so the client
 and the middleware share one source of truth for the API origin. Set it in
-**both** Vercel projects (primarily each project's Production environment); if
+the Vercel project (primarily its Production environment); if
 it's missing, the middleware's same-origin fallback fetches the SPA rewrite and
 every post silently unfurls with generic metadata.
 
 ## Local development
 
-Run the API against the **dev** database and Cognito pool, then the site
-(spec §10 — do not iterate by deploying the API):
+Run the API against a local Postgres database (`portfolio_v6_local`, see the
+API repo's `.env.example`), then the site (spec §10: do not iterate by
+deploying the API):
 
 ```bash
 # in portfolio-v6-api
@@ -178,8 +178,7 @@ includes it. Then:
 
 ## Deployment
 
-Two Vercel projects build on push: **portfolio-v6-prod** (production branch
-`main`, portfolio-v6-prod.vercel.app, API base `…/portfolio-v6-api`) and
-**portfolio-v6-dev** (production branch `dev`, portfolio-v6-dev.vercel.app, API
-base `…/portfolio-v6-api-dev`). Other branches get per-branch preview URLs. The
-apex `benkile.com` stays on v5 until cutover (§12).
+One Vercel project builds on push: **portfolio-v6-prod** (production branch
+`main`, portfolio-v6-prod.vercel.app, API base `…/portfolio-v6-api`). Other
+branches get per-branch preview URLs. The apex `benkile.com` stays on v5 until
+cutover (§12).

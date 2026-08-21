@@ -30,13 +30,13 @@ Three repositories, three deployables:
 
 | Repo | Deploys to | Public URL | Purpose |
 |---|---|---|---|
-| `portfolio-v6` | Vercel (`portfolio-v6-prod` / `portfolio-v6-dev` projects) | `portfolio-v6-prod.vercel.app` (apex `benkile.com` at cutover) | Public site + blog. No auth code. |
-| `portfolio-v6-admin` | Vercel (`portfolio-v6-admin-prod` / `-dev` projects) | `portfolio-v6-admin-prod.vercel.app` | Admin UI. Cognito-gated. |
+| `portfolio-v6` | Vercel (`portfolio-v6-prod` project) | `portfolio-v6-prod.vercel.app` (apex `benkile.com` at cutover) | Public site + blog. No auth code. |
+| `portfolio-v6-admin` | Vercel (`portfolio-v6-admin-prod` project) | `portfolio-v6-admin-prod.vercel.app` | Admin UI. Cognito-gated. |
 | `portfolio-v6-api` | ECR → gateway-managed container | `api.benkile.com/portfolio-v6-api` | Express API. Serves both. |
 
 Everything runs on existing infrastructure: the `bk-gateway-api` ALB and gateway, the
 `bk-db` RDS instance, Secrets Manager, ECR, and the shared EC2 host. New resources are
-limited to two Cognito pools, two databases, two S3 buckets, two secrets, and one ECR
+limited to one Cognito pool, one database, one S3 bucket, one secret, and one ECR
 repository.
 
 ---
@@ -59,7 +59,6 @@ repository.
                     ┌───────────────▼──────────────────────────────────┐
                     │  gateway-api  (.NET proxy + node agent)          │
                     │  /portfolio-v6-api/*      → managed container    │
-                    │  /portfolio-v6-api-dev/*  → managed container    │
                     │  (host ports Docker-assigned by the reconciler)  │
                     └───────────────┬──────────────────────────────────┘
                                     │
@@ -77,15 +76,15 @@ repository.
                     └────────┬──────────────────────┬──────────────────┘
                              │                      │  presigned PUT only
                   ┌──────────▼─────────┐  ┌─────────▼──────────────┐
-                  │ RDS bk-db          │  │ S3 bk-portfolio-v6-*   │
+                  │ RDS bk-db          │  │ S3 bk-portfolio-v6-prod│
                   │ portfolio_v6_prod  │  │ private, OAC-only reads │
-                  │ portfolio_v6_dev   │  └─────────▲───────────────┘
-                  └────────────────────┘            │ OAC
+                  └────────────────────┘  └─────────▲───────────────┘
+                                                    │ OAC
                                                     │
    ═══ MEDIA READ PATH — never touches EC2 ═══════════════════════════
                                         ┌───────────┴───────────────┐
    browser ────────────────────────────▶│ CloudFront                │
-   <img>, <video> (Range → 206 at edge) │ portfolio-v6-{prod,dev}   │
+   <img>, <video> (Range → 206 at edge) │ portfolio-v6-prod         │
                                         │ public, no signing        │
                                         └───────────────────────────┘
                                     ▲
@@ -908,8 +907,8 @@ now-playing uses the stored token from then on. The registered redirect URI is
 for the `spotify_refresh_token` secret — the resolution order is stored token first,
 static secret second. An expired/revoked token surfaces as 400 `invalid_grant` on
 refresh; now-playing silently degrades to idle (§3.5) and the admin Integrations
-page shows the expiry countdown. One Spotify app serves both environments — prod and
-dev are reading the same person's playback.
+page shows the expiry countdown. One Spotify app serves the site: it reads the
+owner's playback.
 
 **Runtime flow.** The API holds the current access token in memory, exchanging the
 refresh token for a new one on startup and whenever a request 401s or the ~1-hour
@@ -1089,15 +1088,13 @@ toggle.
 
 ### 5.1 Cognito pools
 
-Two new pools, mirroring the `file-manager-up` / `file-manager-dev-up` naming already
-in the account:
+One new pool, mirroring the `file-manager-up` naming already in the account:
 
-| Pool | Environment |
-|---|---|
-| `portfolio-v6-admin-up` | production |
-| `portfolio-v6-admin-dev-up` | development |
+| Pool |
+|---|
+| `portfolio-v6-admin-up` |
 
-Configuration for both:
+Configuration:
 
 - `AllowAdminCreateUserOnly: true` — **no self-signup.** Accounts exist only because
   they were created by hand in the console.
@@ -1105,9 +1102,9 @@ Configuration for both:
 - Required attributes: `email`, `given_name`, `family_name`
 - Password policy: 12+ chars, upper/lower/number/symbol (stricter than the
   file-manager pool's 8, since this account can rewrite the public site)
-- **MFA: TOTP required on the production pool**, optional on dev
-- One group per pool: `admins`
-- One app client per pool, no client secret (public SPA client), SRP auth flow
+- **MFA: TOTP required**
+- One group: `admins`
+- One app client, no client secret (public SPA client), SRP auth flow
 
 Deliberately **not** reusing `file-manager-up`: `aws-jwt-verify` validates both pool ID
 and client ID, so separate pools mean a file-manager token is cryptographically invalid
@@ -1211,12 +1208,11 @@ The signed pattern remains available if genuinely gated content is ever needed �
 
 ### 6.2 Buckets
 
-| Bucket | Environment |
-|---|---|
-| `bk-portfolio-v6-prod` | production |
-| `bk-portfolio-v6-dev` | development |
+| Bucket |
+|---|
+| `bk-portfolio-v6-prod` |
 
-Both **fully private**: all four public access blocks on. The only read access is a
+**Fully private**: all four public access blocks on. The only read access is a
 bucket policy granting `s3:GetObject` to the CloudFront service principal, scoped to
 the specific distribution ARN — identical in shape to `file-manager-prod-bucket`'s
 existing policy:
@@ -1239,12 +1235,12 @@ existing policy:
 
 Direct S3 URLs stay unreachable from the internet. CloudFront is the only reader.
 
-Both buckets carry the lifecycle rules defined in §6.9 (`expire-pending-uploads`,
+The bucket carries the lifecycle rules defined in §6.9 (`expire-pending-uploads`,
 `expire-orphaned-media`, and abort-incomplete-multipart).
 
-Both buckets also carry a **CORS policy for the browser-direct upload path**
+The bucket also carries a **CORS policy for the browser-direct upload path**
 (§6.7): `PUT` allowed from the admin origins (`https://*.vercel.app` — the admin
-projects and previews — plus `http://localhost:5174` for local dev), all
+project and previews, plus `http://localhost:5174` for local dev), all
 headers allowed (the presigned signature pins the ones that matter), `ETag`
 exposed. Without this the browser preflight fails and no upload can succeed —
 it is part of bucket provisioning, not an afterthought (added after
@@ -1252,18 +1248,17 @@ implementation surfaced it).
 
 ### 6.3 Distributions
 
-| Distribution | Origin | Alias | Environment |
-|---|---|---|---|
-| `portfolio-v6-prod` | `bk-portfolio-v6-prod` | `media.benkile.com` | production |
-| `portfolio-v6-dev` | `bk-portfolio-v6-dev` | `media-dev.benkile.com` | development |
+| Distribution | Origin | Alias |
+|---|---|---|
+| `portfolio-v6-prod` | `bk-portfolio-v6-prod` | `media.benkile.com` |
 
-Configuration for both:
+Configuration:
 
 | Setting | Value | Why |
 |---|---|---|
 | Origin access | **OAC**, signing `always` | Matches every existing distribution in the account |
 | Trusted key groups | **Disabled** | §6.1 |
-| Alternate domain name | `media.benkile.com` / `media-dev.benkile.com` | §6.10 |
+| Alternate domain name | `media.benkile.com` | §6.10 |
 | Viewer certificate | ACM cert in **us-east-1** | CloudFront requires us-east-1 |
 | Allowed methods | `GET, HEAD` | Uploads go direct to S3, not through the CDN |
 | Viewer protocol | `redirect-to-https` | Consistent with existing distributions |
@@ -1456,17 +1451,15 @@ deletion for correctness or for access control.
 
 ### 6.10 Custom domain
 
-Media is served from **`media.benkile.com`** (prod) and **`media-dev.benkile.com`**
-(dev). Raw `*.cloudfront.net` domains are not used.
+Media is served from **`media.benkile.com`**. Raw `*.cloudfront.net` domains are not
+used.
 
-Setup, per environment:
+Setup:
 
 1. **ACM certificate in us-east-1.** CloudFront only accepts certificates from
    us-east-1 regardless of where the distribution serves — which is the region
    everything else already lives in. The existing `api.benkile.com` certificate is
-   single-SAN and cannot be reused; request a new one. Either one cert per hostname or
-   a single cert with both `media.benkile.com` and `media-dev.benkile.com` as SANs —
-   the latter is one fewer thing to renew.
+   single-SAN and cannot be reused; request a new one covering `media.benkile.com`.
 2. **DNS validation.** ACM issues a `_<hash>.media.benkile.com` CNAME challenge; add it
    at Vercel DNS, which is authoritative for `benkile.com` (`ns1`/`ns2.vercel-dns.com`).
    Validation typically completes within minutes.
@@ -1649,19 +1642,18 @@ Two new databases on the **existing** `bk-db` instance
 instances — a second `db.t3.micro` would double RDS spend for a portfolio site, and the
 existing instance already hosts multiple applications' databases this way.
 
-| Database | Owner role | Environment |
-|---|---|---|
-| `portfolio_v6_prod` | `portfolio_v6_user` | production |
-| `portfolio_v6_dev` | `portfolio_v6_dev_user` | development |
+| Database | Owner role |
+|---|---|
+| `portfolio_v6_prod` | `portfolio_v6_user` |
 
-One role per database, each with privileges on its own database only — matching the
+One role for the database, with privileges on that database only, matching the
 existing `portfolio_user_secret` / `wmsfo_user_secret` pattern.
 
 Migrations use Knex, exactly as `file-manager-api` does, run manually:
 
 ```bash
 DB_HOST=bk-db.cz04ki0uau1m.us-east-1.rds.amazonaws.com \
-DB_NAME=portfolio_v6_dev DB_USER=portfolio_v6_dev_user \
+DB_NAME=portfolio_v6_prod DB_USER=portfolio_v6_user \
 DB_PASSWORD=… DB_SSL=true npm run migrate:latest
 ```
 
@@ -1679,10 +1671,9 @@ contract:
 | Service (manifest row) | Container port | Image tag |
 |---|---|---|
 | `portfolio-v6-api` | 8000 | `:latest` |
-| `portfolio-v6-api-dev` | 8000 | `:dev` |
 
-The app binds the `port` value from its app secret (8000 in both envs). Both services
-are **permanent**, not transitional — v5's `portfolio-api` runs alongside them until
+The app binds the `port` value from its app secret (8000). The service is
+**permanent**, not transitional: v5's `portfolio-api` runs alongside it until
 the owner chooses to retire v5 (§12).
 
 ### 9.3 Secrets Manager
@@ -1690,7 +1681,6 @@ the owner chooses to retire v5 (§12).
 | Secret | Consumer |
 |---|---|
 | `portfolio-v6-api-secrets` | prod container |
-| `portfolio-v6-api-secrets-dev` | dev container |
 
 Shape (following the v5 `IAPISecrets` convention):
 
@@ -1700,11 +1690,11 @@ Shape (following the v5 `IAPISecrets` convention):
   "node_env": "production",
   "port": "8000",
   "s3_bucket_name": "bk-portfolio-v6-prod",
-  "cdn_domain": "media.benkile.com",          // media-dev.benkile.com in the dev secret
+  "cdn_domain": "media.benkile.com",
   "cognito_user_pool_id": "us-east-1_…",
   "cognito_client_id": "…",
   "aws_region": "us-east-1",
-  "spotify_client_id": "…",          // §4.6 — same values in prod and dev secrets
+  "spotify_client_id": "…",          // §4.6
   "spotify_client_secret": "…",
   "spotify_refresh_token": "…"
 }
@@ -1726,11 +1716,10 @@ host.
 Registration is a row per service in the .NET gateway's Postgres **service manifest**
 (name, image, tag, container port, desired status, `include_in_health` flag), created
 once via the gateway's management API / ops dashboard. `portfolio-v6-api` (tag
-`latest`, prod) and `portfolio-v6-api-dev` (tag `dev`) are two independent rows, both
-container port 8000. No gateway rebuild or redeploy is involved.
+`latest`) is one row, container port 8000. No gateway rebuild or redeploy is involved.
 
 **`include_in_health`:** enrolling a service folds it into the gateway's fleet health.
-Dev rows stay out (`false`); the prod row is enrolled.
+The `portfolio-v6-api` row is enrolled.
 
 ### 9.5 Container lifecycle
 
@@ -1742,14 +1731,11 @@ waits for readiness, and cuts the route over. Other services are unaffected.
 
 ### 9.6 Vercel
 
-**Four projects** — the dev/prod split is per *project*, not per Vercel environment
-(a "poor man's dev env": each project's Production deploys off its own branch):
+**Two projects**, one per frontend repo; each project's Production deploys off `main`:
 
 | Project | Repo | Production branch | Production domain |
 |---|---|---|---|
-| `portfolio-v6-dev` | `portfolio-v6` | `dev` | `portfolio-v6-dev.vercel.app` |
 | `portfolio-v6-prod` | `portfolio-v6` | `main` | `portfolio-v6-prod.vercel.app` → `benkile.com` at cutover |
-| `portfolio-v6-admin-dev` | `portfolio-v6-admin` | `dev` | `portfolio-v6-admin-dev.vercel.app` |
 | `portfolio-v6-admin-prod` | `portfolio-v6-admin` | `main` | `portfolio-v6-admin-prod.vercel.app` |
 
 **`benkile.com` stays pointed at the v5 site.** The apex is swapped over in Vercel
@@ -1760,14 +1746,13 @@ Environment variables, set in each project (primarily its Production environment
 
 **Public site**
 ```
-VITE_API_BASE_URL = https://api.benkile.com/portfolio-v6-api        (prod project)
-                    https://api.benkile.com/portfolio-v6-api-dev    (dev project)
+VITE_API_BASE_URL = https://api.benkile.com/portfolio-v6-api
 ```
 
 **Admin**
 ```
-VITE_API_BASE_URL          = …same split as above per project
-VITE_COGNITO_USER_POOL_ID  = us-east-1_…                (prod vs dev pool)
+VITE_API_BASE_URL          = https://api.benkile.com/portfolio-v6-api
+VITE_COGNITO_USER_POOL_ID  = us-east-1_…                (portfolio-v6-admin-up)
 VITE_COGNITO_CLIENT_ID     = …
 VITE_PUBLIC_SITE_URL       = the matching public-site project URL (preview iframe — §7)
 ```
@@ -1856,7 +1841,8 @@ coupling one-directional.
 
 ## 10. Local development
 
-Run the API locally against the **dev** database and **dev** Cognito pool. Prefer
+Run the API locally against a local Postgres database (`portfolio_v6_local`, see the
+API repo's `.env.example`). Prefer
 local iteration over deploying — a deploy blue-greens only this service's container
 (seconds-to-a-minute, other services unaffected), but the local loop is still faster.
 
@@ -1886,20 +1872,19 @@ remains as a fallback for direct access.
 
 ### 11.1 API
 
-`.github/workflows/deploy.yaml` triggers on pushes to `main` and `dev` (markdown-only
-changes ignored). Both branches run the same job: buildx a multi-arch image, push to
-ECR (`:latest` + `:<sha>` on main, `:dev` + `:<sha>` on dev), then one authenticated
-call to the gateway management API — `POST /mgmt/services/<service>/deploy` with the
-SHA tag, where `<service>` is `portfolio-v6-api` on main and `portfolio-v6-api-dev`
-otherwise. The gateway blue-greens the container in place; no instance refresh.
+`.github/workflows/deploy.yaml` triggers on pushes to `main` (markdown-only changes
+ignored), under the GitHub environment `prod`: buildx a multi-arch image, push to ECR
+(`:latest` + immutable `:<sha>-prod`), then one authenticated call to the gateway
+management API, `POST /mgmt/services/portfolio-v6-api/deploy` with the immutable tag.
+The gateway blue-greens the container in place; no instance refresh.
 
 Builds must be `linux/amd64,linux/arm64` via buildx — the host is arm64, and a
 default CI build produces amd64 only, which will not start.
 
 ### 11.2 Frontends
 
-Vercel builds on push, per project (§9.6): `main` → the prod projects' Production,
-`dev` → the dev projects' Production, other branches → preview URLs.
+Vercel builds on push, per project (§9.6): `main` → each project's Production, other
+branches → preview URLs.
 
 ### 11.3 Migrations
 
@@ -1912,12 +1897,12 @@ container, since the old container keeps serving during the blue-green swap.
 
 ## 12. Build order
 
-1. **Infrastructure** — request the ACM certificate for `media.benkile.com` /
-   `media-dev.benkile.com` **first**: DNS validation has latency outside your control,
-   and the distribution aliases later in this same step cannot be attached until it is
-   issued. Then two databases + roles, two Cognito pools + clients + `admins` group +
-   one user each, two S3 buckets with lifecycle rules, two CloudFront distributions +
-   OACs + aliases + bucket policies, Vercel DNS records, two secrets, ECR repo.
+1. **Infrastructure**: request the ACM certificate for `media.benkile.com` **first**.
+   DNS validation has latency outside your control, and the distribution alias later
+   in this same step cannot be attached until it is issued. Then the database + role,
+   the Cognito pool + client + `admins` group + one user, the S3 bucket with lifecycle
+   rules, the CloudFront distribution + OAC + alias + bucket policy, Vercel DNS
+   records, the secret, ECR repo.
 2. **API skeleton** — port v5's `index.ts`/`getAppSecrets`/`getDBSecrets`/`db.ts`, add
    the JSON error handler, add `/api/health`. Deploy once to prove the pipeline.
 3. **Gateway registration** — service-manifest rows for both services (§9.4).
@@ -1974,7 +1959,6 @@ event and nothing in v6 blocks on one.
 | New Cognito pools, not `file-manager-up` | `aws-jwt-verify` binds pool + client, so separate pools give cryptographic isolation. |
 | Databases on existing `bk-db` | A second RDS instance doubles spend; the instance already multi-hosts. |
 | Container port 8000, host ports Docker-assigned | The .NET gateway's reconciler owns host-port allocation; the manifest `port` is the container-side contract only (superseded the original 3002/4002 reserved-port plan). |
-| Dev service out of fleet health (`include_in_health: false`) initially | An unstable enrolled service degrades the gateway's fleet health signal; the prod row is enrolled. |
 | CloudFront from day one; no `/api/media` | Media must never transit the shared `t4g.medium`. Removes v5's throughput ceiling entirely. |
 | Public distribution, not signed URLs | Portfolio media is published public content. Signing adds a round-trip before first paint and cannot coexist with immutable ETag-cached snapshots (§6.1). |
 | Immutable UUID keys + 1-year `max-age` | No invalidations, ever. Replacing media is a new key, not a cache purge. |
@@ -1985,7 +1969,6 @@ event and nothing in v6 blocks on one.
 | `s3_key` in the document, URL resolved at read time | Keeps snapshots domain-agnostic; a distribution can be rebuilt without touching stored media references. |
 | `media.benkile.com` custom alias | Stable hostname decoupled from any specific distribution. Requires an ACM cert in us-east-1. |
 | v5 animated header dropped, not ported | Owner decision. Removes jQuery from the project entirely; `hero` survives as a static section type. |
-| Dev container retained (`portfolio-v6-api-dev`, `:dev`) | Owner decision. Needed so the dev Vercel projects can reach a non-production API. |
 | 50 published versions retained | Owner decision. Ample for rollback at this scale. |
 | Cutover owner-managed, not spec'd | v6 ships on its Vercel project domain; the apex is swapped in Vercel whenever v5 is retired. No coordinated cutover event. |
 | `Link[]` replaces `url`/`repo` scalars | A project can span five repos plus dev and prod deployments. Required `label` is what makes five `repo` links distinguishable. |
@@ -2105,5 +2088,4 @@ None. Design was the last one; resolved in §14.
 | — | Hero animation | **Dropped.** `HeaderBackgroundLogic.js` and jQuery are not ported. `hero` remains a static section type (§3.4). |
 | — | Version retention | **50.** As specified in §3.3. |
 | — | Cutover strategy | **Owner-managed.** v6 ships on its Vercel project domain; apex swapped in Vercel when v5 is retired (§12). |
-| — | Dev container needed? | **Yes.** `portfolio-v6-api-dev` is permanent, along with the dev pool, database, bucket, distribution, and secret. |
 | — | Design/theming | **Split by frontend (§14).** Public site: plain HTML + minimal CSS under containment rules; restyle later. Admin: fully themed MUI (system theme detection, dark mode), built out completely in v1 (§14.4). |
