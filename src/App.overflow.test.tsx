@@ -177,7 +177,16 @@ describe('320px overflow guard — key pages render in-bounds (DESIGN.md §3)', 
     stubApi();
     const { restore } = renderAt320('/');
     await screen.findByRole('heading', { level: 1, name: 'Ben Kile' });
-    await waitFor(() => expect(screen.getByText('A Track With A Fairly Long Title That Could Overflow')).toBeInTheDocument());
+    // The track title shows in both the standalone now-playing section and the
+    // hero strip, so use getAllByText — either instance proves the live data
+    // has landed and layout has settled.
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(
+          'A Track With A Fairly Long Title That Could Overflow',
+        ).length,
+      ).toBeGreaterThan(0),
+    );
     assertNoInlineOverflow(document.body);
     restore();
   });

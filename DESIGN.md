@@ -125,10 +125,12 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 ## 5. Section treatments (public sections, §3.4)
 
 - **hero** — tag line in mono amber (`// software developer`), display headline,
-  short intro; below it an **instrument strip**: NOW PLAYING · DUOLINGO · SITE
-  vN — three `Instrument`s fed by the live endpoints + document version. NOW
-  PLAYING shows the last-played track (`Last: …`) when idle; DUOLINGO is the
-  streak day count.
+  short intro; below it an **instrument strip**: NOW PLAYING · DUOLINGO. Each is
+  a small `Instrument`. NOW PLAYING is an amber CSS equalizer glyph followed by
+  the track title (or the last-played title, with a dim static glyph, when idle;
+  the glyph stays visible even when the store is loading or has no last-played
+  track). DUOLINGO is the streak day count. Hover/tap detail is a separate
+  popover (task 129). No "SITE vN" item (dropped).
 - **about** — prose panel, 62ch measure; optional inline mono annotations.
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).

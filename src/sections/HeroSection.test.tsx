@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import HeroSection from './HeroSection';
 import heroStyles from './HeroSection.module.css';
@@ -9,10 +9,28 @@ function heroSection(data: Record<string, unknown>): Section {
   return { id: 'sec-hero', type: 'hero', data, items: [] } as Section;
 }
 
+function jsonResponse(body: unknown) {
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(body),
+  } as unknown as Response;
+}
+
 const restores: Array<() => void> = [];
+
+// HeroStrip now lives in the hero body slot and subscribes to useNowPlaying;
+// stub the API so its shared fetch resolves quietly in every hero test.
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(jsonResponse({ playing: false })),
+  );
+});
 
 afterEach(() => {
   while (restores.length) restores.pop()!();
+  vi.unstubAllGlobals();
 });
 
 describe('HeroSection (DESIGN.md §5, §6)', () => {
@@ -130,7 +148,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     expect(container.querySelector('section')).toHaveClass(heroStyles.animated);
   });
 
-  it('ignores an OS reduced-motion preference — orchestration still runs (owner decision)', () => {
+  it('ignores an OS reduced-motion preference (orchestration still runs, owner decision)', () => {
     restores.push(mockReducedMotion(true));
 
     const { container } = render(
@@ -144,5 +162,32 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
       screen.getByRole('heading', { level: 1, name: 'Ben Kile' }),
     ).toBeInTheDocument();
     expect(container.querySelector('section')).toHaveClass(heroStyles.animated);
+  });
+
+  it('mounts the HeroStrip in the SectionShell body slot (nth-child(2))', () => {
+    restores.push(mockReducedMotion(false));
+
+    const { container } = render(
+      <HeroSection
+        section={heroSection({
+          title: 'Ben Kile',
+          tagline: '// software developer',
+          intro: 'Building quietly humming systems.',
+        })}
+        media={{}}
+      />,
+    );
+
+    // The body slot is the SectionShell's second direct child; the strip has to
+    // land inside it so the existing 180ms stagger picks it up.
+    const section = container.querySelector('section');
+    expect(section).not.toBeNull();
+    const bodySlot = section!.children[1];
+    expect(bodySlot).toBeDefined();
+    // The strip advertises itself as a list of instrument items.
+    const strip = bodySlot!.querySelector('[role="list"]');
+    expect(strip).not.toBeNull();
+    // And the Spotify item is inside it.
+    expect(strip!.querySelector('[role="listitem"]')).not.toBeNull();
   });
 });

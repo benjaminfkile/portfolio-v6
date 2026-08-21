@@ -1,0 +1,136 @@
+/* HeroStrip: mono "instrument strip" beneath the hero title (DESIGN.md §5).
+   Tokens only. Wraps on narrow screens so the row never overflows the hero. */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The track title sits on the value line and truncates before it can push the
+   row wide enough to break the hero. Full title still reaches AT via the item
+   wrapper's aria-label. */
+.title {
+  display: inline-block;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* ---- Equalizer glyph ------------------------------------------------------ */
+/*
+ * 3 to 5 thin amber bars in a small inline stack. `live` bounces each bar with
+ * a short offset so the row reads as an animated equalizer, not a synced flash;
+ * the static variant renders bars at fixed low heights in --text-dim so the
+ * slot never disappears when nothing is playing (or the store is loading).
+ */
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  width: auto;
+}
+
+.bar {
+  display: inline-block;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--amber);
+  transform-origin: bottom center;
+}
+
+.eqLive .bar {
+  height: 100%;
+  animation: heroEqBounce 900ms ease-in-out infinite;
+}
+
+/* Per-bar timing offsets: same keyframes, staggered so the row jitters like an
+   equalizer instead of pulsing in unison. */
+.eqLive .bar[data-bar='0'] {
+  animation-duration: 780ms;
+  animation-delay: -120ms;
+}
+.eqLive .bar[data-bar='1'] {
+  animation-duration: 920ms;
+  animation-delay: -320ms;
+}
+.eqLive .bar[data-bar='2'] {
+  animation-duration: 700ms;
+  animation-delay: -60ms;
+}
+.eqLive .bar[data-bar='3'] {
+  animation-duration: 1040ms;
+  animation-delay: -220ms;
+}
+.eqLive .bar[data-bar='4'] {
+  animation-duration: 860ms;
+  animation-delay: -180ms;
+}
+
+/* Static (idle / reduced motion): dim bars at fixed low heights. Never a full
+   bar (would read as "playing") and never zero (glyph must stay visible). */
+.eqStatic .bar {
+  background: var(--text-dim);
+}
+.eqStatic .bar[data-bar='0'] {
+  height: 30%;
+}
+.eqStatic .bar[data-bar='1'] {
+  height: 55%;
+}
+.eqStatic .bar[data-bar='2'] {
+  height: 40%;
+}
+.eqStatic .bar[data-bar='3'] {
+  height: 60%;
+}
+.eqStatic .bar[data-bar='4'] {
+  height: 35%;
+}
+
+@keyframes heroEqBounce {
+  0%,
+  100% {
+    height: 22%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+
+/* Belt-and-suspenders with the JS hook: honour a machine-level reduced-motion
+   preference at the CSS layer too. On the owner's desktop (Windows animation
+   effects off) this collapses the live equalizer to the same static bars; call
+   it out in the PR description. */
+@media (prefers-reduced-motion: reduce) {
+  .eqLive .bar {
+    animation: none;
+    background: var(--text-dim);
+  }
+  .eqLive .bar[data-bar='0'] {
+    height: 30%;
+  }
+  .eqLive .bar[data-bar='1'] {
+    height: 55%;
+  }
+  .eqLive .bar[data-bar='2'] {
+    height: 40%;
+  }
+  .eqLive .bar[data-bar='3'] {
+    height: 60%;
+  }
+  .eqLive .bar[data-bar='4'] {
+    height: 35%;
+  }
+}

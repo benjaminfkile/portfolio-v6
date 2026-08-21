@@ -1,5 +1,6 @@
 import type { SectionProps } from './types';
 import SectionShell from '../components/ui/SectionShell';
+import HeroStrip from '../components/HeroStrip';
 import { usePrefersReducedMotion } from '../lib/prefersReducedMotion';
 import styles from './HeroSection.module.css';
 
@@ -54,7 +55,9 @@ export default function HeroSection({ section, media }: SectionProps) {
         eyebrow={data.tagline}
         title={data.title}
         intro={data.intro}
-      />
+      >
+        <HeroStrip />
+      </SectionShell>
     </div>
   );
 }
