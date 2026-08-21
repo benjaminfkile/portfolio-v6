@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { SectionProps } from './types';
 import type { DuolingoSectionData } from '../types/content';
-import { getDuolingo } from '../lib/api';
-import type { DuolingoResponse } from '../lib/api';
+import { useDuolingo } from '../lib/useDuolingo';
 import SectionShell from '../components/ui/SectionShell';
 import Panel from '../components/ui/Panel';
 import Instrument from '../components/ui/Instrument';
@@ -30,39 +28,10 @@ import styles from './DuolingoSection.module.css';
  */
 const DEFAULT_LANGUAGE = 'es';
 
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'unavailable' }
-  | { status: 'ready'; data: Extract<DuolingoResponse, { available: true }> };
-
 export default function DuolingoSection({ section }: SectionProps) {
   const config = section.data as DuolingoSectionData;
   const language = config.language ?? DEFAULT_LANGUAGE;
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    getDuolingo(language)
-      .then((data) => {
-        if (cancelled) return;
-        setState(
-          data.available
-            ? { status: 'ready', data }
-            : { status: 'unavailable' },
-        );
-      })
-      .catch((error: unknown) => {
-        // Degrade to nothing — a failed fetch is not a broken section (§3.5).
-        if (cancelled) return;
-        setState({ status: 'unavailable' });
-        console.error('Failed to load Duolingo', error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [language]);
+  const state = useDuolingo(language);
 
   // Loading and the degrade path both render nothing: the unofficial endpoint is
   // low-stakes by construction, so an unavailable section simply isn't there.

@@ -24,7 +24,11 @@ interface HeroData {
   background_media_id?: string;
 }
 
-export default function HeroSection({ section, media }: SectionProps) {
+export default function HeroSection({
+  section,
+  media,
+  duolingoLanguage,
+}: SectionProps) {
   const data = section.data as HeroData;
   const reduced = usePrefersReducedMotion();
   const background = data.background_media_id
@@ -56,7 +60,7 @@ export default function HeroSection({ section, media }: SectionProps) {
         title={data.title}
         intro={data.intro}
       >
-        <HeroStrip />
+        <HeroStrip duolingoLanguage={duolingoLanguage} />
       </SectionShell>
     </div>
   );

@@ -207,8 +207,10 @@ describe('ContentPage', () => {
     renderPage('/');
 
     // duolingo — the streak, course readout, and the manual score chip (from the
-    // fixture document's config).
-    expect(await screen.findByText('847')).toBeInTheDocument();
+    // fixture document's config). The hero-strip Duolingo item also renders the
+    // streak count from the same shared fetch, so `847` legitimately appears
+    // twice on the page (strip + standalone section).
+    expect((await screen.findAllByText('847')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Spanish')).toBeInTheDocument();
     expect(screen.getByText('Duolingo Score 95')).toBeInTheDocument();
 

@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 import { __resetNowPlayingForTests } from '../lib/useNowPlaying';
+import { __resetDuolingoForTests } from '../lib/useDuolingo';
 import {
   __installFakeHubForTests,
   __resetHubDoubleForTests,
@@ -14,6 +15,10 @@ afterEach(() => {
   // The shared now-playing store is module-level state — reset it after every
   // test (post-unmount) so a snapshot from one test can't leak into the next.
   __resetNowPlayingForTests();
+  // The shared Duolingo cache is module-level too; reset so language snapshots
+  // don't bleed between tests (a `ready` result from one test would otherwise
+  // short-circuit the next test's fetch for the same language).
+  __resetDuolingoForTests();
   __resetHubDoubleForTests();
 });
 

@@ -1,16 +1,44 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import HeroStrip from './HeroStrip';
 import styles from './HeroStrip.module.css';
-import type { NowPlayingResponse } from '../lib/api';
+import type { DuolingoResponse, NowPlayingResponse } from '../lib/api';
 import { mockReducedMotion } from '../test/motion';
 
-function jsonResponse(body: unknown) {
+function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
-    ok: true,
-    status: 200,
+    ok: init.ok ?? true,
+    status: init.status ?? 200,
     json: () => Promise.resolve(body),
   } as unknown as Response;
+}
+
+/**
+ * Route fetch calls to the endpoint they hit — the strip subscribes to two live
+ * feeds (now-playing + Duolingo) and cases care about each one independently.
+ */
+function routedFetch(
+  handlers: {
+    nowPlaying?: NowPlayingResponse;
+    duolingo?: DuolingoResponse | { throw: true };
+  } = {},
+) {
+  return vi.fn().mockImplementation((url: string) => {
+    const path = String(url);
+    if (path.startsWith('/api/now-playing')) {
+      return Promise.resolve(
+        jsonResponse(handlers.nowPlaying ?? { playing: false }),
+      );
+    }
+    if (path.startsWith('/api/duolingo')) {
+      const d = handlers.duolingo;
+      if (d && 'throw' in d) return Promise.reject(new Error('network down'));
+      return Promise.resolve(
+        jsonResponse(d ?? { available: false }),
+      );
+    }
+    return Promise.resolve(jsonResponse({}));
+  });
 }
 
 async function flushMicroAndTimers() {
@@ -178,6 +206,127 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     const eq = container.querySelector(`.${styles.eq}`);
     expect(eq).not.toBeNull();
     expect(eq).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('Duolingo: ready → mono DUOLINGO label + streak "N days" (tabular-nums), a11y "Duolingo streak: N days"', async () => {
+    restores.push(mockReducedMotion(false));
+    vi.stubGlobal(
+      'fetch',
+      routedFetch({
+        duolingo: {
+          available: true,
+          streak: 412,
+          course: { title: 'Spanish', xp: 48_210, crowns: 155 },
+        },
+      }),
+    );
+
+    const { container } = render(<HeroStrip duolingoLanguage="es" />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    // Item wrapper carries the accessible name; the value is a mono readout.
+    expect(
+      screen.getByRole('listitem', { name: 'Duolingo streak: 412 days' }),
+    ).toBeInTheDocument();
+    // The label is mono uppercase via <Instrument>'s label slot; its rendered
+    // text is "Duolingo" (Instrument CSS handles the uppercasing).
+    expect(screen.getByText('Duolingo')).toBeInTheDocument();
+    // The streak count sits in its own tabular-nums span; assert both the count
+    // and the "days" unit are on the value line.
+    expect(container.querySelector(`.${styles.streakCount}`)?.textContent).toBe(
+      '412',
+    );
+    expect(container.querySelector(`.${styles.streakUnit}`)?.textContent).toBe(
+      'days',
+    );
+    // Strip-level detail rule: no course, XP, crowns, or manual score chip.
+    expect(screen.queryByText(/Spanish/)).toBeNull();
+    expect(screen.queryByText(/XP/i)).toBeNull();
+    expect(screen.queryByText(/crowns/i)).toBeNull();
+  });
+
+  it('Duolingo: unavailable payload renders nothing for the item (strip never looks broken)', async () => {
+    restores.push(mockReducedMotion(false));
+    vi.stubGlobal(
+      'fetch',
+      routedFetch({ duolingo: { available: false } }),
+    );
+
+    const { container } = render(<HeroStrip duolingoLanguage="es" />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    // Only the Spotify listitem is present — Duolingo silently degrades.
+    expect(screen.queryByLabelText(/Duolingo streak/i)).toBeNull();
+    expect(container.querySelector(`.${styles.streakCount}`)).toBeNull();
+    // And Spotify still mounts correctly next to the missing Duolingo item.
+    expect(
+      screen.getByRole('listitem', { name: 'Not playing' }),
+    ).toBeInTheDocument();
+  });
+
+  it('Duolingo: a failed fetch renders nothing for the item (never an error string)', async () => {
+    restores.push(mockReducedMotion(false));
+    vi.stubGlobal('fetch', routedFetch({ duolingo: { throw: true } }));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { container } = render(<HeroStrip duolingoLanguage="es" />);
+    // The reject-then-catch chain in useDuolingo needs several microtask beats
+    // to settle under fake timers; drain twice so both the promise chain and
+    // the resulting re-render complete before we assert absence.
+    await act(async () => {
+      await flushMicroAndTimers();
+      await flushMicroAndTimers();
+    });
+
+    // The item silently degrades; no error copy anywhere in the strip.
+    expect(screen.queryByLabelText(/Duolingo streak/i)).toBeNull();
+    expect(container.textContent ?? '').not.toMatch(/error/i);
+
+    errSpy.mockRestore();
+  });
+
+  it('Duolingo: forwards the passed language to the API', async () => {
+    restores.push(mockReducedMotion(false));
+    const fetchMock = routedFetch({
+      duolingo: {
+        available: true,
+        streak: 5,
+        course: { title: 'French', xp: 100, crowns: 1 },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<HeroStrip duolingoLanguage="fr" />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    const duolingoCalls = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).startsWith('/api/duolingo'),
+    );
+    expect(duolingoCalls).toHaveLength(1);
+    expect(String(duolingoCalls[0][0])).toContain('language=fr');
+  });
+
+  it('Duolingo: defaults the language to "es" when the prop is omitted', async () => {
+    restores.push(mockReducedMotion(false));
+    const fetchMock = routedFetch({ duolingo: { available: false } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<HeroStrip />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    const duolingoCalls = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).startsWith('/api/duolingo'),
+    );
+    expect(duolingoCalls).toHaveLength(1);
+    expect(String(duolingoCalls[0][0])).toContain('language=es');
   });
 
   it('truncates a very long title so the row never breaks the hero (a11y label carries the full title)', async () => {
