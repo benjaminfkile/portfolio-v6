@@ -1,12 +1,14 @@
-/* Hero — display header + instrument strip (DESIGN.md §5, §6).
+/* Hero - display header + instrument strip (DESIGN.md §5, §6).
    Tokens only; a literal colour here is a review failure. */
 
 .wrap {
   position: relative;
 }
 
-/* Optional CMS background — a faint console backdrop behind the text, never a
-   loud banner. It sits under the content and never intercepts pointer input. */
+/* Optional CMS background - a faint console backdrop behind the text, never a
+   loud banner. It sits under the content and never intercepts pointer input.
+   Every tunable (task 132) reads a CSS custom property with a safe default so
+   an existing hero with only a background_media_id renders exactly as before. */
 .backdrop {
   position: absolute;
   inset: 0;
@@ -16,11 +18,38 @@
   pointer-events: none;
 }
 
+/* Theme-aware overlay in the ground colour. Alpha per theme lets a photo be
+   softened without losing detail; --ground swaps on data-theme, so the overlay
+   colour follows the active theme with no JS. */
+.backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--ground);
+  opacity: var(--hero-bg-overlay-dark, 0);
+  pointer-events: none;
+}
+
+:root[data-theme='light'] .backdrop::after {
+  opacity: var(--hero-bg-overlay-light, 0);
+}
+
 .backdropImg {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  opacity: var(--hero-backdrop-opacity);
+  object-fit: var(--hero-bg-fit, cover);
+  object-position: var(--hero-bg-position, 50% 50%);
+  opacity: var(--hero-bg-opacity-dark, 0.1);
+  filter: blur(var(--hero-bg-blur, 0px))
+    grayscale(var(--hero-bg-grayscale, 0))
+    brightness(var(--hero-bg-brightness, 1))
+    contrast(var(--hero-bg-contrast, 1))
+    saturate(var(--hero-bg-saturate, 1));
+  transform: scale(var(--hero-bg-scale, 1));
+}
+
+:root[data-theme='light'] .backdropImg {
+  opacity: var(--hero-bg-opacity-light, 0.06);
 }
 
 /* The hero header block sits above the backdrop, and carries the horizontal +
@@ -45,12 +74,12 @@
   font-size: var(--fs-h1);
 }
 
-/* ---- Page-load orchestration — DESIGN.md §6 ------------------------------- */
+/* ---- Page-load orchestration - DESIGN.md §6 ------------------------------- */
 /*
  * The header's lines (eyebrow / heading / intro) and the strip fade/rise 12px,
  * staggered 60ms, once. `.animated` is applied only when motion is allowed, so
  * without it every element renders in its final state. SectionShell renders two
- * direct children — the header block <div> then the body <div> (the strip) — so
+ * direct children - the header block <div> then the body <div> (the strip) - so
  * the selectors reach them positionally, never by hashed class.
  */
 @keyframes heroRise {

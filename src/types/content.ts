@@ -148,6 +148,55 @@ export interface PostRef {
 /* ---- Static-section config shapes (spec §3.4) ----------------------------- */
 
 /**
+ * The `hero` section's optional backdrop tuning (task 132). Every key is optional
+ * and any invalid or unknown value falls back to the site's default at render.
+ * Persisted inside the hero section's `data.background` jsonb blob and echoed
+ * into the published document snapshot alongside `background_media_id`, so a
+ * hero with only a media id keeps rendering exactly as it does today.
+ *
+ * Ranges enforced at both the API write boundary and the public renderer's
+ * sanitiser (a bad snapshot can never inject CSS):
+ * - `opacity_dark` / `opacity_light`: 0..1 (defaults 0.1 dark, 0.06 light)
+ * - `object_fit`: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down' (default 'cover')
+ * - `object_position`: short CSS position string, max 40 chars, letters/digits/
+ *   spaces/`%`/`.`/`-` only (default '50% 50%')
+ * - `blur_px`: 0..40 (default 0)
+ * - `grayscale`: 0..1 (default 0)
+ * - `brightness` / `contrast` / `saturate`: 0..2 (default 1)
+ * - `scale`: 1..2 (default 1); lets a blurred image hide its soft edges
+ * - `overlay_dark` / `overlay_light`: 0..1 (default 0); alpha of a
+ *   `--ground`-coloured overlay per theme to soften the image without losing
+ *   detail
+ */
+export interface HeroBackground {
+  opacity_dark?: number;
+  opacity_light?: number;
+  object_fit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
+  object_position?: string;
+  blur_px?: number;
+  grayscale?: number;
+  brightness?: number;
+  contrast?: number;
+  saturate?: number;
+  scale?: number;
+  overlay_dark?: number;
+  overlay_light?: number;
+}
+
+/**
+ * The `hero` section's published config (spec §3.4). Optional header copy plus
+ * an optional {@link HeroBackground} tuning blob for the CMS backdrop image
+ * referenced by `background_media_id` (task 132).
+ */
+export interface HeroSectionData {
+  title?: string;
+  tagline?: string;
+  intro?: string;
+  background_media_id?: string;
+  background?: HeroBackground;
+}
+
+/**
  * The `skills` section's published config (spec §3.4, v1.5). Optional `heading` /
  * `intro` override the section header copy.
  *

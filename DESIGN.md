@@ -125,7 +125,10 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
 ## 5. Section treatments (public sections, §3.4)
 
 - **hero** — tag line in mono amber (`// software developer`), display headline,
-  short intro; below it an **instrument strip**: NOW PLAYING · DUOLINGO. Each is
+  short intro; below it an **instrument strip**: NOW PLAYING · DUOLINGO. The
+  optional CMS backdrop image is tunable per photo and per theme from the admin
+  (opacity, object-fit/position, filters, scale, and a `--ground` overlay per
+  theme), so a busy photo can be quieted without touching CSS. Each is
   a small `Instrument`. NOW PLAYING is an amber CSS equalizer glyph followed by
   the track title (or the last-played title, with a dim static glyph, when idle;
   the glyph stays visible even when the store is loading or has no last-played
