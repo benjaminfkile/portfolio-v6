@@ -1,7 +1,15 @@
 import Instrument from './ui/Instrument';
-import { useNowPlaying } from '../lib/useNowPlaying';
-import { useDuolingo } from '../lib/useDuolingo';
+import Popover from './ui/Popover';
+import MediaFrame from './ui/MediaFrame';
+import Meter from './ui/Meter';
+import TagChip from './ui/TagChip';
+import { useNowPlaying, type NowPlayingState } from '../lib/useNowPlaying';
+import { useDuolingo, type DuolingoState } from '../lib/useDuolingo';
 import { usePrefersReducedMotion } from '../lib/prefersReducedMotion';
+import {
+  relativeTimeSince,
+  useNowPlayingProgress,
+} from '../lib/nowPlayingProgress';
 import styles from './HeroStrip.module.css';
 
 /**
@@ -11,18 +19,26 @@ import styles from './HeroStrip.module.css';
  * screens so items land side-by-side on desktop and stack on phones.
  *
  * Current items:
- *   - Spotify: subscribes to the shared {@link useNowPlaying} store (same hub
+ * - Spotify: subscribes to the shared {@link useNowPlaying} store (same hub
  *     subscription the standalone `now_playing` section uses, so this never
  *     adds a second fetch). Playing → animated equalizer + track title;
  *     idle-with-last-played → static dim equalizer + last title; loading / error
  *     / no last_played → static dim equalizer with no title.
- *   - Duolingo: subscribes to the shared {@link useDuolingo} cache (same fetch
+ * - Duolingo: subscribes to the shared {@link useDuolingo} cache (same fetch
  *     the standalone `duolingo` section uses when both are on the page). Renders
- *     ONLY the streak count as its value ("N days", tabular-nums) — course, XP,
+ *     ONLY the streak count as its value ("N days", tabular-nums) - course, XP,
  *     crowns, and the manual score chip belong to the standalone section and
  *     the hover/tap detail layer, not the one-line strip. Loading, unavailable,
  *     or a failed fetch render nothing for the item so the strip never looks
  *     broken (§3.5 degrade).
+ *
+ * A shared {@link Popover} primitive provides the disclosure behaviour (task
+ * 129): hover with a ~150ms intent delay on hover-capable devices; tap on
+ * touch; Escape closes and returns focus to the trigger; the panel is styled
+ * with the Panel tokens so it reads as a console readout. The strip items
+ * themselves stay deliberately minimal - richer info (art, artists, progress
+ * meter, XP, crowns, score chip) appears only inside the popover. When the
+ * data is unavailable the popover is simply not offered (no empty panels).
  *
  * The strip never renders as broken or errored (section 3.5 degrade rule).
  */
@@ -37,13 +53,26 @@ export interface HeroStripProps {
    * falls back to the same `es` default the standalone section uses.
    */
   duolingoLanguage?: string;
+  /**
+   * Optional manual `score_label` from the published `duolingo` section
+   * config. When set, the strip's Duolingo popover renders it as a `TagChip`
+   * alongside the live values, mirroring the standalone section's chip so both
+   * detail views stay in sync (task 129).
+   */
+  duolingoScoreLabel?: string;
 }
 
-export default function HeroStrip({ duolingoLanguage }: HeroStripProps = {}) {
+export default function HeroStrip({
+  duolingoLanguage,
+  duolingoScoreLabel,
+}: HeroStripProps = {}) {
   return (
     <div className={styles.strip} role="list">
       <SpotifyItem />
-      <DuolingoItem language={duolingoLanguage ?? DEFAULT_DUOLINGO_LANGUAGE} />
+      <DuolingoItem
+        language={duolingoLanguage ?? DEFAULT_DUOLINGO_LANGUAGE}
+        scoreLabel={duolingoScoreLabel}
+      />
     </div>
   );
 }
@@ -57,16 +86,38 @@ function SpotifyItem() {
 
   const { mode, title, ariaLabel } = resolveSpotify(state);
 
+  const instrument = (
+    <Instrument
+      label="Now playing"
+      accent={mode === 'playing'}
+      leading={<Equalizer live={mode === 'playing' && !reduced} />}
+      value={title ? <span className={styles.title}>{title}</span> : null}
+    />
+  );
+
+  const popoverContent = spotifyPopoverContent(state);
+  // Only offer a popover when there's a track to reveal - playing OR last_played.
+  // Loading / idle-with-nothing renders the bare item with no disclosure so the
+  // panel is never empty (task 129).
+  if (!popoverContent) {
+    return (
+      <div className={styles.item} role="listitem" aria-label={ariaLabel}>
+        {instrument}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.item} role="listitem" aria-label={ariaLabel}>
-      <Instrument
-        label="Now playing"
-        accent={mode === 'playing'}
-        leading={<Equalizer live={mode === 'playing' && !reduced} />}
-        value={
-          title ? <span className={styles.title}>{title}</span> : null
-        }
-      />
+      <Popover
+        panelRole="dialog"
+        panelLabel={ariaLabel}
+        panelClassName={styles.spotifyPanel}
+        triggerAriaLabel={`${ariaLabel} (details)`}
+        content={popoverContent}
+      >
+        {instrument}
+      </Popover>
     </div>
   );
 }
@@ -79,7 +130,7 @@ interface SpotifyRender {
   ariaLabel: string;
 }
 
-function resolveSpotify(state: ReturnType<typeof useNowPlaying>): SpotifyRender {
+function resolveSpotify(state: NowPlayingState): SpotifyRender {
   if (state.status === 'ready') {
     const data = state.data;
     if (data.playing) {
@@ -101,32 +152,182 @@ function resolveSpotify(state: ReturnType<typeof useNowPlaying>): SpotifyRender 
 }
 
 /**
- * The Duolingo strip item — a mono `DUOLINGO` label with the streak day count
+ * Build the Spotify popover body from the shared now-playing state. Returns
+ * `null` when there is nothing to reveal (loading, error, or idle with no
+ * last-played track) - the caller then declines to offer a popover.
+ */
+function spotifyPopoverContent(state: NowPlayingState) {
+  if (state.status !== 'ready') return null;
+  const data = state.data;
+
+  if (data.playing) {
+    return <SpotifyPlayingBody state={state} />;
+  }
+  if (data.last_played) {
+    return <SpotifyLastPlayedBody last={data.last_played} />;
+  }
+  return null;
+}
+
+function SpotifyPlayingBody({ state }: { state: NowPlayingState }) {
+  const { percent, durationMs } = useNowPlayingProgress(state);
+  if (state.status !== 'ready' || !state.data.playing) return null;
+  const { track } = state.data;
+  return (
+    <div className={styles.spotifyBody}>
+      {track.art_url && (
+        <MediaFrame
+          className={styles.spotifyArt}
+          src={track.art_url}
+          alt={`${track.album} album art`}
+          aspectRatio="1 / 1"
+        />
+      )}
+      <div className={styles.spotifyReadout}>
+        <a
+          className={styles.spotifyLink}
+          href={track.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {track.title}
+        </a>
+        <p className={styles.spotifyArtists}>{track.artists.join(', ')}</p>
+        {track.album && (
+          <p className={styles.spotifyAlbum}>{track.album}</p>
+        )}
+        {durationMs > 0 && (
+          <Meter
+            className={styles.spotifyMeter}
+            value={percent}
+            label="Track progress"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpotifyLastPlayedBody({
+  last,
+}: {
+  last: import('../lib/api').LastPlayed;
+}) {
+  const { track } = last;
+  const age = relativeTimeSince(last.played_at);
+  return (
+    <div className={styles.spotifyBody}>
+      {track.art_url && (
+        <MediaFrame
+          className={styles.spotifyArt}
+          src={track.art_url}
+          alt={`${track.album} album art`}
+          aspectRatio="1 / 1"
+        />
+      )}
+      <div className={styles.spotifyReadout}>
+        <p className={styles.spotifyMeta}>
+          {age ? `Last played, ${age}` : 'Last played'}
+        </p>
+        <a
+          className={styles.spotifyLink}
+          href={track.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {track.title}
+        </a>
+        <p className={styles.spotifyArtists}>{track.artists.join(', ')}</p>
+        {track.album && (
+          <p className={styles.spotifyAlbum}>{track.album}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The Duolingo strip item - a mono `DUOLINGO` label with the streak day count
  * as the value ("412 days", tabular-nums). Nothing else at strip level: course,
  * XP, crowns, and the manual score chip belong to the standalone section and
  * the hover/tap detail layer. Renders nothing while loading, on `unavailable`,
- * or on a failed fetch (§3.5 degrade — the unofficial endpoint may break at
+ * or on a failed fetch (§3.5 degrade - the unofficial endpoint may break at
  * any time; the strip must never look broken).
  */
-function DuolingoItem({ language }: { language: string }) {
+function DuolingoItem({
+  language,
+  scoreLabel,
+}: {
+  language: string;
+  scoreLabel?: string;
+}) {
   const state = useDuolingo(language);
   if (state.status !== 'ready') return null;
   const { streak } = state.data;
+
+  const instrument = (
+    <Instrument
+      label="Duolingo"
+      value={
+        <span className={styles.streak}>
+          <span className={styles.streakCount}>{streak}</span>
+          <span className={styles.streakUnit}>days</span>
+        </span>
+      }
+    />
+  );
+
+  const itemLabel = `Duolingo streak: ${streak} days`;
   return (
-    <div
-      className={styles.item}
-      role="listitem"
-      aria-label={`Duolingo streak: ${streak} days`}
-    >
-      <Instrument
-        label="Duolingo"
-        value={
-          <span className={styles.streak}>
-            <span className={styles.streakCount}>{streak}</span>
-            <span className={styles.streakUnit}>days</span>
-          </span>
-        }
-      />
+    <div className={styles.item} role="listitem" aria-label={itemLabel}>
+      <Popover
+        panelRole="tooltip"
+        panelLabel={`Duolingo detail: ${streak}-day streak`}
+        panelClassName={styles.duolingoPanel}
+        triggerAriaLabel={`${itemLabel} (details)`}
+        content={<DuolingoPopoverBody state={state} scoreLabel={scoreLabel} />}
+      >
+        {instrument}
+      </Popover>
+    </div>
+  );
+}
+
+function DuolingoPopoverBody({
+  state,
+  scoreLabel,
+}: {
+  state: Extract<DuolingoState, { status: 'ready' }>;
+  scoreLabel?: string;
+}) {
+  const { streak, course } = state.data;
+  return (
+    <div className={styles.duolingoBody}>
+      <dl className={styles.duolingoStats}>
+        <div className={styles.duolingoRow}>
+          <dt className={styles.duolingoLabel}>Streak</dt>
+          <dd className={styles.duolingoValue}>
+            <span className={styles.duolingoStreakCount}>{streak}</span>
+            <span className={styles.duolingoUnit}>days</span>
+          </dd>
+        </div>
+        <div className={styles.duolingoRow}>
+          <dt className={styles.duolingoLabel}>{course.title}</dt>
+          <dd className={styles.duolingoValue}>
+            <span className={styles.duolingoXp}>
+              {course.xp.toLocaleString('en-US')} XP
+            </span>
+            <span className={styles.duolingoCrowns}>
+              {course.crowns} crowns
+            </span>
+          </dd>
+        </div>
+      </dl>
+      {scoreLabel && (
+        <p className={styles.duolingoScore}>
+          <TagChip>{scoreLabel}</TagChip>
+        </p>
+      )}
     </div>
   );
 }

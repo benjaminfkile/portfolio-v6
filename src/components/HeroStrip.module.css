@@ -1,5 +1,8 @@
 /* HeroStrip: mono "instrument strip" beneath the hero title (DESIGN.md §5).
-   Tokens only. Wraps on narrow screens so the row never overflows the hero. */
+   Tokens only. Wraps on narrow screens so the row never overflows the hero.
+   The disclosure popovers live in Popover.module.css; the styles below cover
+   only the strip layout and the popover *bodies* (art + meta + progress meter
+   for Spotify, a two-row instrument stack + optional score chip for Duolingo). */
 
 .strip {
   display: flex;
@@ -29,7 +32,7 @@
 
 /* Duolingo streak value: an amber tabular-nums count and a dim mono "days"
    unit sitting on the same value line. Mirrors the standalone DuolingoSection
-   voice at strip scale (no course, XP, or crowns — those live in the popover). */
+   voice at strip scale (no course, XP, or crowns - those live in the popover). */
 .streak {
   display: inline-flex;
   align-items: baseline;
@@ -43,6 +46,154 @@
 
 .streakUnit {
   color: var(--text-dim);
+}
+
+/* ---- Spotify popover body ------------------------------------------------- */
+/*
+ * A small album-art thumbnail alongside the mono readout (title / artists /
+ * album) and a thin amber progress Meter that creeps between updates when
+ * playing. Same voice as NowPlayingSection at popover scale so the two detail
+ * views read as parts of one console. Uses tokens only.
+ */
+.spotifyPanel {
+  min-width: 240px;
+}
+
+.spotifyBody {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.spotifyArt {
+  flex: none;
+  width: 56px;
+}
+
+.spotifyReadout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.spotifyMeta {
+  margin: 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+}
+
+.spotifyLink {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-medium);
+  color: var(--amber);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 120ms ease-out;
+}
+
+.spotifyLink:hover,
+.spotifyLink:focus-visible {
+  color: var(--text-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.spotifyArtists {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text);
+}
+
+.spotifyAlbum {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+}
+
+.spotifyMeter {
+  margin-top: var(--space-2);
+}
+
+/* ---- Duolingo popover body ------------------------------------------------ */
+/*
+ * A two-row instrument stack - STREAK (mono amber count + dim "days" unit) and
+ * the course (title + XP in tabular-nums + dim crowns) - plus an optional
+ * manual score TagChip that mirrors the standalone section's chip. `dl` markup
+ * so screen readers pair each label with its value.
+ */
+.duolingoPanel {
+  min-width: 220px;
+}
+
+.duolingoBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.duolingoStats {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.duolingoRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.duolingoLabel {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+}
+
+.duolingoValue {
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+}
+
+.duolingoStreakCount {
+  color: var(--amber);
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.duolingoUnit {
+  color: var(--text-dim);
+  font-size: var(--fs-body-s);
+}
+
+.duolingoXp {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.duolingoCrowns {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.duolingoScore {
+  margin: 0;
 }
 
 /* ---- Equalizer glyph ------------------------------------------------------ */

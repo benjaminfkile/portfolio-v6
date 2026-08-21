@@ -1,9 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent } from '@testing-library/dom';
 import HeroStrip from './HeroStrip';
 import styles from './HeroStrip.module.css';
 import type { DuolingoResponse, NowPlayingResponse } from '../lib/api';
 import { mockReducedMotion } from '../test/motion';
+
+/**
+ * Install a matchMedia stub that reports a hover-capable, fine-pointer input
+ * (typical desktop with mouse). The Popover primitive keys its hover path off
+ * this query; the strip's existing tests inherit motion-allowed behaviour from
+ * {@link mockReducedMotion}. Returns a restore fn.
+ */
+function mockHoverable(hoverable = true): () => void {
+  const original = window.matchMedia;
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches:
+      query.includes('hover: hover') || query.includes('pointer: fine')
+        ? hoverable
+        : false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+}
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -14,7 +41,7 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 /**
- * Route fetch calls to the endpoint they hit — the strip subscribes to two live
+ * Route fetch calls to the endpoint they hit - the strip subscribes to two live
  * feeds (now-playing + Duolingo) and cases care about each one independently.
  */
 function routedFetch(
@@ -259,7 +286,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
       await flushMicroAndTimers();
     });
 
-    // Only the Spotify listitem is present — Duolingo silently degrades.
+    // Only the Spotify listitem is present - Duolingo silently degrades.
     expect(screen.queryByLabelText(/Duolingo streak/i)).toBeNull();
     expect(container.querySelector(`.${styles.streakCount}`)).toBeNull();
     // And Spotify still mounts correctly next to the missing Duolingo item.
@@ -327,6 +354,242 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     );
     expect(duolingoCalls).toHaveLength(1);
     expect(String(duolingoCalls[0][0])).toContain('language=es');
+  });
+
+  it('Spotify popover: playing → click reveals art + artists + album + progress meter + outbound link', async () => {
+    restores.push(mockHoverable(true));
+    const playingWithArt: NowPlayingResponse = {
+      playing: true,
+      track: {
+        title: 'Windowlicker',
+        artists: ['Aphex Twin'],
+        album: 'Windowlicker',
+        art_url: 'https://i.scdn.co/image/abc',
+        url: 'https://open.spotify.com/track/xyz',
+        progress_ms: 2000,
+        duration_ms: 8000,
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(playingWithArt)),
+    );
+
+    render(<HeroStrip />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    const trigger = screen.getByRole('button', {
+      name: /Now playing/,
+    });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    // Click opens the disclosure - same code path as touch tap.
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Now playing: Windowlicker',
+    });
+    expect(dialog).toBeInTheDocument();
+    // Panel ↔ trigger are linked via aria-controls.
+    expect(dialog.id).toBe(trigger.getAttribute('aria-controls'));
+
+    // The outbound Spotify link is rendered with a target=_blank + rel guard
+    // and its href goes to open.spotify.com - Beacon.tsx captures link clicks
+    // globally so link_out will fire on activation.
+    const link = screen.getByRole('link', { name: 'Windowlicker' });
+    expect(link).toHaveAttribute('href', 'https://open.spotify.com/track/xyz');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+    // Album art hotlinked from i.scdn.co (§3.5 - never ingested).
+    const art = screen.getByRole('img');
+    expect(art).toHaveAttribute('src', 'https://i.scdn.co/image/abc');
+
+    // Progress meter reflects progress_ms / duration_ms (2000 / 8000 = 25%).
+    const meter = screen.getByRole('meter', { name: 'Track progress' });
+    expect(meter).toHaveAttribute('aria-valuenow', '25');
+
+    // Artists + album lines are present.
+    expect(dialog).toHaveTextContent('Aphex Twin');
+    expect(dialog).toHaveTextContent('Windowlicker');
+  });
+
+  it('Spotify popover: last-played → panel shows "Last played, <relative time>" and no progress meter', async () => {
+    restores.push(mockHoverable(true));
+    const lastWithAge: NowPlayingResponse = {
+      playing: false,
+      last_played: {
+        track: {
+          title: 'Alberto Balsalm',
+          artists: ['Aphex Twin'],
+          album: '…I Care Because You Do',
+          art_url: 'https://i.scdn.co/image/last',
+          url: 'https://open.spotify.com/track/last',
+        },
+        played_at: new Date(Date.now() - 45 * 60_000).toISOString(),
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(lastWithAge)),
+    );
+
+    render(<HeroStrip />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    const trigger = screen.getByRole('button', { name: /Last played/ });
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Last played: Alberto Balsalm',
+    });
+    expect(dialog).toHaveTextContent(/Last played, 45m ago/);
+    // No em (U+2014) or en (U+2013) dashes in the copy (owner's hard rule).
+    expect(dialog.textContent ?? '').not.toMatch(/[\u2014\u2013]/);
+    expect(
+      screen.queryByRole('meter', { name: 'Track progress' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Spotify popover: idle with no last_played → no popover offered (no empty panels)', async () => {
+    restores.push(mockHoverable(true));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(idle)));
+
+    render(<HeroStrip />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    // The listitem is there but the Instrument is NOT wrapped in a trigger - 
+    // there is no button and no dialog is ever offered.
+    expect(
+      screen.getByRole('listitem', { name: 'Not playing' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Duolingo popover: ready → tooltip shows streak + course XP + crowns; score chip when configured', async () => {
+    restores.push(mockHoverable(true));
+    vi.stubGlobal(
+      'fetch',
+      routedFetch({
+        duolingo: {
+          available: true,
+          streak: 412,
+          course: { title: 'Spanish', xp: 48_210, crowns: 155 },
+        },
+      }),
+    );
+
+    render(
+      <HeroStrip
+        duolingoLanguage="es"
+        duolingoScoreLabel="Score: 82 (B1)"
+      />,
+    );
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    const trigger = screen.getByRole('button', {
+      name: /Duolingo streak/,
+    });
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+
+    // Read-only detail reads as a tooltip, not a dialog.
+    const panel = screen.getByRole('tooltip', {
+      name: /Duolingo detail/,
+    });
+    // Course title + XP with tabular-nums formatting + crowns line.
+    expect(panel).toHaveTextContent('Spanish');
+    expect(panel).toHaveTextContent('48,210 XP');
+    expect(panel).toHaveTextContent('155 crowns');
+    // Streak count also appears in the popover (mono amber emphasis).
+    expect(panel).toHaveTextContent('412');
+    // The manual score chip renders when the published section carries one.
+    expect(panel).toHaveTextContent('Score: 82 (B1)');
+  });
+
+  it('Duolingo popover: without a score_label the chip is absent', async () => {
+    restores.push(mockHoverable(true));
+    vi.stubGlobal(
+      'fetch',
+      routedFetch({
+        duolingo: {
+          available: true,
+          streak: 10,
+          course: { title: 'French', xp: 100, crowns: 1 },
+        },
+      }),
+    );
+
+    render(<HeroStrip duolingoLanguage="fr" />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Duolingo streak/ }));
+    });
+    const panel = screen.getByRole('tooltip', { name: /Duolingo detail/ });
+    expect(panel).toHaveTextContent('French');
+    // No stray "Score" text when the config omits it.
+    expect(panel).not.toHaveTextContent(/Score/);
+  });
+
+  it('a11y: aria-expanded toggles on both popovers and Escape returns focus to the trigger', async () => {
+    restores.push(mockHoverable(true));
+    vi.stubGlobal(
+      'fetch',
+      routedFetch({
+        nowPlaying: playing,
+        duolingo: {
+          available: true,
+          streak: 12,
+          course: { title: 'Spanish', xp: 100, crowns: 1 },
+        },
+      }),
+    );
+
+    render(<HeroStrip duolingoLanguage="es" />);
+    await act(async () => {
+      await flushMicroAndTimers();
+    });
+
+    const spotifyBtn = screen.getByRole('button', { name: /Now playing/ });
+    const duoBtn = screen.getByRole('button', { name: /Duolingo streak/ });
+
+    // Both start collapsed; the two triggers point at distinct panels.
+    expect(spotifyBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(duoBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(spotifyBtn.getAttribute('aria-controls')).not.toBe(
+      duoBtn.getAttribute('aria-controls'),
+    );
+
+    // Open the Spotify popover with focus, then Escape closes and returns focus.
+    await act(async () => {
+      spotifyBtn.focus();
+      fireEvent.focus(spotifyBtn);
+    });
+    expect(spotifyBtn).toHaveAttribute('aria-expanded', 'true');
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await flushMicroAndTimers();
+    });
+    expect(spotifyBtn).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(spotifyBtn);
   });
 
   it('truncates a very long title so the row never breaks the hero (a11y label carries the full title)', async () => {

@@ -8,7 +8,7 @@ import type { SkillsById } from '../lib/skillsIndex';
  * `media_id` references to CDN URLs (§6.8).
  *
  * Live sections (`status`, `blog`, `now_playing`) accept the same props but
- * ignore them — their data is fetched at runtime, not read from the snapshot.
+ * ignore them - their data is fetched at runtime, not read from the snapshot.
  */
 export interface SectionProps {
   section: Section;
@@ -32,4 +32,11 @@ export interface SectionProps {
    * back to the same `es` default the section uses.
    */
   duolingoLanguage?: string;
+  /**
+   * The `score_label` field of the document's `duolingo` section (spec §3.5,
+   * v1.2), or `undefined` when none is published. The hero-strip popover renders
+   * it as a manual `TagChip` alongside the live values (task 129) so the strip's
+   * detail layer stays in sync with the standalone section's chip.
+   */
+  duolingoScoreLabel?: string;
 }

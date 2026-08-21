@@ -129,8 +129,14 @@ overflow; no tooltips in v1 (latest + min/max labels carry the information).
   a small `Instrument`. NOW PLAYING is an amber CSS equalizer glyph followed by
   the track title (or the last-played title, with a dim static glyph, when idle;
   the glyph stays visible even when the store is loading or has no last-played
-  track). DUOLINGO is the streak day count. Hover/tap detail is a separate
-  popover (task 129). No "SITE vN" item (dropped).
+  track). DUOLINGO is the streak day count. Richer detail (album art + artists
+  + progress meter for Spotify; course + XP + crowns + optional score chip for
+  Duolingo) is deferred to a shared `Popover` disclosure: on hover-capable
+  devices the panel opens on hover with a ~150ms intent delay (or on keyboard
+  focus) and closes on mouseleave, blur, or Escape; on touch the panel opens
+  on tap and closes on tap-outside, tap-again, or Escape. Escape always returns
+  focus to the trigger. When the underlying live data is unavailable no popover
+  is offered (no empty panels). No "SITE vN" item (dropped).
 - **about** — prose panel, 62ch measure; optional inline mono annotations.
 - **timeline** — vertical rail with amber node dots; date ranges in mono; media
   thumbnails in `MediaFrame` (hidden <640px if cramped).
