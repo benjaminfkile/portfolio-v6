@@ -450,6 +450,10 @@ function SkillFace({
       scale={[placement.size, placement.size, 1]}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation();
+        // The tooltip is a hover affordance for mouse/trackpad users. A touch
+        // "enters" a tile too (the finger is a pointer), which would flash the
+        // title under a thumb on phones, so touch pointers never set it.
+        if (e.nativeEvent.pointerType === 'touch') return;
         onHover(skill.id);
       }}
       onPointerOut={() => onHover(null)}
