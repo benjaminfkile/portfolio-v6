@@ -91,6 +91,8 @@
 
 .icon {
   flex: none;
+  width: 18px;
+  height: 18px;
   opacity: 0.85;
 }
 

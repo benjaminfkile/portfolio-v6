@@ -1,6 +1,6 @@
 import { useContentDocument } from '../lib/useContentDocument';
 import type { ContentDocument, Link } from '../types/content';
-import ContactIcon from './ContactIcon';
+import LinkIcon from './ui/LinkIcon';
 import styles from './SiteFooter.module.css';
 
 /**
@@ -12,7 +12,7 @@ import styles from './SiteFooter.module.css';
  * type is still how the admin stores the data (an optional body line plus an
  * ordered `Link[]`), but the page renderer ignores it and the footer renders
  * the first contact section found anywhere in the document: each link as an
- * icon + label anchor. No contact data, no row. The section's `heading` is
+ * icon + label anchor (the shared LinkIcon glyph set). No contact data, no row. The section's `heading` is
  * intentionally unused; a footer does not need one.
  *
  * The document comes from the same {@link useContentDocument} the nav and
@@ -41,7 +41,7 @@ export default function SiteFooter() {
                       href={link.url}
                       {...externalAttrs(link.url)}
                     >
-                      <ContactIcon type={link.type} className={styles.icon} />
+                      <LinkIcon type={link.type} className={styles.icon} />
                       <span>{link.label}</span>
                     </a>
                   </li>

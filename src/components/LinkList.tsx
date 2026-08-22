@@ -29,6 +29,11 @@ const GROUP_HEADINGS: Record<LinkType, string> = {
   demo: 'Demos',
   package: 'Packages',
   article: 'Articles',
+  phone: 'Phone',
+  email: 'Email',
+  linkedin: 'LinkedIn',
+  instagram: 'Instagram',
+  facebook: 'Facebook',
   other: 'Links',
 };
 
