@@ -219,6 +219,33 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
       'utf8',
     );
 
+    it('drops the ground overlay on a theme that has no image of its own', () => {
+      restores.push(mockReducedMotion(false));
+      const { container } = render(
+        <HeroSection
+          section={heroSection({
+            background_media_id: 'media-dark',
+            background: { overlay_light: 0.93 },
+          })}
+          media={{
+            'media-dark': {
+              url: 'https://media.benkile.com/dark.jpg',
+              alt: 'Night',
+            },
+          }}
+        />,
+      );
+      const backdrop = container.querySelector(`.${heroStyles.backdrop}`)!;
+      expect(backdrop).toHaveAttribute('data-has-dark');
+      expect(backdrop).not.toHaveAttribute('data-has-light');
+      expect(HERO_CSS).toMatch(
+        /:root\[data-theme=['"]light['"]\]\s+\.backdrop:not\(\[data-has-light\]\)::after[^}]*display:\s*none/,
+      );
+      expect(HERO_CSS).toMatch(
+        /\.backdrop:not\(\[data-has-dark\]\)::after[^}]*display:\s*none/,
+      );
+    });
+
     it('switches per-theme backdrop variants purely in CSS', () => {
       // CSS does the theme switch: light hidden by default, shown (and dark hidden) on light.
       expect(HERO_CSS).toMatch(

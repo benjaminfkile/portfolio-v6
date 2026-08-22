@@ -34,6 +34,21 @@
   opacity: var(--hero-bg-overlay-light, 0);
 }
 
+/* The overlay exists to soften an image. A theme with no image of its own
+   (data-has-dark / data-has-light absent) gets no overlay either, so the hero
+   stays transparent and the page grid shows through. */
+.backdrop:not([data-has-dark])::after {
+  display: none;
+}
+
+:root[data-theme='light'] .backdrop:not([data-has-light])::after {
+  display: none;
+}
+
+:root[data-theme='light'] .backdrop[data-has-light]::after {
+  display: block;
+}
+
 .backdropImg {
   width: 100%;
   height: 100%;

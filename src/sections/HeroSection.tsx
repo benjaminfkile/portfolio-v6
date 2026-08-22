@@ -124,7 +124,12 @@ export default function HeroSection({
   return (
     <div className={styles.wrap}>
       {(background || lightBackground) && (
-        <div className={styles.backdrop} style={backdropVars}>
+        <div
+          className={styles.backdrop}
+          style={backdropVars}
+          data-has-dark={background ? '' : undefined}
+          data-has-light={lightBackground ? '' : undefined}
+        >
           {background && (
             <img
               className={styles.backdropImg}
