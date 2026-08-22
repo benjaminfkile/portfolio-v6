@@ -91,7 +91,9 @@ describe('BlogIndexPage (spec §3.5, §4.1)', () => {
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
   });
 
-  it('filters by tag, refetching the list scoped to the chosen tag', async () => {
+  // Tag filter row is hidden for now (owner request 2026-08-21); the behaviour
+  // test is skipped, not deleted, so it returns with the row.
+  it.skip('filters by tag, refetching the list scoped to the chosen tag', async () => {
     const fetchMock = vi.fn((path: string) =>
       Promise.resolve(
         path.includes('tag=react')
@@ -120,6 +122,18 @@ describe('BlogIndexPage (spec §3.5, §4.1)', () => {
       String(c[0]).includes('tag=react'),
     );
     expect(tagged).toBeTruthy();
+  });
+
+  it('renders no tag filter row while it is hidden (card chips still show)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(jsonResponse({ posts: fixturePostSummaries, next_cursor: null })),
+      ),
+    );
+    renderIndex();
+    await screen.findByText('First post');
+    expect(screen.queryByRole('navigation', { name: /filter posts by tag/i })).toBeNull();
   });
 
   it('renders a blog-name chip on cards (none when null) and a blog filter that round-trips through the URL', async () => {

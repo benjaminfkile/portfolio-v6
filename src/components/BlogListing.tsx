@@ -179,8 +179,15 @@ export default function BlogListing({ onError }: BlogListingProps = {}) {
       });
   };
 
+  // Kept wired (state, merge, fetch param) for when the filter row returns.
+  void setActiveTag;
+  void knownTags;
+
   return (
     <>
+      {/* Tag filter row hidden for now (owner request 2026-08-21). Restore by
+          uncommenting this block and the setActiveTag/knownTags voids below;
+          the fetch stays unscoped while activeTag is null.
       {knownTags.length > 0 && (
         <nav className={styles.filters} aria-label="Filter posts by tag">
           <button
@@ -204,6 +211,7 @@ export default function BlogListing({ onError }: BlogListingProps = {}) {
           ))}
         </nav>
       )}
+      */}
 
       {knownBlogs.length > 0 && (
         <nav className={styles.filters} aria-label="Filter posts by blog">
