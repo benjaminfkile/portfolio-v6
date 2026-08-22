@@ -738,6 +738,25 @@ export default function SkillSphereCanvas({
     return () => io.disconnect();
   }, []);
 
+  // iOS Safari only: `touch-action: none` on the wrapper is not enough there.
+  // A short way into a touch drag WebKit can still decide the gesture is a
+  // page scroll, fire `pointercancel` and stop delivering pointermove, so the
+  // sphere rotates briefly and then freezes until the finger is lifted. The
+  // one thing iOS honours reliably is a NON-passive touchmove listener that
+  // calls preventDefault while a drag is in progress. React registers touch
+  // handlers passively, hence the native listener. Desktop browsers never
+  // reach this path (no touch events), so the pointer handlers below are the
+  // whole story there and stay exactly as they were.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onTouchMove = (event: TouchEvent) => {
+      if (stateRef.current.dragging && event.cancelable) event.preventDefault();
+    };
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onTouchMove);
+  }, []);
+
   // 'always' whenever visible: the sphere spins/tweens unconditionally (the
   // reduced-motion exemption above), so there is no demand tier any more.
   const frameloop: 'always' | 'never' = !inView ? 'never' : 'always';
@@ -788,6 +807,9 @@ export default function SkillSphereCanvas({
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerLeave={endDrag}
+      /* iOS: a cancelled touch must release the drag state too, otherwise the
+         next touch starts from a stale lastX/lastY and jumps. */
+      onPointerCancel={endDrag}
     >
       <Canvas
         frameloop={frameloop}

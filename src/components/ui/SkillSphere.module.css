@@ -20,6 +20,11 @@
   border-radius: var(--r-m);
   overflow: hidden;
   touch-action: none; /* pointer-drag rotates instead of scrolling the page */
+  /* iOS Safari: a held finger would otherwise trigger the long-press callout
+     or text selection, which cancels the pointer mid-drag. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   cursor: grab;
 }
 
