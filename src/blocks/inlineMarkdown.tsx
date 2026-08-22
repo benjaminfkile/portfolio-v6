@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
+import SmartLink from '../components/ui/SmartLink';
 
 /**
  * The constrained inline-markdown renderer used by `paragraph`, `list`, and
@@ -14,8 +15,9 @@ import { Fragment, type ReactNode } from 'react';
  *
  * Two further guards on links: only `http`/`https` URLs become anchors, so a
  * `javascript:` (or `data:`) URL renders as its inert label text instead of a
- * clickable link; and every anchor opens off-site with `rel="noopener
- * noreferrer"` (§3.4), matching the shared `LinkList`.
+ * clickable link; and anchors go through the shared `SmartLink`, which keeps
+ * same-origin links in the page and opens everything else off-site with
+ * `rel="noopener noreferrer"` (§3.4), matching `LinkList`.
  */
 
 /** A link target is safe iff it is an absolute `http`/`https` URL (spec §3.4). */
@@ -97,14 +99,9 @@ function parse(text: string, keyPrefix: string): ReactNode[] {
           const inner = parse(label, `${keyPrefix}-${key}`);
           if (isSafeUrl(url)) {
             out.push(
-              <a
-                key={`${keyPrefix}-${key++}`}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <SmartLink key={`${keyPrefix}-${key++}`} href={url}>
                 {inner}
-              </a>,
+              </SmartLink>,
             );
           } else {
             // Unsafe protocol: drop the link, keep the label as inert text.

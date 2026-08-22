@@ -1,5 +1,6 @@
 import type { Link, LinkType } from '../types/content';
 import styles from './LinkList.module.css';
+import SmartLink from './ui/SmartLink';
 
 /**
  * Renders an ordered `Link[]` (spec §3.4). Reused by portfolio items and, one
@@ -11,8 +12,8 @@ import styles from './LinkList.module.css';
  * headings ("Repositories", "Live", "Docs"). Array order is display order and
  * is preserved both across and within groups. There is no cap on count.
  *
- * Every anchor opens in a new tab with `rel="noopener noreferrer"` — the links
- * point off-site and the content originates from admin writes (§3.4).
+ * Anchors go through `SmartLink`: links back into this site navigate in place,
+ * everything else opens in a new tab with `rel="noopener noreferrer"` (§3.4).
  */
 
 /** A flat row past this many links regroups by type (spec §3.4, "about four"). */
@@ -33,15 +34,9 @@ const GROUP_HEADINGS: Record<LinkType, string> = {
 
 function LinkAnchor({ link }: { link: Link }) {
   return (
-    <a
-      className={styles.link}
-      data-link-type={link.type}
-      href={link.url}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
+    <SmartLink className={styles.link} data-link-type={link.type} href={link.url}>
       {link.label}
-    </a>
+    </SmartLink>
   );
 }
 
