@@ -770,7 +770,16 @@ export default function SkillSphereCanvas({
     s.dragging = true;
     s.lastX = e.clientX;
     s.lastY = e.clientY;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // Mouse: capture on the wrapper so a drag that leaves the card keeps
+    // rotating. Touch: do NOT. A touch pointer is already implicitly captured
+    // by the element it went down on (the canvas), and iOS Safari drops the
+    // gesture when that capture is re-targeted to an ancestor mid-touch: the
+    // sphere moved briefly and then froze until the finger lifted. Implicit
+    // capture already routes every move here via bubbling, and pointerleave
+    // cannot fire while it holds, so nothing else changes.
+    if (e.pointerType !== 'touch') {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -795,7 +804,9 @@ export default function SkillSphereCanvas({
     const s = stateRef.current;
     if (!s.dragging) return;
     s.dragging = false;
-    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    }
   };
 
   return (
