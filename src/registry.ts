@@ -15,7 +15,6 @@ import DuolingoSection from './sections/DuolingoSection';
 import GithubSection from './sections/GithubSection';
 import OpsSection from './sections/OpsSection';
 import ResumeSection from './sections/ResumeSection';
-import ContactSection from './sections/ContactSection';
 
 import HeadingBlock from './blocks/HeadingBlock';
 import ParagraphBlock from './blocks/ParagraphBlock';
@@ -53,7 +52,10 @@ export const SECTION_REGISTRY = {
   github: GithubSection,
   ops: OpsSection,
   resume: ResumeSection,
-  contact: ContactSection,
+  // Contact is rendered by SiteFooter, not in the page flow (2026-08-22). The
+  // type stays registered so a document that carries one renders nothing here
+  // instead of logging an unknown-section warning.
+  contact: () => null,
 } satisfies Record<SectionType, ComponentType<SectionProps>>;
 
 /**

@@ -174,11 +174,9 @@ describe('ContentPage', () => {
     const repoLink = screen.getByRole('link', { name: 'portfolio-v6' });
     expect(repoLink).toHaveAttribute('href', 'https://github.com/example/portfolio-v6');
 
-    // contact — mailto link.
-    expect(screen.getByRole('link', { name: 'hello@benkile.com' })).toHaveAttribute(
-      'href',
-      'mailto:hello@benkile.com',
-    );
+    // contact renders in the footer (SiteFooter), never in the page flow.
+    expect(screen.queryByRole('link', { name: 'hello@benkile.com' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Get in touch')).not.toBeInTheDocument();
   });
 
   it('renders the three live sections from their own runtime fetches (§3.5)', async () => {

@@ -32,6 +32,11 @@ export type LinkType =
   | 'demo'
   | 'package'
   | 'article'
+  | 'phone'
+  | 'email'
+  | 'linkedin'
+  | 'instagram'
+  | 'facebook'
   | 'other';
 
 export interface Link {

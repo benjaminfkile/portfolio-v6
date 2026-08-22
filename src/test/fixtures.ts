@@ -136,7 +136,7 @@ const homeSections: ContentDocument['pages'][number]['sections'] = [
         body: 'Reach out any time.',
         links: [
           {
-            type: 'other',
+            type: 'email',
             label: 'hello@benkile.com',
             url: 'mailto:hello@benkile.com',
           },
