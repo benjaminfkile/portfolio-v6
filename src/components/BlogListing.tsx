@@ -20,7 +20,13 @@ import styles from './BlogListing.module.css';
  * `onError` and render nothing instead (§3.5 degrade).
  */
 
-type Status = 'loading' | 'loadingMore' | 'ready' | 'error';
+/**
+ * `loading` is the first fetch only (nothing to show yet). A filter change
+ * refetches as `refreshing`: the previous cards stay mounted and dimmed until
+ * the new page lands, so the listing never collapses to a one-line
+ * "Loading…" (which yanked the footer up into the viewport mid-fetch).
+ */
+type Status = 'loading' | 'refreshing' | 'loadingMore' | 'ready' | 'error';
 
 export interface BlogListingProps {
   /**
@@ -126,11 +132,12 @@ export default function BlogListing({ onError }: BlogListingProps = {}) {
     );
   };
 
-  // Initial load and every tag / blog change: reset and fetch the first page.
+  // Initial load and every tag / blog change: fetch the first page. On a
+  // filter change the stale list stays rendered (stale-while-revalidate) and
+  // is swapped in one commit when the new page arrives.
   useEffect(() => {
     const controller = new AbortController();
-    setStatus('loading');
-    setPosts([]);
+    setStatus((prev) => (prev === 'loading' ? 'loading' : 'refreshing'));
     setCursor(null);
 
     getPosts(
@@ -146,6 +153,7 @@ export default function BlogListing({ onError }: BlogListingProps = {}) {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
+        setPosts([]);
         setStatus('error');
         console.error('Failed to load posts', error);
         onError?.();
@@ -232,7 +240,7 @@ export default function BlogListing({ onError }: BlogListingProps = {}) {
       )}
 
       {posts.length > 0 && (
-        <ul className={styles.list}>
+        <ul className={styles.list} aria-busy={status === 'refreshing'}>
           {posts.map((post) => (
             <TeaserCard key={post.slug} post={post} />
           ))}
@@ -243,7 +251,7 @@ export default function BlogListing({ onError }: BlogListingProps = {}) {
         <p role="alert">Sorry — more posts could not be loaded right now.</p>
       )}
 
-      {cursor && (
+      {cursor && status !== 'refreshing' && (
         <button
           type="button"
           className={styles.loadMore}
