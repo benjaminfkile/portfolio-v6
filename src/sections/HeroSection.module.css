@@ -52,6 +52,27 @@
   opacity: var(--hero-bg-opacity-light, 0.06);
 }
 
+/* Per-theme backdrops. When the hero carries a light-theme image the renderer
+   tags both <img>s with data-variant; only the one matching the active theme
+   is displayed (a lone default image has no data-variant and serves both).
+   The images stack in the same .backdrop, so they overlap rather than flow. */
+.backdropImg[data-variant] {
+  position: absolute;
+  inset: 0;
+}
+
+.backdropImg[data-variant='light'] {
+  display: none;
+}
+
+:root[data-theme='light'] .backdropImg[data-variant='light'] {
+  display: block;
+}
+
+:root[data-theme='light'] .backdropImg[data-variant='dark'] {
+  display: none;
+}
+
 /* The hero header block sits above the backdrop, and carries the horizontal +
    vertical inset from the backdrop edge so the eyebrow/headline/intro never
    touch the image's rounded corners. Padding is present with or without a
