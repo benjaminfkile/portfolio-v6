@@ -122,7 +122,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     expect(screen.getByAltText('Day')).toHaveAttribute('data-variant', 'light');
   });
 
-  it('leaves the lone default image untagged so it serves both themes', () => {
+  it('tags a lone dark image so it renders on the dark theme only', () => {
     restores.push(mockReducedMotion(false));
 
     render(
@@ -137,7 +137,7 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
       />,
     );
 
-    expect(screen.getByAltText('Only')).not.toHaveAttribute('data-variant');
+    expect(screen.getByAltText('Only')).toHaveAttribute('data-variant', 'dark');
   });
 
   it('inset-pads the text container without a backdrop, so the layout does not jump', () => {

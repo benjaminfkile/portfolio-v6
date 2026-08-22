@@ -52,9 +52,8 @@
   opacity: var(--hero-bg-opacity-light, 0.06);
 }
 
-/* Per-theme backdrops. When the hero carries a light-theme image the renderer
-   tags both <img>s with data-variant; only the one matching the active theme
-   is displayed (a lone default image has no data-variant and serves both).
+/* Per-theme backdrops. Each <img> is tagged data-variant (dark | light) and
+   only the one matching the active theme is displayed; either may be absent.
    The images stack in the same .backdrop, so they overlap rather than flow. */
 .backdropImg[data-variant] {
   position: absolute;

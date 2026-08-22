@@ -106,10 +106,12 @@ export default function HeroSection({
   const background = data.background_media_id
     ? media[data.background_media_id]
     : undefined;
-  // Optional light-theme variant. When present the dark image is tagged
-  // `data-variant="dark"` and the light one `data-variant="light"`; the CSS
-  // module shows whichever matches :root[data-theme] (no JS theme coupling).
-  // Absent, the single default image serves both themes exactly as before.
+  // Per-theme backdrops, each optional and independent: `background_media_id`
+  // renders on the dark theme only, `background_light_media_id` on the light
+  // theme only. Both <img>s are tagged data-variant and the CSS module shows
+  // whichever matches :root[data-theme] (no JS theme coupling). Either slot may
+  // be empty (that theme then has no backdrop); the same asset in both slots
+  // gives a shared image.
   const lightBackground = data.background_light_media_id
     ? media[data.background_light_media_id]
     : undefined;
@@ -126,7 +128,7 @@ export default function HeroSection({
           {background && (
             <img
               className={styles.backdropImg}
-              data-variant={lightBackground ? 'dark' : undefined}
+              data-variant="dark"
               src={background.url}
               alt={background.alt ?? ''}
               loading="lazy"
