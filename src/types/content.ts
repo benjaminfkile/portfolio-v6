@@ -186,13 +186,16 @@ export interface HeroBackground {
 /**
  * The `hero` section's published config (spec §3.4). Optional header copy plus
  * an optional {@link HeroBackground} tuning blob for the CMS backdrop image
- * referenced by `background_media_id` (task 132).
+ * referenced by `background_media_id` (task 132). `background_light_media_id`
+ * optionally swaps in a different image on the light theme; absent, the default
+ * image serves both themes.
  */
 export interface HeroSectionData {
   title?: string;
   tagline?: string;
   intro?: string;
   background_media_id?: string;
+  background_light_media_id?: string;
   background?: HeroBackground;
 }
 

@@ -85,10 +85,12 @@ function backdropStyle(bg?: HeroBackground): BackdropStyle | undefined {
   if (scale !== undefined) s['--hero-bg-scale'] = String(scale);
 
   const overlayDark = clampNum(bg.overlay_dark, 0, 1);
-  if (overlayDark !== undefined) s['--hero-bg-overlay-dark'] = String(overlayDark);
+  if (overlayDark !== undefined)
+    s['--hero-bg-overlay-dark'] = String(overlayDark);
 
   const overlayLight = clampNum(bg.overlay_light, 0, 1);
-  if (overlayLight !== undefined) s['--hero-bg-overlay-light'] = String(overlayLight);
+  if (overlayLight !== undefined)
+    s['--hero-bg-overlay-light'] = String(overlayLight);
 
   return Object.keys(s).length > 0 ? s : undefined;
 }
@@ -104,6 +106,13 @@ export default function HeroSection({
   const background = data.background_media_id
     ? media[data.background_media_id]
     : undefined;
+  // Optional light-theme variant. When present the dark image is tagged
+  // `data-variant="dark"` and the light one `data-variant="light"`; the CSS
+  // module shows whichever matches :root[data-theme] (no JS theme coupling).
+  // Absent, the single default image serves both themes exactly as before.
+  const lightBackground = data.background_light_media_id
+    ? media[data.background_light_media_id]
+    : undefined;
   const backdropVars = backdropStyle(data.background);
 
   const shellClass = [styles.hero, reduced ? undefined : styles.animated]
@@ -112,15 +121,28 @@ export default function HeroSection({
 
   return (
     <div className={styles.wrap}>
-      {background && (
+      {(background || lightBackground) && (
         <div className={styles.backdrop} style={backdropVars}>
-          <img
-            className={styles.backdropImg}
-            src={background.url}
-            alt={background.alt ?? ''}
-            loading="lazy"
-            decoding="async"
-          />
+          {background && (
+            <img
+              className={styles.backdropImg}
+              data-variant={lightBackground ? 'dark' : undefined}
+              src={background.url}
+              alt={background.alt ?? ''}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+          {lightBackground && (
+            <img
+              className={styles.backdropImg}
+              data-variant="light"
+              src={lightBackground.url}
+              alt={lightBackground.alt ?? ''}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
         </div>
       )}
       <SectionShell

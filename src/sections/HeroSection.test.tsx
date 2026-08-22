@@ -93,6 +93,53 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
     expect(img).toHaveAttribute('src', 'https://media.benkile.com/hero.jpg');
   });
 
+  it('renders a tagged light-theme variant alongside the default when background_light_media_id is set', () => {
+    restores.push(mockReducedMotion(false));
+
+    render(
+      <HeroSection
+        section={heroSection({
+          background_media_id: 'media-dark',
+          background_light_media_id: 'media-light',
+        })}
+        media={{
+          'media-dark': {
+            url: 'https://media.benkile.com/dark.jpg',
+            alt: 'Night',
+          },
+          'media-light': {
+            url: 'https://media.benkile.com/light.jpg',
+            alt: 'Day',
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByAltText('Night')).toHaveAttribute(
+      'data-variant',
+      'dark',
+    );
+    expect(screen.getByAltText('Day')).toHaveAttribute('data-variant', 'light');
+  });
+
+  it('leaves the lone default image untagged so it serves both themes', () => {
+    restores.push(mockReducedMotion(false));
+
+    render(
+      <HeroSection
+        section={heroSection({ background_media_id: 'media-hero' })}
+        media={{
+          'media-hero': {
+            url: 'https://media.benkile.com/hero.jpg',
+            alt: 'Only',
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByAltText('Only')).not.toHaveAttribute('data-variant');
+  });
+
   it('inset-pads the text container without a backdrop, so the layout does not jump', () => {
     restores.push(mockReducedMotion(false));
 
@@ -171,6 +218,19 @@ describe('HeroSection (DESIGN.md §5, §6)', () => {
       resolve(process.cwd(), 'src/sections/HeroSection.module.css'),
       'utf8',
     );
+
+    it('switches per-theme backdrop variants purely in CSS', () => {
+      // CSS does the theme switch: light hidden by default, shown (and dark hidden) on light.
+      expect(HERO_CSS).toMatch(
+        /\.backdropImg\[data-variant=['"]light['"]\]\s*\{[^}]*display:\s*none/,
+      );
+      expect(HERO_CSS).toMatch(
+        /:root\[data-theme=['"]light['"]\]\s+\.backdropImg\[data-variant=['"]light['"]\][^}]*display:\s*block/,
+      );
+      expect(HERO_CSS).toMatch(
+        /:root\[data-theme=['"]light['"]\]\s+\.backdropImg\[data-variant=['"]dark['"]\][^}]*display:\s*none/,
+      );
+    });
 
     function renderWithBackground(background: unknown) {
       restores.push(mockReducedMotion(false));
