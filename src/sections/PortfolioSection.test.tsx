@@ -297,6 +297,8 @@ describe('PortfolioSection — Skill Refs v1.8', () => {
     // 'Vercel' carries a dark override → two imgs (CSS-swapped) share the alt.
     expect(screen.getAllByAltText('Vercel')).toHaveLength(2);
     expect(screen.getByAltText('TypeScript')).toBeInTheDocument();
+    // Each chip names its skill for the hover tooltip (CSS reads data-tip).
+    expect(screen.getByAltText('TypeScript').closest('li')).toHaveAttribute('data-tip', 'TypeScript');
 
     // Order follows skill_refs: the Vercel chip precedes the TypeScript chip.
     const chipList = container.querySelector(`.${styles.techIcons}`)!;

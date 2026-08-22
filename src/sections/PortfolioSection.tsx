@@ -182,7 +182,11 @@ export default function PortfolioSection({
                   {resolvedSkills.length > 0 && (
                     <ul className={styles.techIcons}>
                       {resolvedSkills.map(({ id, skill }, i) => (
-                        <li key={`${id}-${i}`}>
+                        <li
+                          key={`${id}-${i}`}
+                          className={styles.techItem}
+                          data-tip={skill.title}
+                        >
                           <TagChip className={styles.techChip}>
                             {/* No className: SkillIcon's own .icon already sizes
                                 the glyph, and a merged class that sets `display`

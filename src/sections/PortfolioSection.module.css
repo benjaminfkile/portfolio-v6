@@ -241,3 +241,47 @@
     margin-bottom: auto;
   }
 }
+
+/* Skill chip tooltip (2026-08-22): hovering a skill icon names it, in the same
+   instrument voice as the sphere's tooltip. Pure CSS off a data-tip attribute
+   so it costs no JS and no focus stop (the img alt already carries the name
+   for assistive tech). Hover-capable pointers only: on touch a tapped chip
+   would otherwise hold a sticky :hover tooltip. */
+.techItem {
+  position: relative;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .techItem::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + var(--space-1));
+    transform: translateX(-50%) translateY(2px);
+    padding: var(--space-1) var(--space-2);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-s);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: var(--fs-label);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--ls-label);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms ease, transform 120ms ease;
+    z-index: 2;
+  }
+
+  .techItem:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .techItem::after {
+    transition: none;
+  }
+}
