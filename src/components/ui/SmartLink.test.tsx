@@ -20,6 +20,18 @@ describe('internalPath', () => {
     expect(internalPath(`${ORIGIN.replace(/:\d+$/, '')}:9999/x`)).toBeNull();
   });
 
+  it('treats the apex domain and its www. form as the same site', () => {
+    // jsdom origin is http://localhost:3000; build the apex/www pair from it.
+    const host = window.location.hostname;
+    const port = window.location.port;
+    expect(internalPath(`http://www.${host}:${port}/blog/p`)).toBe('/blog/p');
+  });
+
+  it('ignores scheme when deciding whether a link is internal', () => {
+    const httpsSame = `https://${window.location.host}/blog/p`;
+    expect(internalPath(httpsSame)).toBe('/blog/p');
+  });
+
   it('returns null for an unparseable URL', () => {
     expect(internalPath('http://')).toBeNull();
   });

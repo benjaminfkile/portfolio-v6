@@ -37,8 +37,21 @@ export function internalPath(url: string): string | null {
   } catch {
     return null;
   }
-  if (parsed.origin !== window.location.origin) return null;
+  if (!sameSite(parsed, window.location)) return null;
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+/**
+ * Same site = same host once a leading `www.` is ignored on both sides, and
+ * same port. The apex domain and its `www.` form are conventionally one site
+ * (one usually redirects to the other), so a content link written against
+ * either should count as internal whichever one the app is being served from.
+ * Scheme is deliberately not compared: an `http://` link to an `https://` site
+ * is still this site, and react-router navigation stays on the current scheme.
+ */
+function sameSite(a: { hostname: string; port: string }, b: { hostname: string; port: string }): boolean {
+  const strip = (host: string) => host.toLowerCase().replace(/^www\./, '');
+  return strip(a.hostname) === strip(b.hostname) && a.port === b.port;
 }
 
 interface SmartLinkProps {
