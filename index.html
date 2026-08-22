@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ben Kile</title>
     <!--
+      Site icon ("bk" in Plex Mono on a panel tile, DESIGN.md §2). The .ico at
+      the root is what Google uses for the search-result icon; the SVG wins in
+      modern tabs; the 180px PNG is for iOS home screens.
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
       No-flash theme: stamp data-theme on <html> from localStorage, falling back
       to prefers-color-scheme, BEFORE first paint (DESIGN.md §2). Dark is native.
     -->
