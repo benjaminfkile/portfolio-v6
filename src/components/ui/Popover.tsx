@@ -16,7 +16,7 @@ import styles from './Popover.module.css';
 /**
  * Popover - the shared disclosure primitive behind the hero strip's Spotify and
  * Duolingo detail layers (task 129, DESIGN.md §5). Strip items stay deliberately
- * minimal; richer information (art, artists, progress meter, XP, crowns) appears
+ * minimal; richer information (art, artists, progress meter, XP) appears
  * only when the visitor interacts.
  *
  * Two interaction models by device (no hover-only affordance - see DESIGN.md §3):

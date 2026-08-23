@@ -46,7 +46,7 @@ const nowPlaying: NowPlayingResponse = {
 const duolingo: DuolingoResponse = {
   available: true,
   streak: 847,
-  course: { title: 'Spanish', xp: 48210, crowns: 155 },
+  total_xp: 52_400, course: { title: 'Spanish', xp: 48210 },
 };
 
 const github: GithubResponse = fixtureGithub;

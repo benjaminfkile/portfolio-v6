@@ -10,7 +10,7 @@ import styles from './DuolingoSection.module.css';
 /**
  * The live `duolingo` section (spec §3.5, DESIGN.md §5, v1.2) — an `Instrument`
  * pair: STREAK (a mono amber count with a `days` label) and the course readout
- * (course title, XP in `tabular-nums`, crowns dim). Its *config* is published in
+ * (course title, account-wide XP in `tabular-nums`, the course's own XP dim; crowns are gone, Duolingo retired them). Its *config* is published in
  * the snapshot (`language`, an optional manual `score_label`); its *data* is
  * fetched at runtime from `GET /api/duolingo?language=<language>`.
  *
@@ -37,7 +37,7 @@ export default function DuolingoSection({ section }: SectionProps) {
   // low-stakes by construction, so an unavailable section simply isn't there.
   if (state.status !== 'ready') return null;
 
-  const { streak, course } = state.data;
+  const { streak, total_xp, course } = state.data;
 
   return (
     <SectionShell
@@ -64,9 +64,11 @@ export default function DuolingoSection({ section }: SectionProps) {
             value={
               <span className={styles.courseValue}>
                 <span className={styles.xp}>
-                  {course.xp.toLocaleString('en-US')} XP
+                  {total_xp.toLocaleString('en-US')} XP
                 </span>
-                <span className={styles.crowns}>{course.crowns} crowns</span>
+                <span className={styles.crowns}>
+                  {course.xp.toLocaleString('en-US')} in {course.title}
+                </span>
               </span>
             }
           />

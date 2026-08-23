@@ -114,7 +114,7 @@ function stubApi() {
         jsonResponse({
           available: true,
           streak: 1234,
-          course: { title: 'Spanish', xp: 99999, crowns: 200 },
+          total_xp: 123_456, course: { title: 'Spanish', xp: 99999 },
         }),
       );
     }

@@ -243,7 +243,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
         duolingo: {
           available: true,
           streak: 412,
-          course: { title: 'Spanish', xp: 48_210, crowns: 155 },
+          total_xp: 52_400, course: { title: 'Spanish', xp: 48_210 },
         },
       }),
     );
@@ -268,7 +268,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     expect(container.querySelector(`.${styles.streakUnit}`)?.textContent).toBe(
       'days',
     );
-    // Strip-level detail rule: no course, XP, crowns, or manual score chip.
+    // Strip-level detail rule: no course, XP, or manual score chip.
     expect(screen.queryByText(/Spanish/)).toBeNull();
     expect(screen.queryByText(/XP/i)).toBeNull();
     expect(screen.queryByText(/crowns/i)).toBeNull();
@@ -322,7 +322,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
       duolingo: {
         available: true,
         streak: 5,
-        course: { title: 'French', xp: 100, crowns: 1 },
+        total_xp: 100, course: { title: 'French', xp: 100 },
       },
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -478,7 +478,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('Duolingo popover: ready → tooltip shows streak + course XP + crowns; score chip when configured', async () => {
+  it('Duolingo popover: ready → tooltip shows streak + total XP + course XP; score chip when configured', async () => {
     restores.push(mockHoverable(true));
     vi.stubGlobal(
       'fetch',
@@ -486,7 +486,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
         duolingo: {
           available: true,
           streak: 412,
-          course: { title: 'Spanish', xp: 48_210, crowns: 155 },
+          total_xp: 52_400, course: { title: 'Spanish', xp: 48_210 },
         },
       }),
     );
@@ -512,10 +512,11 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     const panel = screen.getByRole('tooltip', {
       name: /Duolingo detail/,
     });
-    // Course title + XP with tabular-nums formatting + crowns line.
+    // Course title + total XP with tabular-nums formatting + course XP line.
     expect(panel).toHaveTextContent('Spanish');
-    expect(panel).toHaveTextContent('48,210 XP');
-    expect(panel).toHaveTextContent('155 crowns');
+    expect(panel).not.toHaveTextContent('48,210 XP');
+    expect(panel).toHaveTextContent('52,400 XP');
+    expect(panel).toHaveTextContent('48,210 in Spanish');
     // Streak count also appears in the popover (mono amber emphasis).
     expect(panel).toHaveTextContent('412');
     // The manual score chip renders when the published section carries one.
@@ -530,7 +531,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
         duolingo: {
           available: true,
           streak: 10,
-          course: { title: 'French', xp: 100, crowns: 1 },
+          total_xp: 100, course: { title: 'French', xp: 100 },
         },
       }),
     );
@@ -558,7 +559,7 @@ describe('HeroStrip (DESIGN.md §5)', () => {
         duolingo: {
           available: true,
           streak: 12,
-          course: { title: 'Spanish', xp: 100, crowns: 1 },
+          total_xp: 100, course: { title: 'Spanish', xp: 100 },
         },
       }),
     );

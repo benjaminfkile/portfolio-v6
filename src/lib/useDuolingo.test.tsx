@@ -34,7 +34,7 @@ describe('useDuolingo — shared per-language cache', () => {
       jsonResponse({
         available: true,
         streak: 412,
-        course: { title: 'Spanish', xp: 48_210, crowns: 155 },
+        total_xp: 52_400, course: { title: 'Spanish', xp: 48_210 },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -65,7 +65,7 @@ describe('useDuolingo — shared per-language cache', () => {
       jsonResponse({
         available: true,
         streak: 100,
-        course: { title: 'Spanish', xp: 1, crowns: 1 },
+        total_xp: 1, course: { title: 'Spanish', xp: 1 },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -104,7 +104,7 @@ describe('useDuolingo — shared per-language cache', () => {
         jsonResponse({
           available: true,
           streak,
-          course: { title: 'C', xp: 1, crowns: 1 },
+          total_xp: 1, course: { title: 'C', xp: 1 },
         }),
       );
     });

@@ -23,7 +23,7 @@ function renderDuolingo(data: Record<string, unknown>) {
 const available: DuolingoResponse = {
   available: true,
   streak: 847,
-  course: { title: 'Spanish', xp: 48210, crowns: 155 },
+  total_xp: 52_400, course: { title: 'Spanish', xp: 48210 },
 };
 
 afterEach(() => {
@@ -41,10 +41,11 @@ describe('DuolingoSection (spec §3.5, DESIGN.md §5)', () => {
     expect(await screen.findByText('847')).toBeInTheDocument();
     expect(screen.getByText('days')).toBeInTheDocument();
 
-    // Course readout: title as the Instrument label, XP tabular-nums, crowns dim.
+    // Course readout: title as the Instrument label, total XP tabular-nums, course XP dim.
     expect(screen.getByText('Spanish')).toBeInTheDocument();
-    expect(screen.getByText('48,210 XP')).toBeInTheDocument();
-    expect(screen.getByText('155 crowns')).toBeInTheDocument();
+    expect(screen.queryByText('48,210 XP')).not.toBeInTheDocument();
+    expect(screen.getByText('52,400 XP')).toBeInTheDocument();
+    expect(screen.getByText('48,210 in Spanish')).toBeInTheDocument();
   });
 
   it('passes the configured language as the ?language= query param', async () => {

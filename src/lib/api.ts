@@ -183,8 +183,8 @@ export function getNowPlaying(init?: RequestInit): Promise<NowPlayingResponse> {
 /** The curated course readout returned by `/api/duolingo` (spec §3.5). */
 export interface DuolingoCourse {
   title: string;
+  /** XP earned in this course only. */
   xp: number;
-  crowns: number;
 }
 
 /**
@@ -196,7 +196,9 @@ export interface DuolingoCourse {
  * not exposed here; the section's manual `score_label` config carries it.
  */
 export type DuolingoResponse =
-  | { available: true; streak: number; course: DuolingoCourse }
+  | { available: true; streak: number;
+      /** Account-wide XP, what the Duolingo app shows on the profile. */
+      total_xp: number; course: DuolingoCourse }
   | { available: false };
 
 /**

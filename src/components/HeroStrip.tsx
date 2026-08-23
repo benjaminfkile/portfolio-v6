@@ -27,7 +27,7 @@ import styles from './HeroStrip.module.css';
  * - Duolingo: subscribes to the shared {@link useDuolingo} cache (same fetch
  *     the standalone `duolingo` section uses when both are on the page). Renders
  *     ONLY the streak count as its value ("N days", tabular-nums) - course, XP,
- *     crowns, and the manual score chip belong to the standalone section and
+ *     and the manual score chip belong to the standalone section and
  *     the hover/tap detail layer, not the one-line strip. Loading, unavailable,
  *     or a failed fetch render nothing for the item so the strip never looks
  *     broken (§3.5 degrade).
@@ -37,7 +37,7 @@ import styles from './HeroStrip.module.css';
  * touch; Escape closes and returns focus to the trigger; the panel is styled
  * with the Panel tokens so it reads as a console readout. The strip items
  * themselves stay deliberately minimal - richer info (art, artists, progress
- * meter, XP, crowns, score chip) appears only inside the popover. When the
+ * meter, XP, score chip) appears only inside the popover. When the
  * data is unavailable the popover is simply not offered (no empty panels).
  *
  * The strip never renders as broken or errored (section 3.5 degrade rule).
@@ -249,7 +249,7 @@ function SpotifyLastPlayedBody({
 /**
  * The Duolingo strip item - a mono `DUOLINGO` label with the streak day count
  * as the value ("412 days", tabular-nums). Nothing else at strip level: course,
- * XP, crowns, and the manual score chip belong to the standalone section and
+ * XP, and the manual score chip belong to the standalone section and
  * the hover/tap detail layer. Renders nothing while loading, on `unavailable`,
  * or on a failed fetch (§3.5 degrade - the unofficial endpoint may break at
  * any time; the strip must never look broken).
@@ -300,7 +300,7 @@ function DuolingoPopoverBody({
   state: Extract<DuolingoState, { status: 'ready' }>;
   scoreLabel?: string;
 }) {
-  const { streak, course } = state.data;
+  const { streak, total_xp, course } = state.data;
   return (
     <div className={styles.duolingoBody}>
       <dl className={styles.duolingoStats}>
@@ -315,10 +315,10 @@ function DuolingoPopoverBody({
           <dt className={styles.duolingoLabel}>{course.title}</dt>
           <dd className={styles.duolingoValue}>
             <span className={styles.duolingoXp}>
-              {course.xp.toLocaleString('en-US')} XP
+              {total_xp.toLocaleString('en-US')} XP
             </span>
             <span className={styles.duolingoCrowns}>
-              {course.crowns} crowns
+              {course.xp.toLocaleString('en-US')} in {course.title}
             </span>
           </dd>
         </div>
