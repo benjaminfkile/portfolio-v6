@@ -317,9 +317,6 @@ function DuolingoPopoverBody({
             <span className={styles.duolingoXp}>
               {total_xp.toLocaleString('en-US')} XP
             </span>
-            <span className={styles.duolingoCrowns}>
-              {course.xp.toLocaleString('en-US')} in {course.title}
-            </span>
           </dd>
         </div>
       </dl>

@@ -32,7 +32,7 @@
 
 /* Duolingo streak value: an amber tabular-nums count and a dim mono "days"
    unit sitting on the same value line. Mirrors the standalone DuolingoSection
-   voice at strip scale (no course, XP, or crowns - those live in the popover). */
+   voice at strip scale (no course or XP - those live in the popover). */
 .streak {
   display: inline-flex;
   align-items: baseline;
@@ -125,7 +125,7 @@
 /* ---- Duolingo popover body ------------------------------------------------ */
 /*
  * A two-row instrument stack - STREAK (mono amber count + dim "days" unit) and
- * the course (title + XP in tabular-nums + dim crowns) - plus an optional
+ * the course (title + XP in tabular-nums) - plus an optional
  * manual score TagChip that mirrors the standalone section's chip. `dl` markup
  * so screen readers pair each label with its value.
  */
@@ -187,10 +187,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.duolingoCrowns {
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
 
 .duolingoScore {
   margin: 0;

@@ -66,9 +66,6 @@ export default function DuolingoSection({ section }: SectionProps) {
                 <span className={styles.xp}>
                   {total_xp.toLocaleString('en-US')} XP
                 </span>
-                <span className={styles.crowns}>
-                  {course.xp.toLocaleString('en-US')} in {course.title}
-                </span>
               </span>
             }
           />

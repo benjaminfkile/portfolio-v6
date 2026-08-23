@@ -516,7 +516,6 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     expect(panel).toHaveTextContent('Spanish');
     expect(panel).not.toHaveTextContent('48,210 XP');
     expect(panel).toHaveTextContent('52,400 XP');
-    expect(panel).toHaveTextContent('48,210 in Spanish');
     // Streak count also appears in the popover (mono amber emphasis).
     expect(panel).toHaveTextContent('412');
     // The manual score chip renders when the published section carries one.

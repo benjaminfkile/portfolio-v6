@@ -46,7 +46,7 @@
   color: var(--text-dim);
 }
 
-/* Course: XP is the live tabular-nums value; crowns sit quietly in --text-dim. */
+/* Course: XP is the live tabular-nums value (one number; crowns are retired). */
 .courseValue {
   display: inline-flex;
   align-items: baseline;
@@ -58,10 +58,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.crowns {
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
 
 /* The manual score wears a chip, not the mono live-value voice (DESIGN.md §5). */
 .score {

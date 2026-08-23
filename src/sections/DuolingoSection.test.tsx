@@ -45,7 +45,6 @@ describe('DuolingoSection (spec §3.5, DESIGN.md §5)', () => {
     expect(screen.getByText('Spanish')).toBeInTheDocument();
     expect(screen.queryByText('48,210 XP')).not.toBeInTheDocument();
     expect(screen.getByText('52,400 XP')).toBeInTheDocument();
-    expect(screen.getByText('48,210 in Spanish')).toBeInTheDocument();
   });
 
   it('passes the configured language as the ?language= query param', async () => {
