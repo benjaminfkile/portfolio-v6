@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import SmartLink, { internalPath } from './SmartLink';
+import SmartLink, { canonicalHosts, internalPath } from './SmartLink';
 
 // jsdom serves tests from http://localhost:3000 by default; that is "this site".
 const ORIGIN = window.location.origin;
@@ -34,6 +34,48 @@ describe('internalPath', () => {
 
   it('returns null for an unparseable URL', () => {
     expect(internalPath('http://')).toBeNull();
+  });
+});
+
+describe('internalPath on a non-canonical origin (preview deployment, localhost)', () => {
+  // jsdom serves tests from localhost, which is NOT the canonical host, so this
+  // is exactly the *.vercel.app situation: content links written against the
+  // production domain must still count as internal and resolve to a path on
+  // the current origin (never a jump to prod, never a new tab).
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('defaults the canonical host to benkile.com', () => {
+    vi.stubEnv('VITE_SITE_HOSTS', undefined as unknown as string);
+    expect(canonicalHosts()).toEqual(['benkile.com']);
+    expect(internalPath('https://benkile.com/blog/some-post?x=1#top')).toBe('/blog/some-post?x=1#top');
+    expect(internalPath('https://www.benkile.com/blog/some-post')).toBe('/blog/some-post');
+  });
+
+  it('honors VITE_SITE_HOSTS as a comma-separated list, ignoring www. and whitespace', () => {
+    vi.stubEnv('VITE_SITE_HOSTS', ' www.example.org, other.test ');
+    expect(canonicalHosts()).toEqual(['example.org', 'other.test']);
+    expect(internalPath('https://example.org/p')).toBe('/p');
+    expect(internalPath('https://www.other.test/q')).toBe('/q');
+    expect(internalPath('https://benkile.com/p')).toBeNull();
+  });
+
+  it('still treats unrelated hosts, and a canonical host on an explicit port, as off-site', () => {
+    expect(internalPath('https://example.com/blog/some-post')).toBeNull();
+    expect(internalPath('https://benkile.com:8443/blog/some-post')).toBeNull();
+    expect(internalPath('https://api.benkile.com/portfolio-v6-api/api/posts')).toBeNull();
+  });
+
+  it('renders a canonical-host link as in-place navigation inside a router', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <SmartLink href="https://benkile.com/blog/building-wisper">Building Wisper</SmartLink>
+      </MemoryRouter>,
+    );
+    const anchor = container.querySelector('a');
+    expect(anchor).toHaveAttribute('href', '/blog/building-wisper');
+    expect(anchor).not.toHaveAttribute('target');
   });
 });
 

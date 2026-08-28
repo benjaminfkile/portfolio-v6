@@ -9,9 +9,14 @@ import { Link, useInRouterContext } from 'react-router-dom';
  * pages of this very site, and those should behave like navigation, not like
  * an off-site link that pops a new tab.
  *
- * "Internal" is decided at render time against `window.location.origin`, so
- * nothing here hard-codes a hostname: the same build is internal-aware on any
- * domain it happens to be served from (prod, a preview deployment, localhost).
+ * "Internal" is decided at render time against `window.location.origin` PLUS
+ * the site's canonical host(s) (`VITE_SITE_HOSTS`, default `benkile.com`).
+ * Content links are authored against the canonical domain, so a link to
+ * `https://benkile.com/blog/x` must still navigate in place when the same
+ * build is served from a preview deployment (`*.vercel.app`) or localhost;
+ * before this, every such link looked off-site there and popped a new tab.
+ * A canonical-host link is rewritten to its path and navigates on the
+ * CURRENT origin, so a preview deployment never jumps to prod.
  *
  *  - Same-origin URL inside a router: a react-router `Link` to the path, so the
  *    SPA navigates without a reload and stays in the same tab.
@@ -37,7 +42,7 @@ export function internalPath(url: string): string | null {
   } catch {
     return null;
   }
-  if (!sameSite(parsed, window.location)) return null;
+  if (!sameSite(parsed, window.location) && !isCanonicalHost(parsed)) return null;
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
@@ -50,8 +55,32 @@ export function internalPath(url: string): string | null {
  * is still this site, and react-router navigation stays on the current scheme.
  */
 function sameSite(a: { hostname: string; port: string }, b: { hostname: string; port: string }): boolean {
-  const strip = (host: string) => host.toLowerCase().replace(/^www\./, '');
-  return strip(a.hostname) === strip(b.hostname) && a.port === b.port;
+  return stripWww(a.hostname) === stripWww(b.hostname) && a.port === b.port;
+}
+
+function stripWww(host: string): string {
+  return host.toLowerCase().replace(/^www\./, '');
+}
+
+const DEFAULT_SITE_HOSTS = 'benkile.com';
+
+/**
+ * The canonical public hostnames of this site, regardless of where the build
+ * is currently being served from. Comma-separated in `VITE_SITE_HOSTS`;
+ * defaults to the production domain. `www.` is ignored on both sides.
+ */
+export function canonicalHosts(): string[] {
+  const raw = (import.meta.env.VITE_SITE_HOSTS as string | undefined) ?? DEFAULT_SITE_HOSTS;
+  return raw
+    .split(',')
+    .map((h) => stripWww(h.trim()))
+    .filter(Boolean);
+}
+
+/** True when `url` points at one of the canonical hosts on the default port. */
+function isCanonicalHost(url: { hostname: string; port: string }): boolean {
+  if (url.port !== '') return false;
+  return canonicalHosts().includes(stripWww(url.hostname));
 }
 
 interface SmartLinkProps {
