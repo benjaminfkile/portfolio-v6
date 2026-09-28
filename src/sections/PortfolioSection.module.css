@@ -279,9 +279,3 @@
     transform: translateX(-50%) translateY(0);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .techItem::after {
-    transition: none;
-  }
-}

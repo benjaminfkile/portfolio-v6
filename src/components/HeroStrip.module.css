@@ -274,28 +274,8 @@
   }
 }
 
-/* Belt-and-suspenders with the JS hook: honour a machine-level reduced-motion
-   preference at the CSS layer too. On the owner's desktop (Windows animation
-   effects off) this collapses the live equalizer to the same static bars; call
-   it out in the PR description. */
-@media (prefers-reduced-motion: reduce) {
-  .eqLive .bar {
-    animation: none;
-    background: var(--text-dim);
-  }
-  .eqLive .bar[data-bar='0'] {
-    height: 30%;
-  }
-  .eqLive .bar[data-bar='1'] {
-    height: 55%;
-  }
-  .eqLive .bar[data-bar='2'] {
-    height: 40%;
-  }
-  .eqLive .bar[data-bar='3'] {
-    height: 60%;
-  }
-  .eqLive .bar[data-bar='4'] {
-    height: 35%;
-  }
-}
+/* No @media (prefers-reduced-motion) guard here: the site does not honor the
+   OS reduced-motion flag (owner decision, 2026-08-10; see
+   lib/prefersReducedMotion.ts). The flag reports "reduce" on machines with
+   Windows animation effects off, which froze the live equalizer to static
+   bars while a track was playing. */

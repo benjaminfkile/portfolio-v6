@@ -209,10 +209,11 @@ describe('HeroStrip (DESIGN.md §5)', () => {
     errSpy.mockRestore();
   });
 
-  it('reduced motion: even when a track is playing the equalizer renders static (JS hook path)', async () => {
-    // The JS hook path always renders `eqStatic` when reduced motion is on, so
-    // machines with the setting see calm bars regardless of state. The CSS
-    // @media guard is a belt-and-suspenders for the OS-level flag.
+  it('ignores an OS reduced-motion preference — the equalizer still animates (owner decision)', async () => {
+    // Reduced-motion is not honored site-wide (owner decision, 2026-08-10;
+    // lib/prefersReducedMotion.ts). Even with the OS flag on, a playing track
+    // renders the LIVE equalizer — there is no CSS @media guard either, so
+    // machines with Windows animation effects off see the bars bounce.
     restores.push(mockReducedMotion(true));
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(playing)));
 
@@ -226,12 +227,9 @@ describe('HeroStrip (DESIGN.md §5)', () => {
       screen.getByRole('listitem', { name: 'Now playing: Windowlicker' }),
     ).toBeInTheDocument();
 
-    // But under the site's current hook (which always reports motion allowed
-    // per owner decision, 2026-08-10) the eqLive class is still applied. The
-    // CSS @media guard neutralises the animation on such machines; assert only
-    // that the item is not broken and a glyph is present.
     const eq = container.querySelector(`.${styles.eq}`);
-    expect(eq).not.toBeNull();
+    expect(eq).toHaveClass(styles.eqLive);
+    expect(eq).not.toHaveClass(styles.eqStatic);
     expect(eq).toHaveAttribute('aria-hidden', 'true');
   });
 
